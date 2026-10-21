@@ -1,5 +1,6 @@
 import type { Assignment, DataResult } from '@shared/types'
-import { zjuSession } from '../auth/zjuam'
+import { hasCasCookie, zjuSession } from '../auth/zjuam'
+import { zjuFetch, type ZjuResponse } from '../http'
 
 const BASE = 'https://courses.zju.edu.cn'
 
@@ -17,10 +18,8 @@ interface TodosResponse {
   todo_list: Todo[]
 }
 
-async function request(url: string, accept: string): Promise<Response> {
-  const response = await zjuSession().fetch(url, {
-    credentials: 'include',
-    redirect: 'follow',
+async function request(url: string, accept: string): Promise<ZjuResponse> {
+  const response = await zjuFetch(url, {
     headers: { Accept: accept }
   })
 
@@ -60,7 +59,7 @@ async function login(): Promise<void> {
     const body = await response.text()
     const target = metaRefreshTarget(body, response.url)
 
-    // fetch 只自动跟随 HTTP 跳转，不执行 HTML meta-refresh。
+    // zjuFetch 只自动跟随 HTTP 跳转，不执行 HTML meta-refresh。
     if (target) {
       url = target
       continue
@@ -85,7 +84,12 @@ async function login(): Promise<void> {
   throw new Error('学在浙大登录失败：跳转次数过多')
 }
 
-export function ensureLogin(): Promise<void> {
+export async function ensureLogin(): Promise<void> {
+  if (!await hasCasCookie()) {
+    reset()
+    throw new Error('未登录')
+  }
+
   if (!loginPromise) {
     loginPromise = login().catch((error: unknown) => {
       loginPromise = undefined
@@ -107,7 +111,7 @@ async function fetchTodos(): Promise<TodosResponse> {
     throw new Error('学在浙大未登录')
   }
 
-  return response.json() as Promise<TodosResponse>
+  return response.json<TodosResponse>()
 }
 
 function toAssignment(todo: Todo): Assignment {

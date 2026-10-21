@@ -12,6 +12,22 @@ const NAV: { id: PageId; label: string }[] = [
 export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
   const { page, go, auth, authBusy, login, logout, theme, toggleTheme } = useApp()
   const [solid, setSolid] = useState(false)
+  // 退出需两次点击：第一次把名字换成"退出"，3 秒内再点才生效
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+
+  const onAuth = (): void => {
+    if (!auth.loggedIn) void login()
+    else if (armed) {
+      setArmed(false)
+      void logout()
+    } else setArmed(true)
+  }
 
   useEffect(() => {
     if (!scroller) return
@@ -36,8 +52,8 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
         ))}
       </nav>
       <div className="mast-meta">
-        <button disabled={authBusy} onClick={() => (auth.loggedIn ? logout() : login())}>
-          {auth.loggedIn ? (auth.user?.name ?? '已登录') : '登录'}
+        <button disabled={authBusy} onClick={onAuth} data-armed={armed || undefined} className="data-[armed]:text-[var(--shu)]">
+          {!auth.loggedIn ? '登录' : armed ? '退出' : (auth.user?.name ?? '已登录')}
         </button>
         <button onClick={toggleTheme} aria-label="切换昼夜" className="grid w-5 place-items-center">
           <AnimatePresence mode="popLayout" initial={false}>

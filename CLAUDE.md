@@ -13,6 +13,7 @@ ZJU All in One：聚合浙江大学学业信息（课表、考试、作业、智
 ```bash
 npm run dev                  # 开发模式
 ZJU_DEMO=1 npm run dev       # 演示数据模式：不登录即可调前端（数据通道全部换成 services/demo.ts）
+ZJU_DEBUG=1 npm run dev      # 主进程打印每个 zjuFetch 请求的最终落点、状态码与响应开头，用于对照真实接口
 npm run build                # 构建到 out/
 npm run typecheck            # node（main/preload/shared）与 web（renderer）两套 tsconfig
 ```
@@ -42,7 +43,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 
 - `auth/zjuam.ts` 只负责 CAS：弹出真实 `BrowserWindow` 让用户在 `zjuam.zju.edu.cn` 登录，cookie 存于持久分区 `persist:zju`，以 `iPlanetDirectoryPro` cookie 判定已登录。它**不得 import services**（避免循环依赖）。
 - 登录态组合在 `ipc.ts`：`auth:state` = 有 CAS cookie 时调 `zdbk.fetchProfile()` 取姓名（失败时 `user: null` 但仍算已登录）；`auth:logout` 清 cookie 后调用各 service 的 `reset()`。
-- 每个 service 自己维护一次性的 `ensureLogin()` 与 `reset()`，请求一律走 `zjuSession().fetch(url, { credentials: 'include' })`；重定向后不在目标站点即视为未登录，抛 `Error('未登录')`。渲染进程把这类错误显示为"登录后显示"。
+- 每个 service 自己维护一次性的 `ensureLogin()` 与 `reset()`，请求一律走 `src/main/http.ts` 的 `zjuFetch`。**不要用 `session.fetch`**：Electron 45 下它跟随跳转后 `response.url` 恒为空串，`redirect: 'manual'` 则直接抛错；`zjuFetch` 基于 `net.request` 的 `redirect` 事件记录最终 URL。重定向后不在目标站点即视为未登录，抛 `Error('未登录')`。渲染进程把这类错误显示为"登录后显示"。
 
 ### 数据源（未以登录态实测，字段处有"推测"注释）
 

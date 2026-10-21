@@ -18,6 +18,8 @@ export default defineConfig({
     resolve: {
       alias: { ...shared, '@renderer': resolve('src/renderer/src') }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    // 渲染端与主进程共用同一个 ZJU_DEMO 开关
+    define: { 'import.meta.env.VITE_ZJU_DEMO': JSON.stringify(process.env['ZJU_DEMO'] ?? '') }
   }
 })

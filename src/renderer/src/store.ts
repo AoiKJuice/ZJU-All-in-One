@@ -9,6 +9,8 @@ interface AppStore {
   theme: Theme
   auth: AuthState
   authBusy: boolean
+  /** 首次 auth:state 返回前为 false，数据 hook 等它再决定是否取数 */
+  authReady: boolean
   /** 每次登录状态变化 +1，数据 hook 据此重新拉取 */
   epoch: number
   go: (page: PageId) => void
@@ -23,7 +25,7 @@ export const useApp = create<AppStore>((set, get) => {
     set({ authBusy: true })
     try {
       const auth = await call()
-      set((s) => ({ auth, epoch: s.auth.loggedIn === auth.loggedIn ? s.epoch : s.epoch + 1 }))
+      set((s) => ({ auth, authReady: true, epoch: s.auth.loggedIn === auth.loggedIn ? s.epoch : s.epoch + 1 }))
     } finally {
       set({ authBusy: false })
     }
@@ -37,6 +39,7 @@ export const useApp = create<AppStore>((set, get) => {
     theme,
     auth: { loggedIn: false, user: null },
     authBusy: false,
+    authReady: false,
     epoch: 0,
     go: (page) => set({ page }),
     toggleTheme: () => {

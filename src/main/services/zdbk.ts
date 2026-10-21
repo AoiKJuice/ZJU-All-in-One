@@ -1,5 +1,6 @@
 import type { CourseSession, DataResult, Exam, UserProfile } from '@shared/types'
-import { zjuSession } from '../auth/zjuam'
+import { hasCasCookie } from '../auth/zjuam'
+import { zjuFetch, type ZjuResponse } from '../http'
 
 const BASE = 'https://zdbk.zju.edu.cn/jwglxt'
 // 推测：所给参考摘录未覆盖 SSO 地址。
@@ -70,7 +71,7 @@ function currentTerm(): { xnm: string; xqm: string } {
   return { xnm: `${startYear}-${startYear + 1}`, xqm }
 }
 
-function checkResponse(response: Response): void {
+function checkResponse(response: ZjuResponse): void {
   if (
     (response.status >= 300 && response.status < 400) ||
     new URL(response.url).origin !== new URL(BASE).origin
@@ -83,25 +84,22 @@ function checkResponse(response: Response): void {
 }
 
 async function ensureLogin(): Promise<void> {
+  if (!await hasCasCookie()) {
+    reset()
+    throw new Error('未登录')
+  }
   if (loggedIn) return
 
-  const response = await zjuSession().fetch(SSO_URL, {
-    credentials: 'include',
-    redirect: 'follow'
-  })
-
+  const response = await zjuFetch(SSO_URL)
   checkResponse(response)
-  await response.arrayBuffer()
   loggedIn = true
 }
 
 async function post<T>(path: string, fields?: Record<string, string>): Promise<T> {
   await ensureLogin()
 
-  const response = await zjuSession().fetch(`${BASE}${path}`, {
+  const response = await zjuFetch(`${BASE}${path}`, {
     method: 'POST',
-    credentials: 'include',
-    redirect: 'manual',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       'X-Requested-With': 'XMLHttpRequest',

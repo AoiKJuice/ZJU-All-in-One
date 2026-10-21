@@ -51,7 +51,7 @@ export function SectionHead({ title, note }: { title: string; note?: ReactNode }
 export function Quiet({ error, empty, loading }: { error: string | null; empty: string; loading: boolean }) {
   const { auth, login } = useApp()
   if (loading) return <p className="quiet">…</p>
-  if (!auth.loggedIn && error)
+  if (!auth.loggedIn && !import.meta.env.VITE_ZJU_DEMO)
     return (
       <p className="quiet">
         <button onClick={login}>登录</button>

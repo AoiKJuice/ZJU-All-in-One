@@ -1,19 +1,20 @@
 import type { DataResult, LectureReplay } from '@shared/types'
-import { zjuSession } from '../auth/zjuam'
+import { hasCasCookie, zjuSession } from '../auth/zjuam'
+import { zjuFetch } from '../http'
 
 const BASE_URL = 'https://classroom.zju.edu.cn'
 const TRANSCRIPT_URL = 'https://yjapi.cmc.zju.edu.cn'
 const LOGIN_URL = 'https://tgmedia.cmc.zju.edu.cn/index.php'
 
 interface CourseSession {
-  id: string
+  course_id: string
   sub_id: string
   title: string
   sub_title: string
-  realname: string
-  // 推测：月历时间为北京时间 YYYY-MM-DD HH:mm:ss
-  start_at: string
-  end_at: string
+  lecturer_name: string
+  course_begin: string
+  sub_duration: string
+  status_label: string
 }
 
 interface MonthResponse {
@@ -55,6 +56,10 @@ async function readToken(): Promise<string | undefined> {
 }
 
 export async function ensureLogin(): Promise<void> {
+  if (!await hasCasCookie()) {
+    reset()
+    throw new Error('未登录')
+  }
   if (token) return
 
   token = await readToken()
@@ -68,10 +73,7 @@ export async function ensureLogin(): Promise<void> {
     forward: `${BASE_URL}/`
   }).toString()
 
-  const response = await zjuSession().fetch(url.toString(), {
-    credentials: 'include',
-    redirect: 'follow'
-  })
+  const response = await zjuFetch(url.toString())
 
   if (new URL(response.url).origin !== BASE_URL) {
     throw new Error('未登录')
@@ -92,9 +94,7 @@ async function request<T extends { code: number }>(
   const url = new URL(path, baseUrl)
   url.search = new URLSearchParams(params).toString()
 
-  const response = await zjuSession().fetch(url.toString(), {
-    credentials: 'include',
-    redirect: 'follow',
+  const response = await zjuFetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${token}`,
       'Accept-Language': 'zh_cn'
@@ -106,7 +106,7 @@ async function request<T extends { code: number }>(
   }
   if (!response.ok) throw new Error('智云请求失败')
 
-  const result = (await response.json()) as T
+  const result = await response.json<T>()
   if (result.code !== 0) throw new Error('智云查询失败')
   return result
 }
@@ -115,15 +115,10 @@ function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
-function parseTime(value: string): number {
-  return new Date(`${value.replace(' ', 'T')}+08:00`).getTime()
-}
-
 function replayUrl(course: CourseSession): string {
-  // 推测：回放页面路径及参数沿用现有实现
   const url = new URL('/livingpage', BASE_URL)
   url.search = new URLSearchParams({
-    course_id: course.id,
+    course_id: course.course_id,
     sub_id: course.sub_id,
     tenant_code: '112'
   }).toString()
@@ -148,22 +143,17 @@ export async function fetchReplays(): Promise<DataResult<LectureReplay[]>> {
 
   const courses = months
     .flatMap(month => month.list.flatMap(day => day.course))
-    .map(course => ({
-      course,
-      start: parseTime(course.start_at),
-      end: parseTime(course.end_at)
-    }))
-    .filter(({ start, end }) => start <= now.getTime() && end <= now.getTime())
-    .sort((a, b) => b.start - a.start)
+    .filter(course => course.status_label === '回放')
+    .sort((a, b) => Number(b.course_begin) - Number(a.course_begin))
     .slice(0, 20)
 
-  const data = courses.map(({ course, start, end }) => ({
+  const data = courses.map(course => ({
     id: course.sub_id,
     courseName: course.title,
     title: course.sub_title,
-    teacher: course.realname,
-    recordedAt: new Date(start).toISOString(),
-    durationMinutes: Math.round((end - start) / 60_000),
+    teacher: course.lecturer_name,
+    recordedAt: new Date(Number(course.course_begin) * 1000).toISOString(),
+    durationMinutes: Math.round(Number(course.sub_duration) / 60),
     url: replayUrl(course)
   }))
 
