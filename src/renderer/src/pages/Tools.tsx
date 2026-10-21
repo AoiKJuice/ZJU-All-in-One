@@ -1,33 +1,21 @@
-import { AudioLines, Presentation, type LucideIcon } from 'lucide-react'
-import { Card, PageHeader, Stagger, StaggerItem } from '@renderer/components/ui'
+import { OutlineWord, Reveal } from '@renderer/components/Type'
 
-const TOOLS: { title: string; desc: string; icon: LucideIcon }[] = [
-  { title: '直播课 PPT 提取', desc: '从智云课堂直播 / 回放中抓取课件页面，导出为 PDF', icon: Presentation },
-  { title: '课堂音频转文字', desc: '提取课程音频并转写为带时间轴的文字稿', icon: AudioLines }
-]
+// 内核已就绪（services/classroom.ts 的 listSlides / getTranscript），界面待接
+const TOOLS = ['课件提取', '课堂转写']
 
 export function Tools() {
   return (
-    <>
-      <PageHeader title="工具箱" subtitle="让上课更轻松的小工具" />
-      <Stagger className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {TOOLS.map(({ title, desc, icon: Icon }) => (
-          <StaggerItem key={title}>
-            <Card className="flex gap-4">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-                <Icon size={20} />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{title}</h3>
-                  <span className="rounded-full border border-line px-2 py-px text-[11px] text-muted">即将推出</span>
-                </div>
-                <p className="mt-1 text-sm text-muted">{desc}</p>
-              </div>
-            </Card>
-          </StaggerItem>
-        ))}
-      </Stagger>
-    </>
+    <div className="page">
+      <OutlineWord text="Tools" />
+      <Reveal className="mt-24 max-w-3xl">
+        <ul className="rows border-t border-[var(--rule)]">
+          {TOOLS.map((name) => (
+            <li key={name} className="row !grid-cols-1 opacity-45">
+              <span className="row-title">{name}</span>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
+    </div>
   )
 }

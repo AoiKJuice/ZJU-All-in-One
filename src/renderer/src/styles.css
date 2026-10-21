@@ -1,63 +1,368 @@
 @import 'tailwindcss';
 
-/* Design tokens. Components use these via Tailwind utilities (bg-surface, text-muted, …). */
-@theme {
-  --font-sans: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei UI', system-ui, sans-serif;
-
-  --color-canvas: #f7f7f8;
-  --color-surface: #ffffff;
-  --color-line: #e8e8ec;
-  --color-ink: #17171c;
-  --color-muted: #6b6b76;
-  --color-accent: #1f5eff; /* 求是蓝 */
-  --color-accent-soft: #e8efff;
-  --color-warn: #e5484d;
-
-  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+/* ------------------------------------------------------------------
+   字体：EB Garamond + 方正书宋，与 AoiKJuice 主站一致
+   ------------------------------------------------------------------ */
+@font-face {
+  font-family: 'AJ Latin';
+  src: url('/type/EBGaramond-Variable.woff2') format('woff2');
+  font-weight: 400 800;
+  font-display: swap;
+  size-adjust: 110%;
+}
+@font-face {
+  font-family: 'AJ Latin';
+  src: url('/type/EBGaramond-Italic-Variable.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: italic;
+  font-display: swap;
+  size-adjust: 110%;
+}
+@font-face {
+  font-family: 'AJ Song';
+  src: url('/type/FZShuSong-Z01S.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fira Code';
+  src: url('/type/FiraCode-Regular.woff2') format('woff2');
+  font-display: swap;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-canvas: #0f1115;
-    --color-surface: #171a21;
-    --color-line: #262a33;
-    --color-ink: #ececf1;
-    --color-muted: #8b8d98;
-    --color-accent: #5b8cff;
-    --color-accent-soft: #1b2440;
+/* ------------------------------------------------------------------
+   纸与墨。主题由 html[data-theme] 决定，见 lib/theme.ts
+   ------------------------------------------------------------------ */
+:root,
+html[data-theme='light'] {
+  color-scheme: light;
+  --paper: #f3eee4;
+  --paper-2: #ebe5d8;
+  --veil: rgba(243, 238, 228, 0.8);
+  --ink: #26221d;
+  --ink-2: #554d43;
+  --ink-3: #82786b;
+  --rule: rgba(38, 34, 29, 0.14);
+  --tint: rgba(38, 34, 29, 0.045);
+  --shu: #a94f35;
+  --shu-rgb: 169, 79, 53;
+  --outline: rgba(38, 34, 29, 0.16);
+  --grain-opacity: 0.07;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #1a1714;
+  --paper-2: #221e1a;
+  --veil: rgba(26, 23, 20, 0.82);
+  --ink: #e6dfd2;
+  --ink-2: #b8ae9f;
+  --ink-3: #8c8274;
+  --rule: rgba(230, 223, 210, 0.13);
+  --tint: rgba(230, 223, 210, 0.05);
+  --shu: #d48a6a;
+  --shu-rgb: 212, 138, 106;
+  --outline: rgba(230, 223, 210, 0.14);
+  --grain-opacity: 0.05;
+}
+
+:root {
+  --f-text: 'AJ Latin', 'AJ Song', 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
+  --f-mono: 'Fira Code', ui-monospace, Consolas, monospace;
+  --mast-h: 3.5rem;
+  --gutter: clamp(1.5rem, 4vw, 3.5rem);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-text);
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    font-variant-numeric: oldstyle-nums;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    transition: background-color 0.6s var(--ease), color 0.6s var(--ease);
+  }
+  ::selection {
+    background: rgba(var(--shu-rgb), 0.22);
+  }
+  ::-webkit-scrollbar {
+    width: 0.5625rem;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rule);
+    border: 2px solid var(--paper);
+    border-radius: 0.5625rem;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  :focus-visible {
+    outline: 1px solid var(--shu);
+    outline-offset: 0.25rem;
   }
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  user-select: none;
-}
-
-/* Frameless window: the top strip drags, interactive elements opt out. */
+/* 无边框窗口：刊头可拖动，交互元素除外 */
 .drag {
   -webkit-app-region: drag;
 }
-.no-drag,
-button,
-a,
-input {
+.drag :is(button, a, input) {
   -webkit-app-region: no-drag;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--color-line);
-  border-radius: 8px;
+html[data-theme='dark'] .grain {
+  mix-blend-mode: screen;
+}
+
+/* ------------------------------------------------------------------
+   刊头
+   ------------------------------------------------------------------ */
+.masthead {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 40;
+  height: var(--mast-h);
+  display: flex;
+  align-items: center;
+  gap: 2.25rem;
+  /* 右侧给系统窗口按钮留位 */
+  padding: 0 calc(140px + 1rem) 0 var(--gutter);
+  transition: background-color 0.5s var(--ease);
+}
+.masthead[data-solid='true'] {
+  background: var(--veil);
+  backdrop-filter: blur(1rem) saturate(1.15);
+}
+.wordmark {
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.wordmark i {
+  color: var(--shu);
+}
+.mast-nav {
+  display: flex;
+  gap: 1.75rem;
+  margin-right: auto;
+}
+.mast-link {
+  position: relative;
+  padding: 0.375rem 0;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  transition: color 0.4s var(--ease);
+}
+.mast-link:hover,
+.mast-link[data-active='true'] {
+  color: var(--ink);
+}
+.mark-dot {
+  position: absolute;
+  left: calc(50% - 0.2rem - 0.07em);
+  bottom: -2px;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 50%;
+  background: var(--shu);
+}
+.mast-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 0.9375rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.mast-meta button {
+  transition: color 0.4s var(--ease);
+}
+.mast-meta button:hover {
+  color: var(--shu);
+}
+
+/* ------------------------------------------------------------------
+   页面与区块
+   ------------------------------------------------------------------ */
+.page {
+  position: relative;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: calc(var(--mast-h) + 2.5rem) var(--gutter) 5rem;
+}
+
+.outline-word {
+  position: absolute;
+  right: var(--gutter);
+  top: calc(var(--mast-h) + 0.5rem);
+  z-index: -1;
+  height: clamp(5rem, 12vw, 9.5rem);
+  overflow: visible;
+  pointer-events: none;
+}
+.outline-word text {
+  font-family: 'AJ Latin', Georgia, serif;
+  font-style: italic;
+  font-size: 200px;
+  fill: transparent;
+  stroke: var(--outline);
+  stroke-width: 1.5;
+  stroke-dasharray: 12000;
+  animation: draw-outline 3.6s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+@keyframes draw-outline {
+  from {
+    stroke-dashoffset: 12000;
+  }
+}
+
+.page-title {
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 3.75rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+}
+.page-lede {
+  margin: 1rem 0 0;
+  max-width: 40em;
+  font-size: 1.1875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.page-lede em {
+  font-style: normal;
+  color: var(--shu);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--rule);
+}
+.section-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+}
+.section-note {
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+
+/* 条目：时间 · 正文 · 尾注，靠细线分隔，不用卡片 */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.row {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1.25rem;
+  padding: 0.8125rem 0;
+  border-bottom: 1px solid var(--rule);
+  transition: opacity 0.5s var(--ease);
+}
+.row[data-past='true'] {
+  opacity: 0.42;
+}
+.row-time {
+  font-size: 0.9375rem;
+  color: var(--ink-3);
+  font-variant-numeric: oldstyle-nums tabular-nums;
+  white-space: nowrap;
+}
+.row-title {
+  font-size: 1.1875rem;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+}
+.row-sub {
+  margin-left: 0.75em;
+  font-size: 0.9375rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.row-end {
+  font-size: 0.9375rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.row-end[data-hot='true'],
+.row[data-now='true'] .row-time {
+  color: var(--shu);
+}
+.row[data-now='true'] .row-title::before {
+  content: '';
+  display: inline-block;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  margin: 0 0.6em 0.2em -0.9em;
+  border-radius: 50%;
+  background: var(--shu);
+  vertical-align: middle;
+}
+
+a.row .row-title,
+button.row .row-title {
+  background-image: linear-gradient(var(--shu), var(--shu));
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: color 0.45s var(--ease), background-size 0.7s var(--ease);
+}
+a.row:hover .row-title,
+button.row:hover .row-title {
+  color: var(--shu);
+  background-size: 100% 1px;
+}
+button.row {
+  width: 100%;
+  text-align: left;
+}
+
+.quiet {
+  padding: 1.25rem 0;
+  font-size: 0.9375rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.quiet button {
+  color: var(--shu);
 }

@@ -5,14 +5,18 @@ export const weekdayLabel = (n: number): string => WEEKDAYS[n] ?? ''
 /** JS getDay() (0 = Sunday) → 1 = Monday … 7 = Sunday */
 export const todayWeekday = (): number => ((new Date().getDay() + 6) % 7) + 1
 
-export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+const pad = (n: number): string => String(n).padStart(2, '0')
+
+/** "10.30" */
+export const dotDate = (iso: string): string => {
+  const d = new Date(iso)
+  return `${pad(d.getMonth() + 1)}.${pad(d.getDate())}`
+}
+
+/** "14:00" */
+export const clock = (iso: string): string => {
+  const d = new Date(iso)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 /** "3 天后" / "5 小时后" / "已过期" */

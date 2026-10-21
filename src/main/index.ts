@@ -10,12 +10,9 @@ function createWindow(): void {
     minHeight: 620,
     show: false,
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: nativeTheme.shouldUseDarkColors ? '#e5e5e5' : '#404040',
-      height: 40
-    },
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1115' : '#f7f7f8',
+    // 与刊头同高；符号取墨色中间调，昼夜两种纸色上都看得清
+    titleBarOverlay: { color: '#00000000', symbolColor: '#8c8274', height: 56 },
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1a1714' : '#f3eee4',
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       sandbox: true,

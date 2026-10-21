@@ -1,6 +1,6 @@
 import type { Assignment, CourseSession, DataResult, Exam, LectureReplay } from '@shared/types'
 
-// Placeholder data so the UI is usable before each live integration lands.
+// 演示数据：ZJU_DEMO=1 时替代全部数据通道，便于不登录调前端
 
 export function mock<T>(data: T): DataResult<T> {
   return { data, source: 'mock', fetchedAt: Date.now() }
