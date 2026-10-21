@@ -1,0 +1,63 @@
+@import 'tailwindcss';
+
+/* Design tokens. Components use these via Tailwind utilities (bg-surface, text-muted, …). */
+@theme {
+  --font-sans: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei UI', system-ui, sans-serif;
+
+  --color-canvas: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-line: #e8e8ec;
+  --color-ink: #17171c;
+  --color-muted: #6b6b76;
+  --color-accent: #1f5eff; /* 求是蓝 */
+  --color-accent-soft: #e8efff;
+  --color-warn: #e5484d;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #0f1115;
+    --color-surface: #171a21;
+    --color-line: #262a33;
+    --color-ink: #ececf1;
+    --color-muted: #8b8d98;
+    --color-accent: #5b8cff;
+    --color-accent-soft: #1b2440;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Frameless window: the top strip drags, interactive elements opt out. */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag,
+button,
+a,
+input {
+  -webkit-app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 8px;
+}
