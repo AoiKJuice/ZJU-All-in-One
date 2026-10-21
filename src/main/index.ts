@@ -1,6 +1,12 @@
 import { app, BrowserWindow, nativeTheme, session, shell } from 'electron'
 import { join } from 'node:path'
 import { registerIpc } from './ipc'
+import { initializeDiagnostics } from './diagnostics'
+
+// Windows 回放暂用软件解码，规避 D3D11 解码路径；界面 GPU 合成与 Whisper CUDA 保持原设置。
+if (process.platform === 'win32') app.commandLine.appendSwitch('disable-accelerated-video-decode')
+
+let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -20,6 +26,9 @@ function createWindow(): void {
     }
   })
 
+  mainWindow = win
+  win.on('closed', () => { mainWindow = null })
+
   win.once('ready-to-show', () => win.show())
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
@@ -33,26 +42,53 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['*://*.cmc.zju.edu.cn/*', '*://*.zju.edu.cn/*'] },
-    (details, callback) => {
-      const headers = details.requestHeaders
-      for (const key of Object.keys(headers)) {
-        if (key.toLowerCase() === 'referer') delete headers[key]
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  initializeDiagnostics()
+  app.on('second-instance', showMainWindow)
+
+  app.whenReady().then(() => {
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+      { urls: ['*://*.cmc.zju.edu.cn/*', '*://*.zju.edu.cn/*'] },
+      (details, callback) => {
+        const headers = details.requestHeaders
+        for (const key of Object.keys(headers)) {
+          if (key.toLowerCase() === 'referer') delete headers[key]
+        }
+        headers['Referer'] = 'https://classroom.zju.edu.cn/'
+        callback({ requestHeaders: headers })
       }
-      headers['Referer'] = 'https://classroom.zju.edu.cn/'
-      callback({ requestHeaders: headers })
-    }
-  )
+    )
 
-  registerIpc()
-  createWindow()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    session.defaultSession.webRequest.onHeadersReceived(
+      { urls: ['*://*.cmc.zju.edu.cn/*', '*://*.zju.edu.cn/*'] },
+      (details, callback) => {
+        const headers = { ...details.responseHeaders }
+        for (const key of Object.keys(headers)) {
+          if (key.toLowerCase() === 'access-control-allow-origin') delete headers[key]
+        }
+        headers['Access-Control-Allow-Origin'] = ['*']
+        callback({ responseHeaders: headers })
+      }
+    )
+
+    registerIpc()
+    createWindow()
+    app.on('activate', showMainWindow)
   })
-})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}

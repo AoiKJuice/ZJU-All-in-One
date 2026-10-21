@@ -3,7 +3,10 @@ import type { ZjuApi } from '@shared/ipc'
 import type { DataResult } from '@shared/types'
 import { useApp } from '@renderer/store'
 
-type DataChannel = { [K in keyof ZjuApi]: K extends `data:${string}` ? K : never }[keyof ZjuApi]
+// 只收无参数、返回 DataResult 的 data:* 通道
+type DataChannel = {
+  [K in keyof ZjuApi]: K extends `data:${string}` ? (ZjuApi[K] extends () => Promise<DataResult<unknown>> ? K : never) : never
+}[keyof ZjuApi]
 type Payload<K extends DataChannel> = Awaited<ReturnType<ZjuApi[K]>> extends DataResult<infer T> ? T : never
 
 /** Fetches a `data:*` channel once logged in, and again whenever login state changes; exposes `reload`. */

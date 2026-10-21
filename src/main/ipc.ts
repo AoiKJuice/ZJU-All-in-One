@@ -24,11 +24,16 @@ import {
 } from './services/courses'
 import {
   fetchReplays,
+  fetchLectures,
   listSlides,
   getPlaybackUrl,
+  getPlaybackSource,
   reset as resetClassroom
 } from './services/classroom'
+import { fetchCalendar } from './services/calendar'
+import { getSystemStats } from './stats'
 import { transcribe, readTranscript } from './asr/whisper'
+import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { mock, mockAssignments, mockExams, mockReplays, mockSchedule } from './services/demo'
 
@@ -87,6 +92,9 @@ const handlers: Handlers = {
   'data:exams': () => fetchExams(),
   'data:assignments': () => fetchAssignments(),
   'data:replays': () => fetchReplays(),
+  'data:calendar': () => fetchCalendar(),
+  'data:lectures': (_win, from, to) => fetchLectures(from, to),
+  'system:stats': async () => getSystemStats(),
 
   'homework:detail': (_win, activityId) => getAssignmentDetail(activityId),
   'homework:pick': async (win) => {
@@ -108,7 +116,7 @@ const handlers: Handlers = {
   'homework:submit': (_win, activityId, comment, files) =>
     submitHomework(activityId, comment, files),
 
-  'replay:playback': (_win, courseId, subId) => getPlaybackUrl(courseId, subId),
+  'replay:playback': (_win, courseId, subId) => getPlaybackSource(courseId, subId),
   'replay:slides': (_win, courseId, subId) => listSlides(courseId, subId),
   'replay:exportSlides': async (win, courseId, subId, title) => {
     const filePath = await chooseSavePath(win, title, 'pdf')
@@ -120,7 +128,14 @@ const handlers: Handlers = {
   },
   'replay:transcript': (_win, subId) => readTranscript(subId),
   'replay:transcribe': async (win, courseId, subId) => {
+    const started = Date.now()
+    let stage: TaskProgress['stage'] | undefined
+    logDiagnostic('transcription-started')
     const report = (p: Omit<TaskProgress, 'key'>): void => {
+      if (p.stage !== stage) {
+        stage = p.stage
+        logDiagnostic('transcription-stage', { stage, elapsedMs: Date.now() - started })
+      }
       if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
       win.webContents.send(PROGRESS_EVENT, { key: 'transcribe:' + subId, ...p })
     }
@@ -128,6 +143,7 @@ const handlers: Handlers = {
     try {
       const url = await getPlaybackUrl(courseId, subId)
       const segments = await transcribe(url, subId, report)
+      logDiagnostic('transcription-complete', { segments: segments.length, elapsedMs: Date.now() - started })
       report({ stage: 'done', ratio: 1 })
       return segments
     } catch (error) {
@@ -155,7 +171,9 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:schedule': async () => mock(mockSchedule),
     'data:exams': async () => mock(mockExams),
     'data:assignments': async () => mock(mockAssignments),
-    'data:replays': async () => mock(mockReplays)
+    'data:replays': async () => mock(mockReplays),
+    'data:calendar': () => fetchCalendar(),
+    'data:lectures': async () => []
   } satisfies Partial<Handlers>)
 }
 

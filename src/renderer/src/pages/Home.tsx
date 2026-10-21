@@ -104,12 +104,12 @@ export function Home() {
               {recent.map((r) => (
                 <li key={r.id}>
                   <button className="row" onClick={() => openReplay(r)}>
-                    <span className="row-time">{dotDate(r.recordedAt)}</span>
+                    <span className="row-time">{r.status === 'live' ? <span className="live-mark">直播</span> : dotDate(r.recordedAt)}</span>
                     <span>
                       <span className="row-title">{r.courseName}</span>
                       <span className="row-sub">{r.title}</span>
                     </span>
-                    <span className="row-end">{r.durationMinutes} 分</span>
+                    <span className="row-end">{r.status === 'live' ? r.teacher : `${r.durationMinutes} 分`}</span>
                   </button>
                 </li>
               ))}

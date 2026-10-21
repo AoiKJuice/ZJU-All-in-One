@@ -14,6 +14,7 @@ interface ScheduleRow {
   djj: string
   skcd: string
   xxq: string
+  dsz?: string
 }
 
 interface ScheduleResponse {
@@ -98,7 +99,7 @@ async function ensureLogin(): Promise<void> {
 async function post<T>(path: string, fields?: Record<string, string>): Promise<T> {
   await ensureLogin()
 
-  const response = await zjuFetch(`${BASE}${path}`, {
+  const request = () => zjuFetch(`${BASE}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
@@ -108,6 +109,17 @@ async function post<T>(path: string, fields?: Record<string, string>): Promise<T
     },
     body: fields === undefined ? undefined : new URLSearchParams(fields).toString()
   })
+
+  let response = await request()
+  if (response.status === 901 || response.status === 922) {
+    reset()
+    await ensureLogin()
+    response = await request()
+    if (response.status === 901 || response.status === 922) {
+      reset()
+      throw new Error('教务请求失败')
+    }
+  }
 
   checkResponse(response)
   const text = await response.text()
@@ -143,6 +155,24 @@ function courseLines(html: string): string[] {
   )
 }
 
+function parseWeeks(
+  line: string,
+  dsz?: string
+): Pick<CourseSession, 'weekRange' | 'weekParity'> {
+  const block = /\{([^{}]+)\}/.exec(line)
+  const range = block && /第\s*(\d+)\s*(?:-\s*(\d+)\s*)?周/.exec(block[1])
+  const weekRange: CourseSession['weekRange'] = range
+    ? [Number(range[1]), Number(range[2] ?? range[1])]
+    : [1, 8]
+
+  // 花括号中未标单双周即每周，不再用 dsz 覆盖。
+  const weekParity: CourseSession['weekParity'] = block
+    ? block[1].includes('单周') ? 'odd' : block[1].includes('双周') ? 'even' : 'all'
+    : dsz === '0' ? 'odd' : dsz === '1' ? 'even' : 'all'
+
+  return { weekRange, weekParity }
+}
+
 function parseExamTime(value: string): { startTime: string; endTime: string } {
   const match = /(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})日?\s*[（(]?\s*(\d{1,2})[:：](\d{2})\s*[-－—~～至]\s*(\d{1,2})[:：](\d{2})/.exec(value)
   if (!match) throw new Error('无法解析考试时间')
@@ -161,8 +191,8 @@ export async function fetchSchedule(): Promise<DataResult<CourseSession[]>> {
   const result = await loadSchedule()
   if (result === null) return live([])
 
-  const data = result.kbList.map((row, index) => {
-    const [name, , teacher, location] = courseLines(row.kcb)
+  const data = result.kbList.map((row, index): CourseSession => {
+    const [name, semester, teacher, location] = courseLines(row.kcb)
     const startPeriod = Number(row.djj)
 
     return {
@@ -173,7 +203,8 @@ export async function fetchSchedule(): Promise<DataResult<CourseSession[]>> {
       weekday: Number(row.xqj),
       startPeriod,
       endPeriod: startPeriod + Number(row.skcd) - 1,
-      semesterPart: row.xxq
+      semesterPart: row.xxq,
+      ...parseWeeks(semester, row.dsz)
     }
   })
 

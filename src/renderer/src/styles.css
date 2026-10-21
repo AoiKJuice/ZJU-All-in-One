@@ -47,7 +47,7 @@ html[data-theme='light'] {
   --shu: #a94f35;
   --shu-rgb: 169, 79, 53;
   --outline: rgba(38, 34, 29, 0.16);
-  --grain-opacity: 0.07;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 html[data-theme='dark'] {
@@ -63,7 +63,7 @@ html[data-theme='dark'] {
   --shu: #d48a6a;
   --shu-rgb: 212, 138, 106;
   --outline: rgba(230, 223, 210, 0.14);
-  --grain-opacity: 0.05;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.86 0 0 0 0 0.8 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 :root {
@@ -133,17 +133,9 @@ html[data-theme='dark'] {
   -webkit-app-region: no-drag;
 }
 
-.grain {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  pointer-events: none;
-  opacity: var(--grain-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: multiply;
-}
-html[data-theme='dark'] .grain {
-  mix-blend-mode: screen;
+/* 纸纹：直接画在 body 背景上（不用全窗 mix-blend 覆盖层，避免与视频/GPU 负载叠加时拖垮合成） */
+body {
+  background-image: var(--grain);
 }
 
 /* ------------------------------------------------------------------
@@ -603,4 +595,132 @@ button.row {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+/* 文字稿区块显示细滚动条（其余区块隐藏） */
+.pane-scroll.scroll-bar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+  padding-right: 0.5rem;
+}
+.pane-scroll.scroll-bar::-webkit-scrollbar {
+  display: block;
+  width: 0.375rem;
+}
+.pane-scroll.scroll-bar::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border: 0;
+  border-radius: 0.375rem;
+}
+.pane-scroll.scroll-bar::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
+
+/* 转写步骤：已完成淡墨，当前朱色，未到细线色 */
+.steps {
+  display: flex;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  letter-spacing: 0.12em;
+}
+.steps li {
+  position: relative;
+  color: var(--rule);
+  transition: color 0.5s var(--ease);
+}
+.steps li[data-state='done'] {
+  color: var(--ink-3);
+}
+.steps li[data-state='now'] {
+  color: var(--shu);
+}
+.steps li + li::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* 悬停高级信息：浮于进度下方，细线框，不用阴影卡片 */
+.stats {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  background: var(--veil);
+  backdrop-filter: blur(0.75rem);
+  border: 1px solid var(--rule);
+}
+.stats dt {
+  color: var(--ink-3);
+  letter-spacing: 0.08em;
+}
+.stats dd {
+  margin: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 直播标记：朱色小字 + 呼吸点 */
+.live-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  color: var(--shu);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+.live-mark::before {
+  content: '';
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--shu);
+  animation: breathe 1.8s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* 课表格子：左侧朱线 + 文字；可点进视频的课悬停时课名朱色下划线 */
+.course-cell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 3px;
+  padding: 0.25rem 0.25rem 0.25rem 0.625rem;
+  text-align: left;
+  line-height: 1.35;
+  border-left: 1px solid var(--shu);
+}
+.course-name {
+  font-size: 0.9375rem;
+  letter-spacing: 0.03em;
+  background-image: linear-gradient(var(--shu), var(--shu));
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: color 0.45s var(--ease), background-size 0.7s var(--ease);
+}
+.course-cell[data-playable] {
+  cursor: pointer;
+}
+.course-cell[data-playable]:hover .course-name {
+  color: var(--shu);
+  background-size: 100% 1px;
 }

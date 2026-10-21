@@ -29,6 +29,26 @@ export interface CourseSession {
   endPeriod: number
   /** e.g. "秋冬" / "春夏" / "秋" … */
   semesterPart: string
+  /** 在所属半学期内的教学周范围（1 起，含两端），如 第1-8周 → [1, 8] */
+  weekRange: [number, number]
+  weekParity: 'all' | 'odd' | 'even'
+}
+
+/** 校历：一学年学期的两个半学期起止、节假日与调课（来源 Celechron 公开校历） */
+export interface TermCalendar {
+  /** 学年学期，如 2026-2027-1 */
+  id: string
+  halves: {
+    /** 秋 / 冬 / 春 / 夏 */
+    name: string
+    /** YYYY-MM-DD，含两端 */
+    start: string
+    end: string
+  }[]
+  /** YYYY-MM-DD → 名称；当天停课 */
+  holidays: Record<string, string>
+  /** 调课：date 这天按 follows 那天的课表上课 */
+  exchanges: { date: string; follows: string; name: string }[]
 }
 
 export interface Exam {
@@ -54,6 +74,7 @@ export interface Assignment {
   url?: string
 }
 
+/** 智云课次（回放 / 直播 / 未开始统一用它） */
 export interface LectureReplay {
   /** = 智云 sub_id */
   id: string
@@ -61,10 +82,34 @@ export interface LectureReplay {
   courseName: string
   title: string
   teacher: string
-  /** ISO 8601 */
+  /** ISO 8601，计划开始 */
   recordedAt: string
   durationMinutes: number
   url?: string
+  /** 智云 sub_status：1 直播中，2 未开始，3 回放生成中，5 无回放，6 回放 */
+  status: 'live' | 'upcoming' | 'generating' | 'none' | 'replay'
+  /** 上课日期 YYYY-MM-DD（北京时间） */
+  date: string
+  /** 由 sub_title 中"第3-5节"解析，解析不到则缺省 */
+  startPeriod?: number
+  endPeriod?: number
+}
+
+export interface PlaybackSource {
+  url: string
+  /** mp4 = 回放直链；hls = 直播 m3u8 */
+  kind: 'mp4' | 'hls'
+}
+
+/** 悬停转写进度时显示的高级信息 */
+export interface SystemStats {
+  /** 全机 CPU 占用 0–1 */
+  cpu: number
+  memory: { used: number; total: number }
+  /** 本应用（含 Whisper / ffmpeg 子进程）占用内存，字节 */
+  appMemory: number
+  /** NVIDIA 显卡；无或查询失败时缺省 */
+  gpu?: { name: string; util: number; memUsed: number; memTotal: number }
 }
 
 export interface Attachment {
@@ -122,4 +167,12 @@ export interface TaskProgress {
   /** 0–1；无法估计时缺省 */
   ratio?: number
   message?: string
+  /** 下载类阶段：已下载 / 总字节 */
+  bytes?: { done: number; total: number }
+  /** 下载速度，字节/秒 */
+  speed?: number
+  /** 当前阶段预计剩余秒数 */
+  eta?: number
+  /** transcribe 阶段新识别出的段落（增量，渲染端累积） */
+  partial?: TranscriptSegment[]
 }

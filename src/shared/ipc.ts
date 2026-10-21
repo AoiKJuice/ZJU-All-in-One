@@ -6,6 +6,9 @@ import type {
   DataResult,
   Exam,
   LectureReplay,
+  PlaybackSource,
+  SystemStats,
+  TermCalendar,
   PickedFile,
   Slide,
   TaskProgress,
@@ -26,7 +29,14 @@ export interface ZjuApi {
   'data:schedule': () => Promise<DataResult<CourseSession[]>>
   'data:exams': () => Promise<DataResult<Exam[]>>
   'data:assignments': () => Promise<DataResult<Assignment[]>>
+  /** 近期回放，正在直播的排在最前 */
   'data:replays': () => Promise<DataResult<LectureReplay[]>>
+  /** 当前学年学期校历 */
+  'data:calendar': () => Promise<TermCalendar>
+  /** 区间内（YYYY-MM-DD，含两端）的全部智云课次，供课表点课跳视频 */
+  'data:lectures': (from: string, to: string) => Promise<LectureReplay[]>
+  /** 悬停转写进度时轮询 */
+  'system:stats': () => Promise<SystemStats>
 
   'homework:detail': (activityId: string) => Promise<AssignmentDetail>
   /** 打开系统文件选择框；取消时返回空数组 */
@@ -34,7 +44,8 @@ export interface ZjuApi {
   'homework:submit': (activityId: string, comment: string, files: PickedFile[]) => Promise<void>
 
   /** 已签名、可直接给 <video> 播放的回放地址 */
-  'replay:playback': (courseId: string, subId: string) => Promise<string>
+  /** 回放为 mp4 直链；直播中返回 hls */
+  'replay:playback': (courseId: string, subId: string) => Promise<PlaybackSource>
   'replay:slides': (courseId: string, subId: string) => Promise<Slide[]>
   /** 弹出保存框并导出 PDF；取消时返回 null */
   'replay:exportSlides': (courseId: string, subId: string, title: string) => Promise<string | null>
@@ -55,6 +66,9 @@ export const ZJU_CHANNELS = [
   'data:exams',
   'data:assignments',
   'data:replays',
+  'data:calendar',
+  'data:lectures',
+  'system:stats',
   'homework:detail',
   'homework:pick',
   'homework:submit',

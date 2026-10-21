@@ -42,7 +42,6 @@ export function App() {
         </AnimatePresence>
       </main>
       <AssignmentSheet />
-      <div className="grain" aria-hidden="true" />
     </>
   )
 }

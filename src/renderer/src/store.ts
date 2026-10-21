@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Assignment, AuthState, LectureReplay, TaskProgress } from '@shared/types'
+import type { Assignment, AuthState, LectureReplay, TaskProgress, TranscriptSegment } from '@shared/types'
 import { applyTheme, initialTheme, type Theme } from './lib/theme'
 
 export type PageId = 'home' | 'schedule' | 'replay'
@@ -12,6 +12,9 @@ interface AppStore {
   assignment: Assignment | null
   /** 主进程推送的长任务进度，按 key 存最新一条 */
   tasks: Record<string, TaskProgress>
+  /** 转写中实时识别出的段落，按任务 key 累积 */
+  partials: Record<string, TranscriptSegment[]>
+  clearPartials: (key: string) => void
   theme: Theme
   auth: AuthState
   authBusy: boolean
@@ -49,6 +52,8 @@ export const useApp = create<AppStore>((set, get) => {
     replay: null,
     assignment: null,
     tasks: {},
+    partials: {},
+    clearPartials: (key) => set((s) => ({ partials: { ...s.partials, [key]: [] } })),
     theme,
     auth: { loggedIn: false, user: null },
     authBusy: false,
@@ -70,4 +75,9 @@ export const useApp = create<AppStore>((set, get) => {
 })
 
 // 进度事件全局订阅一次，离开回放页也不丢
-window.zju.onProgress((p) => useApp.setState((s) => ({ tasks: { ...s.tasks, [p.key]: p } })))
+window.zju.onProgress((p) =>
+  useApp.setState((s) => ({
+    tasks: { ...s.tasks, [p.key]: p },
+    partials: p.partial?.length ? { ...s.partials, [p.key]: [...(s.partials[p.key] ?? []), ...p.partial] } : s.partials
+  }))
+)
