@@ -4,7 +4,7 @@ import { zjuSession } from './auth/zjuam'
 export interface ZjuFetchInit {
   method?: string
   headers?: Record<string, string>
-  body?: string
+  body?: string | Buffer
 }
 
 export interface ZjuResponse {

@@ -1,9 +1,9 @@
-import type { DataResult, LectureReplay } from '@shared/types'
+import { createHash } from 'node:crypto'
+import type { DataResult, LectureReplay, Slide } from '@shared/types'
 import { hasCasCookie, zjuSession } from '../auth/zjuam'
 import { zjuFetch } from '../http'
 
 const BASE_URL = 'https://classroom.zju.edu.cn'
-const TRANSCRIPT_URL = 'https://yjapi.cmc.zju.edu.cn'
 const LOGIN_URL = 'https://tgmedia.cmc.zju.edu.cn/index.php'
 
 interface CourseSession {
@@ -32,14 +32,25 @@ interface SlidesResponse {
   total: number
 }
 
-interface TranscriptResponse {
+interface PlaybackResponse {
   code: number
-  list: {
-    all_content: {
-      begin_sec: number
-      text: string
-    }[]
-  }[]
+  data: {
+    content: {
+      save_playback: {
+        contents: string
+      }
+    }
+  }
+}
+
+interface UserResponse {
+  code: number
+  message: string
+  params: {
+    id: string | number
+    tenant_id: string | number
+    phone?: string | null
+  }
 }
 
 let token: string | undefined
@@ -87,11 +98,11 @@ export async function ensureLogin(): Promise<void> {
 async function request<T extends { code: number }>(
   path: string,
   params: Record<string, string>,
-  baseUrl = BASE_URL
+  checkCode = true
 ): Promise<T> {
   await ensureLogin()
 
-  const url = new URL(path, baseUrl)
+  const url = new URL(path, BASE_URL)
   url.search = new URLSearchParams(params).toString()
 
   const response = await zjuFetch(url.toString(), {
@@ -107,7 +118,7 @@ async function request<T extends { code: number }>(
   if (!response.ok) throw new Error('智云请求失败')
 
   const result = await response.json<T>()
-  if (result.code !== 0) throw new Error('智云查询失败')
+  if (checkCode && result.code !== 0) throw new Error('智云查询失败')
   return result
 }
 
@@ -147,8 +158,9 @@ export async function fetchReplays(): Promise<DataResult<LectureReplay[]>> {
     .sort((a, b) => Number(b.course_begin) - Number(a.course_begin))
     .slice(0, 20)
 
-  const data = courses.map(course => ({
-    id: course.sub_id,
+  const data: LectureReplay[] = courses.map(course => ({
+    id: String(course.sub_id),
+    courseId: String(course.course_id),
     courseName: course.title,
     title: course.sub_title,
     teacher: course.lecturer_name,
@@ -161,10 +173,10 @@ export async function fetchReplays(): Promise<DataResult<LectureReplay[]>> {
 }
 
 export async function listSlides(
-  subId: string,
-  courseId: string
-): Promise<{ imageUrl: string }[]> {
-  const slides: { imageUrl: string }[] = []
+  courseId: string,
+  subId: string
+): Promise<Slide[]> {
+  const slides: Slide[] = []
   let page = 1
   let total: number
 
@@ -179,6 +191,10 @@ export async function listSlides(
       }
     )
 
+    if (result.list.length === 0 && slides.length < result.total) {
+      throw new Error('智云课件分页不完整')
+    }
+
     slides.push(...result.list.map(slide => {
       const content = JSON.parse(slide.content) as { pptimgurl: string }
       return { imageUrl: content.pptimgurl }
@@ -190,24 +206,28 @@ export async function listSlides(
   return slides
 }
 
-export async function getTranscript(
+export async function getPlaybackUrl(
+  courseId: string,
   subId: string
-): Promise<{ time: string; text: string }[]> {
-  const result = await request<TranscriptResponse>(
-    '/courseapi/v3/web-socket/search-trans-result',
-    {
-      sub_id: subId,
-      format: 'json'
-    },
-    TRANSCRIPT_URL
+): Promise<string> {
+  const playback = await request<PlaybackResponse>(
+    '/courseapi/v3/portal-home-setting/get-sub-info',
+    { course_id: courseId, sub_id: subId }
   )
+  const user = await request<UserResponse>('/userapi/v1/infosimple', {}, false)
+  if (user.message !== '查询成功') throw new Error('智云查询失败')
 
-  if (result.list.length === 0) return []
+  const original = playback.data.content.save_playback.contents
+  const url = new URL(original)
+  const { id, tenant_id: tenantId, phone } = user.params
+  const ts = Math.floor(Date.now() / 1000)
+  const reversedPhone = [...String(phone ?? '')].reverse().join('')
+  const hash = createHash('md5')
+    .update(`${url.pathname}${id}${tenantId}${reversedPhone}${ts}`)
+    .digest('hex')
 
-  return result.list[0].all_content.map(segment => ({
-    time: String(segment.begin_sec),
-    text: segment.text
-  }))
+  url.searchParams.append('t', `${id}-${ts}-${hash}`)
+  return url.toString()
 }
 
 export function reset(): void {

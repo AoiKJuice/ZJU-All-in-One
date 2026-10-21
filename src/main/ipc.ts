@@ -1,6 +1,14 @@
-import { BrowserWindow, ipcMain } from 'electron'
-import type { ZjuApi, ZjuChannel } from '@shared/ipc'
-import type { AuthState } from '@shared/types'
+import {
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  type OpenDialogOptions,
+  type SaveDialogOptions
+} from 'electron'
+import { stat } from 'node:fs/promises'
+import { basename } from 'node:path'
+import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
+import type { AuthState, TaskProgress } from '@shared/types'
 import { hasCasCookie, login, logout } from './auth/zjuam'
 import {
   fetchSchedule,
@@ -8,11 +16,28 @@ import {
   fetchProfile,
   reset as resetZdbk
 } from './services/zdbk'
-import { fetchAssignments, reset as resetCourses } from './services/courses'
-import { fetchReplays, reset as resetClassroom } from './services/classroom'
+import {
+  fetchAssignments,
+  getAssignmentDetail,
+  submitHomework,
+  reset as resetCourses
+} from './services/courses'
+import {
+  fetchReplays,
+  listSlides,
+  getPlaybackUrl,
+  reset as resetClassroom
+} from './services/classroom'
+import { transcribe, readTranscript } from './asr/whisper'
+import { exportSlidesPdf, writeTranscript } from './export'
 import { mock, mockAssignments, mockExams, mockReplays, mockSchedule } from './services/demo'
 
-type Handlers = { [K in ZjuChannel]: (win: BrowserWindow | null) => ReturnType<ZjuApi[K]> }
+type Handlers = {
+  [K in ZjuChannel]: (
+    win: BrowserWindow | null,
+    ...args: Parameters<ZjuApi[K]>
+  ) => ReturnType<ZjuApi[K]>
+}
 
 async function getAuthState(): Promise<AuthState> {
   if (!(await hasCasCookie())) {
@@ -26,6 +51,22 @@ async function getAuthState(): Promise<AuthState> {
     // 教务接口尚待实测，个人信息失败不否定 CAS cookie 状态。
     return { loggedIn: true, user: null }
   }
+}
+
+async function chooseSavePath(
+  win: BrowserWindow | null,
+  title: string,
+  extension: string
+): Promise<string | null> {
+  const options: SaveDialogOptions = {
+    defaultPath: `${title}.${extension}`,
+    filters: [{ name: extension.toUpperCase(), extensions: [extension] }]
+  }
+  const result = await (win
+    ? dialog.showSaveDialog(win, options)
+    : dialog.showSaveDialog(options))
+
+  return result.canceled ? null : result.filePath
 }
 
 const handlers: Handlers = {
@@ -45,7 +86,68 @@ const handlers: Handlers = {
   'data:schedule': () => fetchSchedule(),
   'data:exams': () => fetchExams(),
   'data:assignments': () => fetchAssignments(),
-  'data:replays': () => fetchReplays()
+  'data:replays': () => fetchReplays(),
+
+  'homework:detail': (_win, activityId) => getAssignmentDetail(activityId),
+  'homework:pick': async (win) => {
+    const options: OpenDialogOptions = {
+      properties: ['openFile', 'multiSelections']
+    }
+    const result = await (win
+      ? dialog.showOpenDialog(win, options)
+      : dialog.showOpenDialog(options))
+
+    if (result.canceled) return []
+
+    return Promise.all(result.filePaths.map(async (path) => ({
+      path,
+      name: basename(path),
+      size: (await stat(path)).size
+    })))
+  },
+  'homework:submit': (_win, activityId, comment, files) =>
+    submitHomework(activityId, comment, files),
+
+  'replay:playback': (_win, courseId, subId) => getPlaybackUrl(courseId, subId),
+  'replay:slides': (_win, courseId, subId) => listSlides(courseId, subId),
+  'replay:exportSlides': async (win, courseId, subId, title) => {
+    const filePath = await chooseSavePath(win, title, 'pdf')
+    if (filePath === null) return null
+
+    const slides = await listSlides(courseId, subId)
+    await exportSlidesPdf(slides, title, filePath)
+    return filePath
+  },
+  'replay:transcript': (_win, subId) => readTranscript(subId),
+  'replay:transcribe': async (win, courseId, subId) => {
+    const report = (p: Omit<TaskProgress, 'key'>): void => {
+      if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
+      win.webContents.send(PROGRESS_EVENT, { key: 'transcribe:' + subId, ...p })
+    }
+
+    try {
+      const url = await getPlaybackUrl(courseId, subId)
+      const segments = await transcribe(url, subId, report)
+      report({ stage: 'done', ratio: 1 })
+      return segments
+    } catch (error) {
+      report({
+        stage: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+      throw error
+    }
+  },
+  'replay:exportTranscript': async (win, subId, format, title) => {
+    const segments = await readTranscript(subId)
+    if (segments === null) throw new Error('尚未转写')
+
+    const filePath = await chooseSavePath(win, title, format)
+    if (filePath === null) return null
+
+    await writeTranscript(segments, format, title, filePath)
+    return filePath
+  }
 }
 
 if (process.env['ZJU_DEMO'] === '1') {
@@ -57,8 +159,19 @@ if (process.env['ZJU_DEMO'] === '1') {
   } satisfies Partial<Handlers>)
 }
 
+function registerChannel<K extends ZjuChannel>(channel: K): void {
+  const handler = handlers[channel] as (
+    win: BrowserWindow | null,
+    ...args: Parameters<ZjuApi[K]>
+  ) => ReturnType<ZjuApi[K]>
+
+  ipcMain.handle(channel, (e, ...args: Parameters<ZjuApi[K]>) =>
+    handler(BrowserWindow.fromWebContents(e.sender), ...args)
+  )
+}
+
 export function registerIpc(): void {
-  for (const [channel, handler] of Object.entries(handlers)) {
-    ipcMain.handle(channel, (e) => handler(BrowserWindow.fromWebContents(e.sender)))
+  for (const channel of ZJU_CHANNELS) {
+    registerChannel(channel)
   }
 }

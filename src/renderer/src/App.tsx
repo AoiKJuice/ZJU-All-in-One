@@ -4,12 +4,13 @@ import { Masthead } from './components/Masthead'
 import { useApp, type PageId } from './store'
 import { Home } from './pages/Home'
 import { Schedule } from './pages/Schedule'
-import { Tools } from './pages/Tools'
+import { Replay } from './pages/Replay'
+import { AssignmentSheet } from './components/AssignmentSheet'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
   schedule: Schedule,
-  tools: Tools
+  replay: Replay
 }
 
 export function App() {
@@ -40,6 +41,7 @@ export function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+      <AssignmentSheet />
       <div className="grain" aria-hidden="true" />
     </>
   )

@@ -1,15 +1,18 @@
+import type { ReactNode } from 'react'
 import type { CourseSession } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
+import { useApp } from '@renderer/store'
 import { OutlineWord, Quiet, Reveal, SectionHead } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isUrgent, relativeTo, todayWeekday, weekdayLabel } from '@renderer/lib/format'
 
-/** 主页即全部：今日课程、截止、考试、回放汇在一屏，一句话总结放在最上面 */
+/** 主页即全部：今日课程、截止、回放、考试汇在一屏；每块内部滚动，窗口再小也不必整页下滑 */
 export function Home() {
   const schedule = useZju('data:schedule')
   const assignments = useZju('data:assignments')
   const exams = useZju('data:exams')
   const replays = useZju('data:replays')
+  const { openReplay, openAssignment } = useApp()
 
   const now = new Date()
   const wd = todayWeekday()
@@ -27,10 +30,10 @@ export function Home() {
   const upcoming = (exams.data ?? [])
     .filter((e) => new Date(e.endTime) > now)
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
-  const recent = (replays.data ?? []).slice(0, 5)
+  const recent = replays.data ?? []
 
   return (
-    <div className="page">
+    <div className="page page-fit">
       <OutlineWord text="Today" />
       <Reveal>
         <h1 className="page-title">
@@ -43,9 +46,8 @@ export function Home() {
         </p>
       </Reveal>
 
-      <div className="mt-14 grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-x-16 gap-y-14">
-        <Reveal i={2}>
-          <SectionHead title={showTomorrow ? '明日' : '今日'} />
+      <div className="panes grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Pane i={2} title={showTomorrow ? '明日' : '今日'}>
           {dayList.length === 0 ? (
             <Quiet loading={schedule.loading} error={schedule.error} empty="无课" />
           ) : (
@@ -67,17 +69,16 @@ export function Home() {
               })}
             </ul>
           )}
-        </Reveal>
+        </Pane>
 
-        <Reveal i={3}>
-          <SectionHead title="截止" />
+        <Pane i={3} title="截止">
           {pending.length === 0 ? (
             <Quiet loading={assignments.loading} error={assignments.error} empty="无" />
           ) : (
             <ul className="rows">
               {pending.map((a) => (
                 <li key={a.id}>
-                  <a className="row" href={a.url} target="_blank" rel="noreferrer">
+                  <button className="row" onClick={() => openAssignment(a)}>
                     <span className="row-time">
                       {dotDate(a.deadline)} {clock(a.deadline)}
                     </span>
@@ -88,37 +89,35 @@ export function Home() {
                     <span className="row-end" data-hot={isUrgent(a.deadline) || undefined}>
                       {relativeTo(a.deadline)}
                     </span>
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
           )}
-        </Reveal>
+        </Pane>
 
-        <Reveal i={4}>
-          <SectionHead title="回放" />
+        <Pane i={4} title="回放">
           {recent.length === 0 ? (
             <Quiet loading={replays.loading} error={replays.error} empty="无" />
           ) : (
             <ul className="rows">
               {recent.map((r) => (
                 <li key={r.id}>
-                  <a className="row" href={r.url} target="_blank" rel="noreferrer">
+                  <button className="row" onClick={() => openReplay(r)}>
                     <span className="row-time">{dotDate(r.recordedAt)}</span>
                     <span>
                       <span className="row-title">{r.courseName}</span>
                       <span className="row-sub">{r.title}</span>
                     </span>
                     <span className="row-end">{r.durationMinutes} 分</span>
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
           )}
-        </Reveal>
+        </Pane>
 
-        <Reveal i={5}>
-          <SectionHead title="考试" />
+        <Pane i={5} title="考试">
           {upcoming.length === 0 ? (
             <Quiet loading={exams.loading} error={exams.error} empty="无" />
           ) : (
@@ -140,9 +139,18 @@ export function Home() {
               ))}
             </ul>
           )}
-        </Reveal>
+        </Pane>
       </div>
     </div>
+  )
+}
+
+function Pane({ i, title, children }: { i: number; title: string; children: ReactNode }) {
+  return (
+    <Reveal i={i} className="pane">
+      <SectionHead title={title} />
+      <div className="pane-scroll">{children}</div>
+    </Reveal>
   )
 }
 
@@ -154,7 +162,6 @@ function Summary(props: { next?: CourseSession; urgent: number; exam?: { courseN
         下一节 {periodStart(props.next.startPeriod)} {props.next.name}
       </span>
     )
-  } else {
   }
   if (props.urgent) parts.push(<span key="a"><em>{props.urgent}</em> 项作业将截止</span>)
   if (props.exam) parts.push(<span key="e">{props.exam.courseName}考试 {relativeTo(props.exam.startTime)}</span>)

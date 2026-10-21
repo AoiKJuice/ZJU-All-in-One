@@ -4,8 +4,7 @@ import { useApp, type PageId } from '@renderer/store'
 
 const NAV: { id: PageId; label: string }[] = [
   { id: 'home', label: '主页' },
-  { id: 'schedule', label: '课表' },
-  { id: 'tools', label: '工具' }
+  { id: 'schedule', label: '课表' }
 ]
 
 /** 刊头：字标、三项导航（朱点随切换滑动）、登录与昼夜切换 */

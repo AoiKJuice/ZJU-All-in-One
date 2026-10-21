@@ -1,11 +1,17 @@
 import { create } from 'zustand'
-import type { AuthState } from '@shared/types'
+import type { Assignment, AuthState, LectureReplay, TaskProgress } from '@shared/types'
 import { applyTheme, initialTheme, type Theme } from './lib/theme'
 
-export type PageId = 'home' | 'schedule' | 'tools'
+export type PageId = 'home' | 'schedule' | 'replay'
 
 interface AppStore {
   page: PageId
+  /** 回放页当前打开的课次 */
+  replay: LectureReplay | null
+  /** 侧页中打开的作业 */
+  assignment: Assignment | null
+  /** 主进程推送的长任务进度，按 key 存最新一条 */
+  tasks: Record<string, TaskProgress>
   theme: Theme
   auth: AuthState
   authBusy: boolean
@@ -14,6 +20,10 @@ interface AppStore {
   /** 每次登录状态变化 +1，数据 hook 据此重新拉取 */
   epoch: number
   go: (page: PageId) => void
+  openReplay: (replay: LectureReplay) => void
+  openAssignment: (assignment: Assignment | null) => void
+  /** 让所有数据 hook 重新拉取（如提交作业后） */
+  refresh: () => void
   toggleTheme: () => void
   refreshAuth: () => Promise<void>
   login: () => Promise<void>
@@ -36,12 +46,18 @@ export const useApp = create<AppStore>((set, get) => {
 
   return {
     page: 'home',
+    replay: null,
+    assignment: null,
+    tasks: {},
     theme,
     auth: { loggedIn: false, user: null },
     authBusy: false,
     authReady: false,
     epoch: 0,
     go: (page) => set({ page }),
+    openReplay: (replay) => set({ replay, page: 'replay' }),
+    openAssignment: (assignment) => set({ assignment }),
+    refresh: () => set((s) => ({ epoch: s.epoch + 1 })),
     toggleTheme: () => {
       const next = get().theme === 'dark' ? 'light' : 'dark'
       applyTheme(next)
@@ -52,3 +68,6 @@ export const useApp = create<AppStore>((set, get) => {
     logout: () => runAuth(() => window.zju['auth:logout']())
   }
 })
+
+// 进度事件全局订阅一次，离开回放页也不丢
+window.zju.onProgress((p) => useApp.setState((s) => ({ tasks: { ...s.tasks, [p.key]: p } })))

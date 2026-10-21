@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, session, shell } from 'electron'
 import { join } from 'node:path'
 import { registerIpc } from './ipc'
 
@@ -34,6 +34,18 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.cmc.zju.edu.cn/*', '*://*.zju.edu.cn/*'] },
+    (details, callback) => {
+      const headers = details.requestHeaders
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'referer') delete headers[key]
+      }
+      headers['Referer'] = 'https://classroom.zju.edu.cn/'
+      callback({ requestHeaders: headers })
+    }
+  )
+
   registerIpc()
   createWindow()
   app.on('activate', () => {
