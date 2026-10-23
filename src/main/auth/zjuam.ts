@@ -21,9 +21,8 @@ export async function hasCasCookie(): Promise<boolean> {
   return cookies.length > 0
 }
 
+// 总是打开登录窗口：cookie 可能已在服务器端过期；若 CAS 仍有效，登录页会立即跳转写回 cookie 并自动关窗
 export async function login(parent?: BrowserWindow): Promise<void> {
-  if (await hasCasCookie()) return
-
   return new Promise((resolve, reject) => {
     const authSession = zjuSession()
     const win = new BrowserWindow({

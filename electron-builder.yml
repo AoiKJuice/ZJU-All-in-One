@@ -1,0 +1,35 @@
+appId: top.aoikjuice.zju-all-in-one
+productName: ZJU All in One
+copyright: AoiKJuice
+
+directories:
+  output: release
+  buildResources: build
+
+# 渲染端依赖已由 Vite 打进 out/，运行时只需 out/ 与生产依赖（ffmpeg-static）
+files:
+  - out/**
+  - package.json
+
+# ffmpeg 可执行文件不能放在 asar 里运行，whisper.ts 会把路径中的 app.asar 换成 app.asar.unpacked
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+
+# 国内网络：Electron 本体走 npmmirror（NSIS 等构建工具用环境变量 ELECTRON_BUILDER_BINARIES_MIRROR）
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
+
+win:
+  icon: build/icon.png
+  target:
+    - nsis
+    - portable
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: ZJU All in One
+  artifactName: ZJU-All-in-One-Setup-${version}.${ext}
+
+portable:
+  artifactName: ZJU-All-in-One-${version}-portable.${ext}

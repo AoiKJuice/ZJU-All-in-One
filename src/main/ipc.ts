@@ -52,8 +52,16 @@ async function getAuthState(): Promise<AuthState> {
   try {
     const { data: user } = await fetchProfile()
     return { loggedIn: true, user }
-  } catch {
-    // 教务接口尚待实测，个人信息失败不否定 CAS cookie 状态。
+  } catch (error) {
+    // cookie 还在但服务器端 CAS 会话已过期：SSO 被弹回登录页，按未登录处理并清掉残留 cookie
+    if (error instanceof Error && error.message === '未登录') {
+      await logout()
+      resetZdbk()
+      resetCourses()
+      resetClassroom()
+      return { loggedIn: false, user: null }
+    }
+    // 教务个人信息字段尚待实测，其他失败不否定 CAS 登录态
     return { loggedIn: true, user: null }
   }
 }
