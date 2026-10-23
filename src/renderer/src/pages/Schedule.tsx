@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { LectureReplay, TermCalendar } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
 import { useApp } from '@renderer/store'
-import { OutlineWord, Quiet, Reveal } from '@renderer/components/Type'
+import { Quiet, Reveal, Sep } from '@renderer/components/Type'
 import { PERIOD_COUNT, periodStart } from '@renderer/lib/periods'
 import { weekdayLabel } from '@renderer/lib/format'
 import { addDays, findLecture, mondayOf, sessionsOn, teachingWeek, ymd } from '@renderer/lib/calendar'
@@ -47,11 +47,17 @@ export function Schedule() {
   const tw = cal && dates.map((d) => teachingWeek(cal, d)).find(Boolean)
 
   return (
-    <div className="page">
-      <OutlineWord text="Week" />
-      <Reveal className="mt-16 flex items-end justify-between">
+    <div className="page page-wide">
+      <Reveal className="mt-2 flex items-end justify-between">
         <h1 className="page-title !text-[clamp(1.75rem,2.5vw+1.5vh,2.75rem)]">
-          {tw ? `${tw.half} · 第 ${tw.week} 周` : '课表'}
+          {tw ? (
+            <>
+              {tw.half}
+              <Sep />第 {tw.week} 周
+            </>
+          ) : (
+            '课表'
+          )}
           <span className="ml-5 text-[0.45em] tracking-[0.06em] text-[var(--ink-3)]">
             {dates[0].slice(5).replace('-', '.')} – {dates[6].slice(5).replace('-', '.')}
           </span>
@@ -69,7 +75,7 @@ export function Schedule() {
         </div>
       </Reveal>
 
-      <Reveal i={1} className="mt-8">
+      <Reveal i={1} className="mt-4">
         {!data?.length || !cal ? (
           <Quiet loading={loading || (loggedIn && !cal)} error={error} empty="无" />
         ) : (

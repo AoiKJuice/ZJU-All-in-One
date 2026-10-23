@@ -62,6 +62,11 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 回放页（`pages/Replay.tsx`）：`<video>` 直接播放 `replay:playback` 返回的签名地址（`vod.cmc.zju.edu.cn`，签名见 `classroom.getPlaybackUrl`，部分账号 `phone` 为空按空串签）；默认 session 对 `*.cmc.zju.edu.cn` 补 Referer。课件图是 http 地址，靠 CSP 的 `upgrade-insecure-requests` 升级为 https。
 - 转写：`src/main/asr/whisper.ts`，首次使用下载 whisper.cpp CUDA 12.4 构建（b5454，约 684MB）与 `ggml-large-v3-turbo-q5_0`（hf-mirror，约 574MB）到 userData/whisper；ffmpeg 来自 `ffmpeg-static`（安装时设 `FFMPEG_BINARIES_URL=https://registry.npmmirror.com/-/binary/ffmpeg-static`）。GPU 失败时以 `-ng` 重跑一次。结果缓存在 userData/transcripts。**不使用智云自带转写**（用户认为效果差）。
 - 导出：`src/main/export.ts`，课件用隐藏窗口 `printToPDF`，文字稿 txt/srt/md。
+- 播放器（`components/Player.tsx`）为自绘控制条：回放有播放/进度/倍速，直播（hls）不允许暂停与拖动、被暂停会立即恢复；铺满窗口与全屏按钮相邻，全屏作用于整个播放器容器（字幕、控制条一起进全屏）。
+- 课件区（`components/SlideViewer.tsx`）：缩略图 / 大图切换，大图可翻页、默认跟随当前讲解页（直播取最新一页，回放取 `created_sec` ≤ 播放时间的最后一页）；点击课件不影响播放，右键菜单"全窗口查看 / 下载"。
+- 回放页布局：左列视频（`.player-wrap` 用容器查询取 min(列宽, 可用高 × 16/9)），右侧栏在 课件 / 文字稿 / 选集 间切换，三个面板始终挂载只隐藏（字幕依赖文字稿 DOM）。左列偏高（容器宽高比 ≤ 5/4）时视频下方显示当前讲解页（`useCurrentSlide`）。右键视频切换铺满。
+- **主进程请求校内 `http://` 地址会挂起不返回**（智云课件图 `pptimgurl` 就是 http）：渲染端靠 CSP `upgrade-insecure-requests` 才正常；主进程下载 / 导出前用 `download.ts` 的 `upgrade()` 升成 https。
+- **下载一律在应用内完成**：`file:download`（保存框 + `main/download.ts` 用登录会话流式写盘，cmc 域补 Referer）与 `file:reveal`；不要用 `<a target=_blank>` 指向文件（会被 `setWindowOpenHandler` 交给浏览器）。作业说明里的文件链接也被拦截走应用内下载。
 - 作业提交（`courses.submitHomework`）流程逆向自学在浙大前端：`POST /api/uploads` → `PUT upload_url` → `POST /api/course/activities/{id}/submissions`。**真实提交不可撤回，调试时不要替用户点提交**；界面上需两次点击确认。
 - 直播：`sub_status` 1 直播中 / 2 未开始 / 3 回放生成中 / 5 无回放 / 6 回放；直播流为 `search-live-course-list` 的 `sub_content.output.m3u8` + `clientUUID`，渲染端用 hls.js 播放（CSP 需 `connect-src`，主进程对 cmc 域补 CORS 头）。
 - 课表按周翻页依赖 Celechron 公开校历 `calendar.celechron.top/<学年-学期>.json`；`exchange` 键前 8 位为放假日、后 8 位为调休上课日（上课日按放假日课表排）。
@@ -71,7 +76,9 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 风格沿用 AoiKJuice 主站（`C:\Project\AoiKJuice\frontend\aoi-next`）："Stay Quiet"、去卡片化、高效率。
 - 纸与墨配色 + 朱色（`--shu`）为唯一强调色；EB Garamond + 方正书宋（字体文件在 `src/renderer/public/type/`）；颗粒纸纹；空心描边大字（`OutlineWord`）作页面水印；进入动画为"上浮 + 去模糊"（`Reveal`，按 `i` 错落）。
 - **界面不放解释性、冗余文字**：不写副标题、计数、来源注记、功能描述；空状态只写"无"。
+- **不用点号（·）作分隔**，用 `Sep`（细竖线）/ `Joined`（components/Type.tsx）；选中态用主题色下划线（刊头导航的滑动点除外）。
 - **不要用卡片**：信息用 `.rows/.row`（时间 · 正文 · 尾注，细线分隔）呈现，区块标题用 `SectionHead`；空/错/未登录状态统一用 `Quiet` 一行小字。样式类集中在 `styles.css`，颜色只用 CSS 变量（`--paper/--ink/--ink-2/--ink-3/--rule/--tint/--shu`）。
+- 主题色在播放器黑底控件上用提亮版本 `--shu-bright`（随 data-accent 定义）。
 - 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。
 - 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
 - `Reveal` 动画结束会清掉 filter/transform：带 filter 的祖先会让 `position: fixed` 的后代（如铺满的播放器）只相对它定位。

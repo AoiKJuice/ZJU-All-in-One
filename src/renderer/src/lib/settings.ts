@@ -9,15 +9,16 @@ export interface Settings {
   accent: Accent
 }
 
-export const FONT_OPTIONS: { id: FontStyle; label: string }[] = [
-  { id: 'song', label: '书宋' },
-  { id: 'hei', label: '黑体' },
-  { id: 'kai', label: '文楷' }
+// name 为字体本身的名字，设置页以该字体显示它
+export const FONT_OPTIONS: { id: FontStyle; name: string }[] = [
+  { id: 'song', name: '方正书宋' },
+  { id: 'hei', name: '微软雅黑' },
+  { id: 'kai', name: '霞鹜文楷' }
 ]
 
 export const ACCENT_OPTIONS: { id: Accent; label: string; color: string }[] = [
   { id: 'blue', label: '求是蓝', color: '#003f88' },
-  { id: 'red', label: '求是红', color: '#b01f24' },
+  { id: 'red', label: '创新红', color: '#b01f24' },
   { id: 'shu', label: '朱砂', color: '#a94f35' }
 ]
 

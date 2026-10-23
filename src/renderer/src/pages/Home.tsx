@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import type { CourseSession } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
 import { useApp } from '@renderer/store'
-import { OutlineWord, Quiet, Reveal, SectionHead } from '@renderer/components/Type'
+import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isUrgent, relativeTo, todayWeekday, weekdayLabel } from '@renderer/lib/format'
 
@@ -131,7 +131,12 @@ export function Home() {
                     <span className="row-title">{e.courseName}</span>
                     <span className="row-sub">
                       {e.location}
-                      {e.seat && ` · ${e.seat} 座`}
+                      {e.seat && (
+                        <>
+                          <Sep />
+                          {e.seat} 座
+                        </>
+                      )}
                     </span>
                   </span>
                   <span className="row-end">{relativeTo(e.startTime)}</span>
@@ -165,5 +170,5 @@ function Summary(props: { next?: CourseSession; urgent: number; exam?: { courseN
   }
   if (props.urgent) parts.push(<span key="a"><em>{props.urgent}</em> 项作业将截止</span>)
   if (props.exam) parts.push(<span key="e">{props.exam.courseName}考试 {relativeTo(props.exam.startTime)}</span>)
-  return <>{parts.flatMap((p, i) => (i ? ['　·　', p] : [p]))}</>
+  return <Joined parts={parts} />
 }

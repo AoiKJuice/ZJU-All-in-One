@@ -21,10 +21,7 @@ export function Settings() {
           <Row label="字体">
             {FONT_OPTIONS.map((o) => (
               <Option key={o.id} active={settings.font === o.id} onClick={() => setSetting('font', o.id)}>
-                <span style={{ fontFamily: FAMILY[o.id] }}>
-                  {o.label}
-                  <span className="ml-2 text-[var(--ink-3)]">求是 2026.10</span>
-                </span>
+                <span style={{ fontFamily: FAMILY[o.id] }}>{o.name}</span>
               </Option>
             ))}
           </Row>

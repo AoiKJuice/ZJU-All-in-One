@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Assignment, AssignmentDetail, PickedFile } from '@shared/types'
 import { useApp } from '@renderer/store'
+import { Joined } from './Type'
+import { DownloadRow, downloadFile } from './Download'
 import { clock, dotDate, relativeTo } from '@renderer/lib/format'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -19,6 +21,9 @@ function clean(html: string): string {
   })
   return doc.body.innerHTML
 }
+
+// 说明里的文件链接（学在浙大附件接口或常见文件后缀）走应用内下载，不交给浏览器
+const FILE_LINK = /\/api\/uploads\/|\.(pdf|docx?|pptx?|xlsx?|zip|rar|7z|txt|md|csv|png|jpe?g|gif|mp4|mp3)(\?|#|$)/i
 
 const size = (n: number): string => (n > 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${Math.ceil(n / 1024)} KB`)
 
@@ -110,7 +115,7 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
         </button>
       </div>
       <p className="quiet !py-2">
-        {a.courseName}　·　{dotDate(a.deadline)} {clock(a.deadline)}　·　{relativeTo(a.deadline)}
+        <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />
         {a.url && (
           <a className="act ml-4" href={a.url} target="_blank" rel="noreferrer">
             原页面 ↗
@@ -123,15 +128,21 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
           <p className="quiet">{error ?? '…'}</p>
         ) : (
           <>
-            {detail.descriptionHtml && <div className="rich" dangerouslySetInnerHTML={{ __html: clean(detail.descriptionHtml) }} />}
+            {detail.descriptionHtml && <div
+                className="rich"
+                onClick={(e) => {
+                  const link = (e.target as HTMLElement).closest('a')
+                  if (!link || !FILE_LINK.test(link.href)) return
+                  e.preventDefault()
+                  const name = link.textContent?.trim() || decodeURIComponent(new URL(link.href).pathname.split('/').pop() ?? 'file')
+                  void downloadFile(link.href, name)
+                }}
+                dangerouslySetInnerHTML={{ __html: clean(detail.descriptionHtml) }}
+              />}
             {detail.attachments.length > 0 && (
               <ul className="rows mt-4">
                 {detail.attachments.map((f) => (
-                  <li key={f.url}>
-                    <a className="row !grid-cols-1 !py-2" href={f.url} target="_blank" rel="noreferrer">
-                      <span className="row-title !text-base">{f.name}</span>
-                    </a>
-                  </li>
+                  <DownloadRow key={f.url} url={f.url} name={f.name} />
                 ))}
               </ul>
             )}
@@ -144,7 +155,7 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
                       <span className="row-time">
                         {dotDate(s.submittedAt)} {clock(s.submittedAt)}
                       </span>
-                      <span className="text-[0.9375rem]">{[s.comment, ...s.files.map((f) => f.name)].filter(Boolean).join('　·　')}</span>
+                      <span className="text-[0.9375rem]"><Joined parts={[s.comment, ...s.files.map((f) => f.name)]} /></span>
                     </li>
                   ))}
                 </ul>

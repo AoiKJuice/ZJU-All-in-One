@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { SystemStats, TaskProgress } from '@shared/types'
+import { Joined } from './Type'
 
 const STEPS = [
   ['engine', '引擎'],
@@ -40,7 +41,7 @@ export function TranscribeProgress({ task }: { task: TaskProgress }) {
       <div className="progress mt-2">
         <span style={{ width: pct(task.ratio ?? 0) }} />
       </div>
-      <p className="quiet !py-2 tabular-nums">{detail.join('　·　') || '…'}</p>
+      <p className="quiet !py-2 tabular-nums">{detail.length ? <Joined parts={detail} /> : '…'}</p>
       <AnimatePresence>{hover && <Stats />}</AnimatePresence>
     </div>
   )

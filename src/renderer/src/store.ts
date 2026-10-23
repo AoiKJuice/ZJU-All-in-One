@@ -30,6 +30,9 @@ interface AppStore {
   openAssignment: (assignment: Assignment | null) => void
   /** 让所有数据 hook 重新拉取（如提交作业后） */
   refresh: () => void
+  /** 底部轻提示；action 为可选的文字按钮 */
+  toast: { id: number; text: string; action?: { label: string; run: () => void } } | null
+  notify: (text: string, action?: { label: string; run: () => void }) => void
   toggleTheme: () => void
   refreshAuth: () => Promise<void>
   login: () => Promise<void>
@@ -72,6 +75,14 @@ export const useApp = create<AppStore>((set, get) => {
     openReplay: (replay) => set({ replay, page: 'replay' }),
     openAssignment: (assignment) => set({ assignment }),
     refresh: () => set((s) => ({ epoch: s.epoch + 1 })),
+    toast: null,
+    notify: (text, action) => {
+      const id = Date.now()
+      set({ toast: { id, text, action } })
+      setTimeout(() => {
+        if (get().toast?.id === id) set({ toast: null })
+      }, 5000)
+    },
     toggleTheme: () => get().setSetting('theme', get().theme === 'dark' ? 'light' : 'dark'),
     refreshAuth: () => runAuth(() => window.zju['auth:state']()),
     login: () => runAuth(() => window.zju['auth:login']()),

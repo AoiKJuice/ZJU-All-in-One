@@ -1,4 +1,4 @@
-import type { Assignment, CourseSession, DataResult, Exam, LectureReplay } from '@shared/types'
+import type { Assignment, CourseSession, DataResult, Exam, LectureReplay, Slide, TranscriptSegment } from '@shared/types'
 
 // 演示数据：ZJU_DEMO=1 时替代全部数据通道，便于不登录调前端
 
@@ -36,3 +36,19 @@ export const mockReplays: LectureReplay[] = [
   { id: 'r1', courseId: 'demo', courseName: '线性代数（甲）', title: '第 8 讲 特征值与特征向量', teacher: '李老师', recordedAt: day(-1, 9, 50), durationMinutes: 135, status: 'replay', date: day(-1, 0).slice(0, 10) },
   { id: 'r2', courseId: 'demo', courseName: '数学分析（甲）Ⅰ', title: '第 9 讲 一致连续', teacher: '张老师', recordedAt: day(-2, 8), durationMinutes: 90, status: 'replay', date: day(-1, 0).slice(0, 10) }
 ]
+
+// 回放页演示：SVG 课件页（data URL）、几段文字稿
+export const mockSlides: Slide[] = Array.from({ length: 12 }, (_, i) => ({
+  time: i * 300,
+  imageUrl:
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="1280" height="720" fill="#fbfaf7"/><text x="80" y="160" font-size="64" font-family="serif" fill="#26221d">第 ${i + 1} 页</text><rect x="80" y="220" width="${400 + i * 40}" height="12" fill="#c9c2b6"/><rect x="80" y="260" width="620" height="12" fill="#c9c2b6"/></svg>`
+    )
+}))
+
+export const mockTranscript: TranscriptSegment[] = Array.from({ length: 40 }, (_, i) => ({
+  start: i * 20,
+  end: i * 20 + 18,
+  text: `演示文字稿第 ${i + 1} 段，用来查看侧栏的排版与滚动。`
+}))

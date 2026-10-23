@@ -6,6 +6,7 @@ import type {
   TranscriptSegment
 } from '@shared/types'
 import { zjuSession } from './auth/zjuam'
+import { upgrade } from './download'
 
 function escapeHtml(value: string): string {
   return value
@@ -26,7 +27,7 @@ export async function exportSlidesPdf(
   // 图片先通过认证会话读取，打印窗口只加载内联数据。
   const images: string[] = []
   for (const slide of slides) {
-    const response = await zjuSession().fetch(slide.imageUrl, {
+    const response = await zjuSession().fetch(upgrade(slide.imageUrl), {
       headers: { Referer: 'https://classroom.zju.edu.cn/' }
     })
     if (!response.ok) throw new Error('课件图片下载失败')

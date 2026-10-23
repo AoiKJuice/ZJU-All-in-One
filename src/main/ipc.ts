@@ -1,12 +1,14 @@
 import {
+  app,
   BrowserWindow,
   dialog,
   ipcMain,
+  shell,
   type OpenDialogOptions,
   type SaveDialogOptions
 } from 'electron'
 import { stat } from 'node:fs/promises'
-import { basename } from 'node:path'
+import { basename, join } from 'node:path'
 import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
 import type { AuthState, TaskProgress } from '@shared/types'
 import { hasCasCookie, login, logout } from './auth/zjuam'
@@ -35,7 +37,8 @@ import { getSystemStats } from './stats'
 import { transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
-import { mock, mockAssignments, mockExams, mockReplays, mockSchedule } from './services/demo'
+import { downloadToFile } from './download'
+import { mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript } from './services/demo'
 
 type Handlers = {
   [K in ZjuChannel]: (
@@ -103,6 +106,15 @@ const handlers: Handlers = {
   'data:calendar': () => fetchCalendar(),
   'data:lectures': (_win, from, to) => fetchLectures(from, to),
   'system:stats': async () => getSystemStats(),
+
+  'file:download': async (win, url, name) => {
+    const options: SaveDialogOptions = { defaultPath: join(app.getPath('downloads'), name) }
+    const result = await (win ? dialog.showSaveDialog(win, options) : dialog.showSaveDialog(options))
+    if (result.canceled || !result.filePath) return null
+    await downloadToFile(url, result.filePath)
+    return result.filePath
+  },
+  'file:reveal': async (_win, path) => shell.showItemInFolder(path),
 
   'homework:detail': (_win, activityId) => getAssignmentDetail(activityId),
   'homework:pick': async (win) => {
@@ -181,7 +193,12 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:assignments': async () => mock(mockAssignments),
     'data:replays': async () => mock(mockReplays),
     'data:calendar': () => fetchCalendar(),
-    'data:lectures': async () => []
+    'data:lectures': async () => mockReplays,
+    'replay:slides': async () => mockSlides,
+    'replay:transcript': async () => mockTranscript,
+    'replay:playback': async () => {
+      throw new Error('演示模式无视频')
+    }
   } satisfies Partial<Handlers>)
 }
 

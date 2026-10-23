@@ -1,31 +1,43 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
 import type { PlaybackSource, Slide, TranscriptFormat, TranscriptSegment } from '@shared/types'
 import { useApp } from '@renderer/store'
-import { OutlineWord, Reveal, SectionHead } from '@renderer/components/Type'
+import { Joined, OutlineWord, Reveal } from '@renderer/components/Type'
 import { dotDate } from '@renderer/lib/format'
 import { Player } from '@renderer/components/Player'
 import { TranscribeProgress } from '@renderer/components/TranscribeProgress'
-import { LectureStrip } from '@renderer/components/LectureStrip'
+import { LectureList } from '@renderer/components/LectureList'
+import { SlideViewer } from '@renderer/components/SlideViewer'
+import { useCurrentSlide } from '@renderer/hooks/useCurrentSlide'
 
 const hms = (sec: number): string =>
   [Math.floor(sec / 3600), Math.floor((sec % 3600) / 60), Math.floor(sec % 60)].map((n) => String(n).padStart(2, '0')).join(':')
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
-/** 回放页：左侧播放器与课件，右侧文字稿（本地 Whisper）；点时间跳转播放，课件与文字稿均可导出 */
+type Tab = 'slides' | 'transcript' | 'lectures'
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'slides', label: '课件' },
+  { id: 'transcript', label: '文字稿' },
+  { id: 'lectures', label: '选集' }
+]
+
+/**
+ * 回放 / 直播页：左侧整列给视频（16:9 按列宽与可用高度取较小者），右侧侧栏在 课件 / 文字稿 / 选集 之间切换。
+ * 三个面板都保持挂载、只是隐藏：字幕依赖文字稿行定位当前句，课件要保留跟随状态。
+ */
 export function Replay() {
   const replay = useApp((s) => s.replay)!
+  const notify = useApp((s) => s.notify)
   const key = `transcribe:${replay.id}`
   const task = useApp((s) => s.tasks[key])
   const partial = useApp((s) => s.partials[key])
   const clearPartials = useApp((s) => s.clearPartials)
   const live = replay.status === 'live'
+  const [tab, setTab] = useState<Tab>('slides')
   const [slides, setSlides] = useState<Slide[] | null>(null)
   const [slidesError, setSlidesError] = useState<string | null>(null)
   const [segments, setSegments] = useState<TranscriptSegment[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [zoom, setZoom] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [src, setSrc] = useState<PlaybackSource | null>(null)
   const [srcError, setSrcError] = useState<string | null>(null)
@@ -41,6 +53,7 @@ export function Replay() {
   const [captions, setCaptions] = useState(true)
   const subtitle = useRef<HTMLParagraphElement>(null)
   const title = `${replay.courseName} ${replay.title}`.trim()
+  const currentSlide = useCurrentSlide(slides, video, live, src)
 
   useEffect(() => {
     let active = true
@@ -128,6 +141,7 @@ export function Replay() {
   const transcribe = async (): Promise<void> => {
     setError(null)
     clearPartials(key)
+    setTab('transcript')
     try {
       setSegments(await window.zju['replay:transcribe'](replay.courseId, replay.id))
     } catch (e) {
@@ -137,7 +151,23 @@ export function Replay() {
 
   const exportSlides = async (): Promise<void> => {
     setBusy(true)
-    await window.zju['replay:exportSlides'](replay.courseId, replay.id, title).finally(() => setBusy(false))
+    try {
+      const path = await window.zju['replay:exportSlides'](replay.courseId, replay.id, title)
+      if (path) notify('已导出', { label: '打开位置', run: () => void window.zju['file:reveal'](path) })
+    } catch (e) {
+      notify(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const exportText = async (format: TranscriptFormat): Promise<void> => {
+    try {
+      const path = await window.zju['replay:exportTranscript'](replay.id, format, title)
+      if (path) notify('已导出', { label: '打开位置', run: () => void window.zju['file:reveal'](path) })
+    } catch (e) {
+      notify(errorText(e))
+    }
   }
 
   const seek = (sec: number): void => {
@@ -153,154 +183,141 @@ export function Replay() {
     }
   }
 
-  const exportText = (format: TranscriptFormat): void => void window.zju['replay:exportTranscript'](replay.id, format, title)
-
   return (
-    <div className="page page-fit">
-      <OutlineWord text="Replay" />
-      <Reveal>
-        <h1 className="page-title">
+    <div className="page page-fit page-wide replay-page">
+      <OutlineWord text={live ? 'Live' : 'Replay'} />
+      <Reveal className="replay-head">
+        <h1 className="replay-title">
           {replay.courseName}
-          {live && <span className="live-mark ml-5 align-middle text-[0.35em]">直播</span>}
+          {live && <span className="live-mark ml-4 text-[0.55em]">直播</span>}
         </h1>
-      </Reveal>
-      <Reveal i={1}>
-        <p className="page-lede">
-          {replay.title}　·　{replay.teacher}　·　{dotDate(replay.recordedAt)}
+        <p className="replay-meta">
+          <Joined parts={[replay.title, replay.teacher, dotDate(replay.recordedAt)]} />
           {replay.url && (
             <a className="act ml-6" href={replay.url} target="_blank" rel="noreferrer">
               原页面 ↗
             </a>
           )}
         </p>
-        <LectureStrip current={replay} />
       </Reveal>
 
-      <div className="panes grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <Reveal i={2} className="pane gap-5">
-          <div className="player" data-expanded={expanded || undefined}>
+      <div className="replay-layout">
+        <Reveal i={1} className="replay-main">
+          <div className="player-wrap">
             {src ? (
-              <Player ref={video} source={src} onError={onPlayerError} />
+              <Player ref={video} source={src} onError={onPlayerError} expanded={expanded} onToggleExpand={() => setExpanded((x) => !x)}>
+                {captions && segments && <p ref={subtitle} className="subtitle" />}
+              </Player>
             ) : (
-              <p className="quiet">{srcError ?? '…'}</p>
-            )}
-            {captions && segments && <p ref={subtitle} className="subtitle" />}
-            {src && (
-              <button className="player-expand" onClick={() => setExpanded((x) => !x)}>
-                {expanded ? '还原' : '铺满'}
-              </button>
+              <div className="player">
+                <p className="quiet">{srcError ?? '…'}</p>
+              </div>
             )}
           </div>
-          {src && srcError && <p className="quiet">{srcError}</p>}
-          <SectionHead
-            title="课件"
-            note={
-              <span className="acts">
-                {slides && slides.length > 0 && <span>{slides.length} 页</span>}
-                <button className="act" disabled={!slides?.length || busy} onClick={exportSlides}>
-                  {busy ? '导出中' : '导出 PDF'}
-                </button>
-              </span>
-            }
-          />
-          <div className="pane-scroll pt-4">
-            {slides === null ? (
-              <p className="quiet">{slidesError ?? '…'}</p>
-            ) : slides.length === 0 ? (
-              <p className="quiet">无</p>
-            ) : (
-              <div className="slides">
-                {slides.map((s, i) => (
-                  <button key={s.imageUrl} className="slide" onClick={() => (s.time !== undefined ? seek(s.time) : setZoom(s.imageUrl))}>
-                    <img src={s.imageUrl} alt="" loading="lazy" decoding="async" />
-                    <span className="slide-no">{i + 1}</span>
-                  </button>
-                ))}
-              </div>
+          {src && srcError && <p className="quiet !py-1">{srcError}</p>}
+          {/* 左列偏高时（容器查询），视频下方显示当前讲解页，与视频同时可见 */}
+          <div className="current-slide">
+            {slides?.[currentSlide] && (
+              <>
+                <img src={slides[currentSlide].imageUrl} alt="" />
+                <span className="slide-no">
+                  {currentSlide + 1} / {slides.length}
+                </span>
+              </>
             )}
           </div>
         </Reveal>
 
-        <Reveal i={3} className="pane">
-          <SectionHead
-            title="文字稿"
-            note={
-              segments ? (
-                <span className="acts">
+        <Reveal i={2} className="replay-side">
+          <nav className="tabs">
+            {TABS.map((t) => (
+              <button key={t.id} data-active={tab === t.id || undefined} onClick={() => setTab(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          <section className="tab-panel" hidden={tab !== 'slides'}>
+            <SlideViewer
+              slides={slides}
+              error={slidesError}
+              video={video}
+              ready={src}
+              live={live}
+              courseName={replay.courseName}
+              onSeek={seek}
+              extra={
+                <button className="act" disabled={!slides?.length || busy} onClick={exportSlides}>
+                  {busy ? '导出中' : '导出 PDF'}
+                </button>
+              }
+            />
+          </section>
+
+          <section className="tab-panel" hidden={tab !== 'transcript'}>
+            <div className="acts tab-tools">
+              {segments ? (
+                <>
                   <button className="act" data-on={captions || undefined} onClick={() => setCaptions((x) => !x)}>
-                    {captions ? '字幕 ·' : '字幕'}
+                    字幕
                   </button>
+                  <span className="flex-1" />
                   {(['txt', 'srt', 'md'] as const).map((f) => (
-                    <button key={f} className="act" onClick={() => exportText(f)}>
+                    <button key={f} className="act" onClick={() => void exportText(f)}>
                       {f.toUpperCase()}
                     </button>
                   ))}
-                </span>
+                </>
               ) : (
                 !live && (
                   <button className="act" disabled={running} onClick={transcribe}>
                     转写
                   </button>
                 )
-              )
-            }
-          />
-          {running && <TranscribeProgress task={task} />}
-          <div
-            ref={scroller}
-            className="pane-scroll scroll-bar pt-2"
-            onScroll={(e) => {
-              const el = e.currentTarget
-              following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
-            }}
-          >
-            {segments ? (
-              <div ref={transcript} className="transcript">
-                {segments.map((s, i) => (
-                  <p key={`${s.start}:${i}`}>
-                    <button onClick={() => seek(s.start)}>
+              )}
+            </div>
+            {running && <TranscribeProgress task={task} />}
+            <div
+              ref={scroller}
+              className="pane-scroll scroll-bar pt-1"
+              onScroll={(e) => {
+                const el = e.currentTarget
+                following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+              }}
+            >
+              {segments ? (
+                <div ref={transcript} className="transcript">
+                  {segments.map((s, i) => (
+                    <p key={`${s.start}:${i}`}>
+                      <button onClick={() => seek(s.start)}>
+                        <time>{hms(s.start)}</time>
+                      </button>
+                      <span>{s.text}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : running && partial?.length ? (
+                <div className="transcript">
+                  {partial.map((s, i) => (
+                    <p key={`${s.start}:${i}`}>
                       <time>{hms(s.start)}</time>
-                    </button>
-                    <span>{s.text}</span>
-                  </p>
-                ))}
-              </div>
-            ) : running && partial?.length ? (
-              <div className="transcript">
-                {partial.map((s, i) => (
-                  <p key={`${s.start}:${i}`}>
-                    <time>{hms(s.start)}</time>
-                    <span>{s.text}</span>
-                  </p>
-                ))}
-              </div>
-            ) : (
-              !running && <p className="quiet">{error ?? '无'}</p>
-            )}
-          </div>
+                      <span>{s.text}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                !running && <p className="quiet">{error ?? '无'}</p>
+              )}
+            </div>
+          </section>
+
+          <section className="tab-panel" hidden={tab !== 'lectures'}>
+            <div className="pane-scroll scroll-bar">
+              <LectureList current={replay} />
+            </div>
+          </section>
         </Reveal>
       </div>
-
-      <AnimatePresence>
-        {zoom && (
-          <motion.div
-            className="lightbox"
-            onClick={() => setZoom(null)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <motion.img
-              src={zoom}
-              alt=""
-              initial={{ scale: 0.96, filter: 'blur(6px)' }}
-              animate={{ scale: 1, filter: 'blur(0px)' }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

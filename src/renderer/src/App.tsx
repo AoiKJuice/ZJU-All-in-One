@@ -8,6 +8,7 @@ import { Replay } from './pages/Replay'
 import { Settings } from './pages/Settings'
 import { AssignmentSheet } from './components/AssignmentSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { Toast } from './components/Toast'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
@@ -49,6 +50,7 @@ export function App() {
       <ErrorBoundary>
         <AssignmentSheet />
       </ErrorBoundary>
+      <Toast />
     </>
   )
 }

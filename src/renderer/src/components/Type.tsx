@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { useApp } from '@renderer/store'
 
@@ -59,4 +59,24 @@ export function Quiet({ error, empty, loading }: { error: string | null; empty: 
       </p>
     )
   return <p className="quiet">{error ?? empty}</p>
+}
+
+/** 分隔：一条细竖线，不用点号 */
+export function Sep() {
+  return <span className="sep" aria-hidden="true" />
+}
+
+/** 把多段内容用 Sep 串起来，空项跳过 */
+export function Joined({ parts }: { parts: ReactNode[] }) {
+  const items = parts.filter((p) => p !== null && p !== undefined && p !== false && p !== '')
+  return (
+    <>
+      {items.map((p, i) => (
+        <Fragment key={i}>
+          {i > 0 && <Sep />}
+          {p}
+        </Fragment>
+      ))}
+    </>
+  )
 }

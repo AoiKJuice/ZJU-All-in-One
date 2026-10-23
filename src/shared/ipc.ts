@@ -38,6 +38,11 @@ export interface ZjuApi {
   /** 悬停转写进度时轮询 */
   'system:stats': () => Promise<SystemStats>
 
+  /** 应用内下载：弹保存框（默认"下载"目录 + name），用登录会话写文件；取消返回 null，成功返回路径 */
+  'file:download': (url: string, name: string) => Promise<string | null>
+  /** 在资源管理器中显示文件 */
+  'file:reveal': (path: string) => Promise<void>
+
   'homework:detail': (activityId: string) => Promise<AssignmentDetail>
   /** 打开系统文件选择框；取消时返回空数组 */
   'homework:pick': () => Promise<PickedFile[]>
@@ -69,6 +74,8 @@ export const ZJU_CHANNELS = [
   'data:calendar',
   'data:lectures',
   'system:stats',
+  'file:download',
+  'file:reveal',
   'homework:detail',
   'homework:pick',
   'homework:submit',
