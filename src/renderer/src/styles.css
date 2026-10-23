@@ -141,9 +141,9 @@ html[data-font='kai'] {
   #root {
     height: 100%;
   }
-  /* 整体随窗口缩放：所有 rem 尺寸跟着变，小窗口时尽量免于下滑 */
+  /* 整体随窗口缩放：所有 rem 尺寸跟着变，小窗口时尽量免于下滑；--scale 为设置页的字号档位 */
   html {
-    font-size: clamp(12px, 0.5vw + 0.95vh, 17px);
+    font-size: calc(clamp(12px, 0.5vw + 0.95vh, 17px) * var(--scale, 1));
   }
   body {
     margin: 0;
@@ -1180,34 +1180,58 @@ button.row {
   width: auto;
 }
 
-/* 左列：视频 + （高度富余时）当前讲解页 */
-.replay-main {
-  container: rmain / size;
+/* 播放器里的课件层：盖在视频上显示当前讲解页，不拦截鼠标（单击 / 双击 / 右键仍作用于视频） */
+.player-slide {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  pointer-events: none;
 }
-.current-slide {
-  display: none;
+
+/* 主页下拉刷新：刊头下一道主题色细线随拉动展开，触发后铺满再淡出 */
+.pull-line {
+  position: fixed;
+  top: var(--mast-h);
+  left: 50%;
+  z-index: 39;
+  width: min(24rem, 40vw);
+  height: 1px;
+  background: var(--shu);
+  pointer-events: none;
+  opacity: min(1, calc(var(--p) * 3));
+  transform: translateX(-50%) scaleX(var(--p));
+  transition: transform 0.25s var(--ease), opacity 0.3s var(--ease);
 }
-@container rmain (max-aspect-ratio: 5 / 4) {
-  .replay-main .player-wrap {
-    flex: none;
-    container-type: normal;
-  }
-  .replay-main .player-wrap > .player {
-    width: 100%;
-  }
-  .replay-main .current-slide {
-    position: relative;
-    display: block;
-    flex: 1;
-    min-height: 0;
-    margin-top: 0.75rem;
-    background: var(--paper-2);
-  }
-  .current-slide img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
+.pull-line[data-done] {
+  animation: pull-done 0.9s var(--ease) forwards;
+}
+@keyframes pull-done {
+  0% { transform: translateX(-50%) scaleX(1); opacity: 1; }
+  100% { transform: translateX(-50%) scaleX(2.5); opacity: 0; }
+}
+
+/* 登录面板：刊头"登录"下方，纸底细线，不做卡片阴影 */
+.login-panel {
+  position: fixed;
+  top: var(--mast-h);
+  right: calc(140px + 1rem);
+  z-index: 45;
+  width: 18rem;
+  padding: 1rem 1.5rem 1.25rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+.login-field {
+  min-height: 0;
+  padding: 0.6rem 0;
+  resize: none;
+}
+.login-error {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--shu);
 }

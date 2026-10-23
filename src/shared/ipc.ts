@@ -23,7 +23,8 @@ import type {
  */
 export interface ZjuApi {
   'auth:state': () => Promise<AuthState>
-  'auth:login': () => Promise<AuthState>
+  /** 带账号密码：程序内登录并加密保存，过期时自动重登；不带：弹出统一身份认证网页（验证码等兜底） */
+  'auth:login': (account?: { username: string; password: string }) => Promise<AuthState>
   'auth:logout': () => Promise<AuthState>
 
   'data:schedule': () => Promise<DataResult<CourseSession[]>>

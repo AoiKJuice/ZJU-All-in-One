@@ -18,6 +18,8 @@ interface Props {
   /** 铺满窗口 */
   expanded: boolean
   onToggleExpand: () => void
+  /** 当前讲解页图片；有值时控制条出现「课件」，点后在视频位置显示它 */
+  slide?: string
   /** 叠在画面上的内容（字幕） */
   children?: ReactNode
 }
@@ -27,7 +29,7 @@ interface Props {
  * 回放：播放/暂停、进度、时间、音量、倍速、铺满、全屏。
  * 直播（hls）：不允许暂停与拖动，只有音量、铺满、全屏；被暂停时立即恢复播放。
  */
-export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player({ source, onError, expanded, onToggleExpand, children }, ref) {
+export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player({ source, onError, expanded, onToggleExpand, slide, children }, ref) {
   const box = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   useImperativeHandle(ref, () => video.current!, [])
@@ -41,6 +43,9 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
   const [speed, setSpeed] = useState(1)
   const [fullscreen, setFullscreen] = useState(false)
   const [idle, setIdle] = useState(false)
+  // 课件模式：视频位置显示当前讲解页，声音照常
+  const [showSlide, setShowSlide] = useState(false)
+  const slideOn = showSlide && !!slide
 
   // 加载源：mp4 直接给 <video>；直播 m3u8 用 hls.js（Chromium 不原生支持 HLS）
   useEffect(() => {
@@ -168,6 +173,7 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
           onToggleExpand()
         }}
       />
+      {slideOn && <img className="player-slide" src={slide} alt="" />}
       {children}
       <div className="player-bar" onMouseMove={wake}>
         {live ? (
@@ -215,6 +221,7 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
             {speed}×
           </button>
         )}
+        {slide && <button onClick={() => setShowSlide((x) => !x)}>{slideOn ? '画面' : '课件'}</button>}
         <button onClick={onToggleExpand}>{expanded ? '还原' : '铺满'}</button>
         <button onClick={fullscreenToggle}>{fullscreen ? '退出全屏' : '全屏'}</button>
       </div>

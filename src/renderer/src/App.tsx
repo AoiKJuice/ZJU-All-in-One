@@ -9,6 +9,7 @@ import { Settings } from './pages/Settings'
 import { AssignmentSheet } from './components/AssignmentSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Toast } from './components/Toast'
+import { LoginPanel } from './components/LoginPanel'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
@@ -20,12 +21,26 @@ const PAGES: Record<PageId, ComponentType> = {
 export function App() {
   const page = useApp((s) => s.page)
   const refreshAuth = useApp((s) => s.refreshAuth)
+  const back = useApp((s) => s.back)
+  const forward = useApp((s) => s.forward)
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
   const Page = PAGES[page]
 
   useEffect(() => {
     void refreshAuth()
   }, [refreshAuth])
+
+  // 鼠标侧键：3 返回，4 前进
+  useEffect(() => {
+    const onUp = (e: MouseEvent): void => {
+      if (e.button === 3) back()
+      else if (e.button === 4) forward()
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('mouseup', onUp)
+    return () => window.removeEventListener('mouseup', onUp)
+  }, [back, forward])
 
   useEffect(() => {
     scroller?.scrollTo({ top: 0 })
@@ -50,6 +65,7 @@ export function App() {
       <ErrorBoundary>
         <AssignmentSheet />
       </ErrorBoundary>
+      <LoginPanel />
       <Toast />
     </>
   )

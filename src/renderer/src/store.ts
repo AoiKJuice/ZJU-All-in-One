@@ -5,6 +5,12 @@ import { applySettings, initialSettings, type Settings } from './lib/settings'
 
 export type PageId = 'home' | 'schedule' | 'replay' | 'settings'
 
+/** 一条浏览记录：页面 + 回放页所开的课次 */
+interface Visit {
+  page: PageId
+  replay: LectureReplay | null
+}
+
 interface AppStore {
   page: PageId
   /** 回放页当前打开的课次 */
@@ -25,6 +31,11 @@ interface AppStore {
   authReady: boolean
   /** 每次登录状态变化 +1，数据 hook 据此重新拉取 */
   epoch: number
+  /** 浏览记录，鼠标侧键前进 / 返回 */
+  past: Visit[]
+  future: Visit[]
+  back: () => void
+  forward: () => void
   go: (page: PageId) => void
   openReplay: (replay: LectureReplay) => void
   openAssignment: (assignment: Assignment | null) => void
@@ -35,7 +46,11 @@ interface AppStore {
   notify: (text: string, action?: { label: string; run: () => void }) => void
   toggleTheme: () => void
   refreshAuth: () => Promise<void>
-  login: () => Promise<void>
+  /** 登录面板是否展开 */
+  loginOpen: boolean
+  setLoginOpen: (open: boolean) => void
+  /** 带账号密码为程序内登录，不带为网页登录；失败时抛出 */
+  login: (account?: { username: string; password: string }) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -48,6 +63,13 @@ export const useApp = create<AppStore>((set, get) => {
     } finally {
       set({ authBusy: false })
     }
+  }
+
+  // 换页时把当前页记入 past，清空 future；同一页同一课次不记
+  const visit = (next: Visit): void => {
+    const { page, replay, past } = get()
+    if (page === next.page && replay?.id === next.replay?.id) return
+    set({ ...next, past: [...past, { page, replay }].slice(-50), future: [] })
   }
 
   const settings = initialSettings()
@@ -71,8 +93,22 @@ export const useApp = create<AppStore>((set, get) => {
     authBusy: false,
     authReady: false,
     epoch: 0,
-    go: (page) => set({ page }),
-    openReplay: (replay) => set({ replay, page: 'replay' }),
+    past: [],
+    future: [],
+    back: () => {
+      const { past, future, page, replay, assignment } = get()
+      // 作业侧页开着时，返回先关侧页
+      if (assignment) return set({ assignment: null })
+      const prev = past.at(-1)
+      if (prev) set({ ...prev, past: past.slice(0, -1), future: [{ page, replay }, ...future] })
+    },
+    forward: () => {
+      const { past, future, page, replay } = get()
+      const next = future[0]
+      if (next) set({ ...next, past: [...past, { page, replay }], future: future.slice(1) })
+    },
+    go: (page) => visit({ page, replay: get().replay }),
+    openReplay: (replay) => visit({ page: 'replay', replay }),
     openAssignment: (assignment) => set({ assignment }),
     refresh: () => set((s) => ({ epoch: s.epoch + 1 })),
     toast: null,
@@ -85,7 +121,12 @@ export const useApp = create<AppStore>((set, get) => {
     },
     toggleTheme: () => get().setSetting('theme', get().theme === 'dark' ? 'light' : 'dark'),
     refreshAuth: () => runAuth(() => window.zju['auth:state']()),
-    login: () => runAuth(() => window.zju['auth:login']()),
+    loginOpen: false,
+    setLoginOpen: (loginOpen) => set({ loginOpen }),
+    login: async (account) => {
+      await runAuth(() => window.zju['auth:login'](account))
+      if (get().auth.loggedIn) set({ loginOpen: false })
+    },
     logout: () => runAuth(() => window.zju['auth:logout']())
   }
 })

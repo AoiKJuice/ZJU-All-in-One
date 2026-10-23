@@ -8,8 +8,9 @@ import { initializeDiagnostics } from './diagnostics'
 const profile = process.env['ZJU_PROFILE']
 app.setPath('userData', join(app.getPath('appData'), profile ? `zju-all-in-one-${profile}` : 'zju-all-in-one'))
 
-// Windows 回放暂用软件解码，规避 D3D11 解码路径；界面 GPU 合成与 Whisper CUDA 保持原设置。
-if (process.platform === 'win32') app.commandLine.appendSwitch('disable-accelerated-video-decode')
+// Windows 上界面不用 GPU：Whisper CUDA 占满显卡时，Chromium 的 GPU 进程被饿住，
+// 它挂在主窗口下的子窗口会把主窗口一起拖进"未响应"（AppHang，转写约一分半后出现）。软件合成后两者不再争用。
+if (process.platform === 'win32') app.disableHardwareAcceleration()
 
 let mainWindow: BrowserWindow | null = null
 

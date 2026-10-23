@@ -50,12 +50,14 @@ export function SectionHead({ title, note }: { title: string; note?: ReactNode }
 
 /** 区块的空 / 错 / 未登录状态，统一一行安静的小字 */
 export function Quiet({ error, empty, loading }: { error: string | null; empty: string; loading: boolean }) {
-  const { auth, login } = useApp()
+  const { auth, setLoginOpen } = useApp()
   if (loading) return <p className="quiet">…</p>
   if (!auth.loggedIn && !import.meta.env.VITE_ZJU_DEMO)
     return (
       <p className="quiet">
-        <button onClick={login}>登录</button>
+        <button data-login-toggle onClick={() => setLoginOpen(true)}>
+          登录
+        </button>
       </p>
     )
   return <p className="quiet">{error ?? empty}</p>

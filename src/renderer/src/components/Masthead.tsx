@@ -9,7 +9,7 @@ const NAV: { id: PageId; label: string }[] = [
 
 /** 刊头：字标、三项导航（朱点随切换滑动）、登录与昼夜切换 */
 export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
-  const { page, go, auth, authBusy, login, logout, theme, toggleTheme } = useApp()
+  const { page, go, auth, authBusy, loginOpen, setLoginOpen, logout, theme, toggleTheme } = useApp()
   const [solid, setSolid] = useState(false)
   // 退出需两次点击：第一次把名字换成"退出"，3 秒内再点才生效
   const [armed, setArmed] = useState(false)
@@ -21,7 +21,7 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
   }, [armed])
 
   const onAuth = (): void => {
-    if (!auth.loggedIn) void login()
+    if (!auth.loggedIn) setLoginOpen(!loginOpen)
     else if (armed) {
       setArmed(false)
       void logout()
@@ -54,7 +54,13 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
         <button onClick={() => go('settings')} data-active={page === 'settings' || undefined} className="data-[active]:text-[var(--shu)]">
           设置
         </button>
-        <button disabled={authBusy} onClick={onAuth} data-armed={armed || undefined} className="data-[armed]:text-[var(--shu)]">
+        <button
+          data-login-toggle
+          disabled={authBusy}
+          onClick={onAuth}
+          data-armed={armed || loginOpen || undefined}
+          className="data-[armed]:text-[var(--shu)]"
+        >
           {!auth.loggedIn ? '登录' : armed ? '退出' : (auth.user?.name ?? '已登录')}
         </button>
         <button onClick={toggleTheme} aria-label="切换昼夜" className="grid w-5 place-items-center">

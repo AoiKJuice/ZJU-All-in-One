@@ -5,6 +5,8 @@ export interface ZjuFetchInit {
   method?: string
   headers?: Record<string, string>
   body?: string | Buffer
+  /** false：被弹回统一身份认证登录页时不自动重登（登录流程自身的请求） */
+  relogin?: false
 }
 
 export interface ZjuResponse {
@@ -15,9 +17,28 @@ export interface ZjuResponse {
   json<T>(): Promise<T>
 }
 
-export function zjuFetch(
+let onExpired: (() => Promise<boolean>) | undefined
+
+/** 注册 CAS 过期时的重登回调（由 ipc.ts 接上账号密码登录，避免 http 与 auth/password 互相引用） */
+export function onCasExpired(handler: () => Promise<boolean>): void {
+  onExpired = handler
+}
+
+const landedOnCasLogin = (url: string): boolean => {
+  const u = new URL(url)
+  return u.hostname === 'zjuam.zju.edu.cn' && u.pathname.startsWith('/cas/login')
+}
+
+/** 请求经 SSO 被弹回统一身份认证登录页时，用保存的账号密码重登并重试一次 */
+export async function zjuFetch(url: string, init: ZjuFetchInit = {}): Promise<ZjuResponse> {
+  const response = await send(url, init)
+  if (init.relogin === false || !onExpired || !landedOnCasLogin(response.url) || landedOnCasLogin(url)) return response
+  return (await onExpired()) ? send(url, init) : response
+}
+
+function send(
   url: string,
-  init: ZjuFetchInit = {}
+  init: ZjuFetchInit
 ): Promise<ZjuResponse> {
   return new Promise((resolve, reject) => {
     let finalUrl = url

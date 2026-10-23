@@ -9,9 +9,12 @@ import {
 } from 'electron'
 import { stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
 import type { AuthState, TaskProgress } from '@shared/types'
 import { hasCasCookie, login, logout } from './auth/zjuam'
+import { clearCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
+import { onCasExpired } from './http'
 import {
   fetchSchedule,
   fetchExams,
@@ -47,8 +50,21 @@ type Handlers = {
   ) => ReturnType<ZjuApi[K]>
 }
 
+function resetServices(): void {
+  resetZdbk()
+  resetCourses()
+  resetClassroom()
+}
+
+// 任何请求被 SSO 弹回登录页时，用保存的账号密码重登；各 service 的一次性登录态随之作废
+onCasExpired(async () => {
+  const ok = await relogin()
+  if (ok) resetServices()
+  return ok
+})
+
 async function getAuthState(): Promise<AuthState> {
-  if (!(await hasCasCookie())) {
+  if (!(await hasCasCookie()) && !(await relogin())) {
     return { loggedIn: false, user: null }
   }
 
@@ -56,12 +72,10 @@ async function getAuthState(): Promise<AuthState> {
     const { data: user } = await fetchProfile()
     return { loggedIn: true, user }
   } catch (error) {
-    // cookie 还在但服务器端 CAS 会话已过期：SSO 被弹回登录页，按未登录处理并清掉残留 cookie
+    // 服务器端 CAS 会话已过期且无法用保存的密码重登：按未登录处理并清掉残留 cookie
     if (error instanceof Error && error.message === '未登录') {
       await logout()
-      resetZdbk()
-      resetCourses()
-      resetClassroom()
+      resetServices()
       return { loggedIn: false, user: null }
     }
     // 教务个人信息字段尚待实测，其他失败不否定 CAS 登录态
@@ -87,15 +101,20 @@ async function chooseSavePath(
 
 const handlers: Handlers = {
   'auth:state': () => getAuthState(),
-  'auth:login': async (win) => {
-    await login(win ?? undefined)
+  'auth:login': async (win, account) => {
+    if (account) {
+      await passwordLogin(account.username, account.password)
+      await saveCredentials(account.username, account.password)
+    } else {
+      await login(win ?? undefined)
+    }
+    resetServices()
     return getAuthState()
   },
   'auth:logout': async () => {
     await logout()
-    resetZdbk()
-    resetCourses()
-    resetClassroom()
+    await clearCredentials()
+    resetServices()
     return { loggedIn: false, user: null }
   },
 
@@ -196,8 +215,11 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:lectures': async () => mockReplays,
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,
+    // ZJU_DEMO_VIDEO 指向本地视频文件时用它调播放器，否则无视频
     'replay:playback': async () => {
-      throw new Error('演示模式无视频')
+      const file = process.env['ZJU_DEMO_VIDEO']
+      if (!file) throw new Error('演示模式无视频')
+      return { url: pathToFileURL(file).href, kind: 'mp4' as const }
     }
   } satisfies Partial<Handlers>)
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useApp } from '@renderer/store'
 import { OutlineWord, Reveal } from '@renderer/components/Type'
-import { ACCENT_OPTIONS, FONT_OPTIONS, type FontStyle } from '@renderer/lib/settings'
+import { ACCENT_OPTIONS, FONT_OPTIONS, SIZE_OPTIONS, type FontStyle } from '@renderer/lib/settings'
 
 // 与 styles.css 中 html[data-font] 的字体栈一致，用来让每个选项以自身字体预览
 const FAMILY: Record<FontStyle, string> = {
@@ -22,6 +22,13 @@ export function Settings() {
             {FONT_OPTIONS.map((o) => (
               <Option key={o.id} active={settings.font === o.id} onClick={() => setSetting('font', o.id)}>
                 <span style={{ fontFamily: FAMILY[o.id] }}>{o.name}</span>
+              </Option>
+            ))}
+          </Row>
+          <Row label="字号">
+            {SIZE_OPTIONS.map((o) => (
+              <Option key={o.id} active={settings.size === o.id} onClick={() => setSetting('size', o.id)}>
+                <span style={{ fontSize: `${o.scale}em` }}>{o.label}</span>
               </Option>
             ))}
           </Row>

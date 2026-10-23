@@ -15,6 +15,7 @@ npm run dev                  # 开发模式
 ZJU_DEMO=1 npm run dev       # 演示数据模式：不登录即可调前端（数据通道全部换成 services/demo.ts）
 ZJU_PROFILE=test npm run dev # 另开一套数据目录（zju-all-in-one-test），可与已安装版并行，不撞单实例锁
 npm run dist                 # 打包 Windows 安装包 + 便携版到 release/（先设 ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/）
+ZJU_DEMO=1 ZJU_DEMO_VIDEO=<本地 mp4> npm run dev # 演示模式下用本地视频调播放器
 ZJU_DEBUG=1 npm run dev      # 主进程打印每个 zjuFetch 请求的最终落点、状态码与响应开头，用于对照真实接口
 npm run build                # 构建到 out/
 npm run typecheck            # node（main/preload/shared）与 web（renderer）两套 tsconfig
@@ -46,6 +47,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 ### 认证与 SSO
 
 - `auth/zjuam.ts` 只负责 CAS：弹出真实 `BrowserWindow` 让用户在 `zjuam.zju.edu.cn` 登录，cookie 存于持久分区 `persist:zju`，以 `iPlanetDirectoryPro` cookie 判定已登录。它**不得 import services**（避免循环依赖）。
+- 账号密码登录在 `auth/password.ts`（流程照 Celechron：登录页取 execution → `/cas/v2/getPubKey` → 无填充 RSA → 表单提交；失败提示在登录页 `#errormsg`，页面始终带隐藏的验证码区，不能据 captcha 字样判断）。凭据用 `safeStorage` 加密存 userData/credentials.bin；只有密码被拒才清掉，网络错误不清。`zjuFetch` 被 SSO 弹回 `/cas/login` 时调用 `onCasExpired` 注册的回调（ipc.ts 接上 `relogin`）重登并重试一次，http.ts 不直接 import password.ts。网页登录（`auth:login` 不带参数）保留作验证码兜底。**调试时不要替用户输入账号密码**，真实登录只能由用户验证。
 - 登录态组合在 `ipc.ts`：`auth:state` = 有 CAS cookie 时调 `zdbk.fetchProfile()` 取姓名（失败时 `user: null` 但仍算已登录）；`auth:logout` 清 cookie 后调用各 service 的 `reset()`。
 - 每个 service 自己维护一次性的 `ensureLogin()` 与 `reset()`，请求一律走 `src/main/http.ts` 的 `zjuFetch`。**不要用 `session.fetch`**：Electron 45 下它跟随跳转后 `response.url` 恒为空串，`redirect: 'manual'` 则直接抛错；`zjuFetch` 基于 `net.request` 的 `redirect` 事件记录最终 URL。重定向后不在目标站点即视为未登录，抛 `Error('未登录')`。渲染进程把这类错误显示为"登录后显示"。
 
@@ -64,7 +66,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 导出：`src/main/export.ts`，课件用隐藏窗口 `printToPDF`，文字稿 txt/srt/md。
 - 播放器（`components/Player.tsx`）为自绘控制条：回放有播放/进度/倍速，直播（hls）不允许暂停与拖动、被暂停会立即恢复；铺满窗口与全屏按钮相邻，全屏作用于整个播放器容器（字幕、控制条一起进全屏）。
 - 课件区（`components/SlideViewer.tsx`）：缩略图 / 大图切换，大图可翻页、默认跟随当前讲解页（直播取最新一页，回放取 `created_sec` ≤ 播放时间的最后一页）；点击课件不影响播放，右键菜单"全窗口查看 / 下载"。
-- 回放页布局：左列视频（`.player-wrap` 用容器查询取 min(列宽, 可用高 × 16/9)），右侧栏在 课件 / 文字稿 / 选集 间切换，三个面板始终挂载只隐藏（字幕依赖文字稿 DOM）。左列偏高（容器宽高比 ≤ 5/4）时视频下方显示当前讲解页（`useCurrentSlide`）。右键视频切换铺满。
+- 回放页布局：左列视频（`.player-wrap` 用容器查询取 min(列宽, 可用高 × 16/9)），右侧栏在 课件 / 文字稿 / 选集 间切换，三个面板始终挂载只隐藏（字幕依赖文字稿 DOM）。播放器控制条的「课件」按钮把视频位置切成当前讲解页（`useCurrentSlide`，声音照常），再点「画面」切回；不在视频下方另放课件区（用户明确不要）。右键视频切换铺满。
 - **主进程请求校内 `http://` 地址会挂起不返回**（智云课件图 `pptimgurl` 就是 http）：渲染端靠 CSP `upgrade-insecure-requests` 才正常；主进程下载 / 导出前用 `download.ts` 的 `upgrade()` 升成 https。
 - **下载一律在应用内完成**：`file:download`（保存框 + `main/download.ts` 用登录会话流式写盘，cmc 域补 Referer）与 `file:reveal`；不要用 `<a target=_blank>` 指向文件（会被 `setWindowOpenHandler` 交给浏览器）。作业说明里的文件链接也被拦截走应用内下载。
 - 作业提交（`courses.submitHomework`）流程逆向自学在浙大前端：`POST /api/uploads` → `PUT upload_url` → `POST /api/course/activities/{id}/submissions`。**真实提交不可撤回，调试时不要替用户点提交**；界面上需两次点击确认。
@@ -79,10 +81,10 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - **不用点号（·）作分隔**，用 `Sep`（细竖线）/ `Joined`（components/Type.tsx）；选中态用主题色下划线（刊头导航的滑动点除外）。
 - **不要用卡片**：信息用 `.rows/.row`（时间 · 正文 · 尾注，细线分隔）呈现，区块标题用 `SectionHead`；空/错/未登录状态统一用 `Quiet` 一行小字。样式类集中在 `styles.css`，颜色只用 CSS 变量（`--paper/--ink/--ink-2/--ink-3/--rule/--tint/--shu`）。
 - 主题色在播放器黑底控件上用提亮版本 `--shu-bright`（随 data-accent 定义）。
-- 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。
+- 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。 字号四档（小 / 标准 / 大 / 特大）写成 `--scale`，乘在根字号上，不提供自定义数值。
 - 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
 - `Reveal` 动画结束会清掉 filter/transform：带 filter 的祖先会让 `position: fixed` 的后代（如铺满的播放器）只相对它定位。
-- 导航只有主页、课表；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
+- 导航只有主页、课表；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态，`go`/`openReplay` 记入 `past`/`future`，鼠标侧键（button 3/4）返回 / 前进，作业侧页开着时返回先关侧页；主页滚到顶后继续上滚约三格触发刷新（`usePullRefresh`，刊头下一道细线示意）；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
 - 节次作息表在 `lib/periods.ts`。
 - 窗口无边框（`titleBarOverlay` 高 56px，与刊头同高），刊头右侧为系统按钮留出 140px；可拖动区域加 `.drag`。
 
@@ -91,7 +93,8 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 2026-10 排查结论：主进程事件循环从未阻塞（`diagnostics.ts` 有 >1s 卡顿监测，日志在 userData/logs/app.log；Windows 事件日志里是 `Application Hang`/AppHangB1，而非崩溃）。卡死总伴随 GPU 重负载（视频解码、Whisper CUDA ~80%）叠加昂贵的合成：全窗 `mix-blend-mode` 覆盖层、上千行逐行 `filter: blur` 动画、每条新结果整表重渲染。因此：
 - 不要加全窗 blend/filter 覆盖层；纸纹画在 `body` 背景上（`--grain`）。
 - 长列表与流式结果用普通元素，不做逐行 filter 动画；主进程推送需节流（转写 partial 每 250ms 合并一次）。
-- Windows 上关闭了硬件视频解码（`index.ts`），Whisper/ffmpeg 子进程以低于正常优先级运行。
+- Windows 上**整个界面关闭硬件加速**（`app.disableHardwareAcceleration()`）：2026-10-23 再次在 Whisper 识别约一分半后 AppHang——CUDA 占满显卡时 Chromium GPU 进程被饿住，它挂在主窗口下的子窗口把主窗口拖成未响应。只关硬件视频解码不够。Whisper/ffmpeg 子进程以低于正常优先级运行。
+- 排查时：转写临时目录 userData/whisper/task-* 里剩下的文件能看出卡在哪一步（有 audio.wav 无 transcript.json = 识别阶段）。
 - 隐藏/最小化窗口时动画帧暂停，`AnimatePresence mode="wait"` 的页面切换会停在退场阶段，脚本化测试前先 `Page.bringToFront`。
 
 ### 构建细节

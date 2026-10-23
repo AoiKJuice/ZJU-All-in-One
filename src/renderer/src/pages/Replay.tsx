@@ -205,7 +205,14 @@ export function Replay() {
         <Reveal i={1} className="replay-main">
           <div className="player-wrap">
             {src ? (
-              <Player ref={video} source={src} onError={onPlayerError} expanded={expanded} onToggleExpand={() => setExpanded((x) => !x)}>
+              <Player
+                ref={video}
+                source={src}
+                onError={onPlayerError}
+                expanded={expanded}
+                onToggleExpand={() => setExpanded((x) => !x)}
+                slide={slides?.[currentSlide]?.imageUrl}
+              >
                 {captions && segments && <p ref={subtitle} className="subtitle" />}
               </Player>
             ) : (
@@ -215,17 +222,6 @@ export function Replay() {
             )}
           </div>
           {src && srcError && <p className="quiet !py-1">{srcError}</p>}
-          {/* 左列偏高时（容器查询），视频下方显示当前讲解页，与视频同时可见 */}
-          <div className="current-slide">
-            {slides?.[currentSlide] && (
-              <>
-                <img src={slides[currentSlide].imageUrl} alt="" />
-                <span className="slide-no">
-                  {currentSlide + 1} / {slides.length}
-                </span>
-              </>
-            )}
-          </div>
         </Reveal>
 
         <Reveal i={2} className="replay-side">

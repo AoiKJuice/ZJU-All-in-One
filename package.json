@@ -1,6 +1,6 @@
 {
   "name": "zju-all-in-one",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "聚合浙江大学学业信息与实用工具的桌面应用",
   "main": "./out/main/index.js",

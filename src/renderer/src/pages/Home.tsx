@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { CourseSession } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
 import { useApp } from '@renderer/store'
+import { usePullRefresh } from '@renderer/hooks/usePullRefresh'
 import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isUrgent, relativeTo, todayWeekday, weekdayLabel } from '@renderer/lib/format'
@@ -12,7 +13,8 @@ export function Home() {
   const assignments = useZju('data:assignments')
   const exams = useZju('data:exams')
   const replays = useZju('data:replays')
-  const { openReplay, openAssignment } = useApp()
+  const { openReplay, openAssignment, refresh } = useApp()
+  const pull = usePullRefresh(refresh)
 
   const now = new Date()
   const wd = todayWeekday()
@@ -35,6 +37,7 @@ export function Home() {
   return (
     <div className="page page-fit">
       <OutlineWord text="Today" />
+      <span className="pull-line" data-done={pull === 1 || undefined} style={{ ['--p' as string]: pull }} />
       <Reveal>
         <h1 className="page-title">
           {now.getMonth() + 1}月{now.getDate()}日<span className="ml-4 text-[0.55em] text-[var(--ink-3)]">{weekdayLabel(wd)}</span>
