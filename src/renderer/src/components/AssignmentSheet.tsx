@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import type { AssignmentDetail, PickedFile } from '@shared/types'
+import type { Assignment, AssignmentDetail, PickedFile } from '@shared/types'
 import { useApp } from '@renderer/store'
 import { clock, dotDate, relativeTo } from '@renderer/lib/format'
 
@@ -45,7 +45,7 @@ export function AssignmentSheet() {
             exit={{ x: '100%' }}
             transition={{ duration: 0.6, ease: EASE }}
           >
-            <Body key={assignment.id} onSubmitted={refresh} />
+            <Body key={assignment.id} a={assignment} onSubmitted={refresh} />
           </motion.aside>
         </>
       )}
@@ -53,8 +53,8 @@ export function AssignmentSheet() {
   )
 }
 
-function Body({ onSubmitted }: { onSubmitted: () => void }) {
-  const a = useApp((s) => s.assignment)!
+// 作业以 prop 传入而非从 store 读：关闭时 store 先清空，退场动画期间这里仍要渲染原来的作业
+function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
   const openAssignment = useApp((s) => s.openAssignment)
   const [detail, setDetail] = useState<AssignmentDetail | null>(null)
   const [error, setError] = useState<string | null>(null)

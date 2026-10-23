@@ -6,6 +6,7 @@ import { Home } from './pages/Home'
 import { Schedule } from './pages/Schedule'
 import { Replay } from './pages/Replay'
 import { AssignmentSheet } from './components/AssignmentSheet'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
@@ -37,11 +38,15 @@ export function App() {
             exit={{ opacity: 0, filter: 'blur(6px)' }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           >
-            <Page />
+            <ErrorBoundary>
+              <Page />
+            </ErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </main>
-      <AssignmentSheet />
+      <ErrorBoundary>
+        <AssignmentSheet />
+      </ErrorBoundary>
     </>
   )
 }
