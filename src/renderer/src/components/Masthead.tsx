@@ -51,6 +51,9 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
         ))}
       </nav>
       <div className="mast-meta">
+        <button onClick={() => go('settings')} data-active={page === 'settings' || undefined} className="data-[active]:text-[var(--shu)]">
+          设置
+        </button>
         <button disabled={authBusy} onClick={onAuth} data-armed={armed || undefined} className="data-[armed]:text-[var(--shu)]">
           {!auth.loggedIn ? '登录' : armed ? '退出' : (auth.user?.name ?? '已登录')}
         </button>

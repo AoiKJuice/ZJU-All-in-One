@@ -24,6 +24,33 @@
   font-weight: 400 700;
   font-display: swap;
 }
+/* 数字：EB Garamond 的旧式数字高低错落、不耐看，改用 Source Serif 4 的等高数字（只接管数字与常见符号） */
+@font-face {
+  font-family: 'AJ Digits';
+  src: url('/type/SourceSerif4-400.woff2') format('woff2');
+  font-weight: 400 500;
+  font-display: swap;
+  unicode-range: U+0030-0039, U+002E, U+003A, U+002D, U+002F, U+0025, U+002B;
+}
+@font-face {
+  font-family: 'AJ Digits';
+  src: url('/type/SourceSerif4-600.woff2') format('woff2');
+  font-weight: 600 800;
+  font-display: swap;
+  unicode-range: U+0030-0039, U+002E, U+003A, U+002D, U+002F, U+0025, U+002B;
+}
+@font-face {
+  font-family: 'AJ Sans';
+  src: url('/type/Inter-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'AJ Kai';
+  src: url('/type/LXGWWenKai-500.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
 @font-face {
   font-family: 'Fira Code';
   src: url('/type/FiraCode-Regular.woff2') format('woff2');
@@ -66,8 +93,37 @@ html[data-theme='dark'] {
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.86 0 0 0 0 0.8 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* 主题色：朱砂 / 求是蓝 RGB(0,63,136) / 求是红（浙大 VI 中称"创新红"）RGB(176,31,36)；夜间各取提亮版本 */
+html[data-accent='blue'] {
+  --shu: #003f88;
+  --shu-rgb: 0, 63, 136;
+}
+html[data-accent='red'] {
+  --shu: #b01f24;
+  --shu-rgb: 176, 31, 36;
+}
+html[data-theme='dark'][data-accent='blue'] {
+  --shu: #7ea4dd;
+  --shu-rgb: 126, 164, 221;
+}
+html[data-theme='dark'][data-accent='red'] {
+  --shu: #e0706a;
+  --shu-rgb: 224, 112, 106;
+}
+
+/* 字体风格：书宋（默认）/ 黑体 / 文楷，由 html[data-font] 决定，见 lib/settings.ts */
+:root,
+html[data-font='song'] {
+  --f-text: 'AJ Digits', 'AJ Latin', 'AJ Song', 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
+}
+html[data-font='hei'] {
+  --f-text: 'AJ Sans', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
+}
+html[data-font='kai'] {
+  --f-text: 'AJ Digits', 'AJ Kai', 'KaiTi', 'STKaiti', serif;
+}
+
 :root {
-  --f-text: 'AJ Latin', 'AJ Song', 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
   --f-mono: 'Fira Code', ui-monospace, Consolas, monospace;
   --mast-h: 3.5rem;
   --gutter: clamp(1.5rem, 4vw, 3.5rem);
@@ -91,7 +147,7 @@ html[data-theme='dark'] {
     font-family: var(--f-text);
     font-size: 1.0625rem;
     line-height: 1.75;
-    font-variant-numeric: oldstyle-nums;
+    font-variant-numeric: lining-nums;
     -webkit-font-smoothing: antialiased;
     user-select: none;
     transition: background-color 0.6s var(--ease), color 0.6s var(--ease);
@@ -335,7 +391,7 @@ body {
 .row-time {
   font-size: 0.9375rem;
   color: var(--ink-3);
-  font-variant-numeric: oldstyle-nums tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   white-space: nowrap;
 }
 .row-title {
@@ -478,6 +534,95 @@ button.row {
   max-height: 46vh;
   background: var(--paper-2);
 }
+.player {
+  position: relative;
+}
+/* 铺满：盖住整个窗口（含刊头），黑底，视频居中 */
+.player[data-expanded] {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  max-height: none;
+  aspect-ratio: auto;
+  background: #000;
+}
+.player-expand {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+}
+.player:hover .player-expand,
+.player[data-expanded] .player-expand {
+  opacity: 1;
+}
+.player[data-expanded] .player-expand {
+  top: calc(56px + 0.5rem);
+}
+/* 字幕：画面下方居中，半透明墨底，不挡控制条 */
+.subtitle {
+  position: absolute;
+  left: 50%;
+  bottom: 3.75rem;
+  z-index: 1;
+  max-width: 86%;
+  margin: 0;
+  padding: 0.125rem 0.75rem;
+  transform: translateX(-50%);
+  font-size: clamp(0.9375rem, 1.6vw, 1.375rem);
+  line-height: 1.5;
+  text-align: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.subtitle:empty {
+  display: none;
+}
+
+/* 本门课的节次条：横排日期，可横向滚动 */
+.lecture-strip {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
+  padding: 0 1.5rem 0.5rem;
+  margin-inline: -1.5rem;
+}
+.lecture-strip button {
+  position: relative;
+  color: var(--ink-3);
+  transition: color 0.4s var(--ease);
+}
+.lecture-strip button:hover {
+  color: var(--ink);
+}
+.lecture-strip button[data-current] {
+  color: var(--shu);
+}
+.lecture-strip button[data-current]::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 0.15rem);
+  bottom: -0.3rem;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: var(--shu);
+}
+
 .player video {
   width: 100%;
   height: 100%;
@@ -723,4 +868,37 @@ button.row {
 .course-cell[data-playable]:hover .course-name {
   color: var(--shu);
   background-size: 100% 1px;
+}
+
+/* 设置项：文字选项，当前项主题色 + 下方一粒点 */
+.opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 1.0625rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  transition: color 0.4s var(--ease);
+}
+.opt:hover {
+  color: var(--ink);
+}
+.opt[data-active] {
+  color: var(--shu);
+}
+.opt[data-active]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -0.35rem;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 50%;
+  background: var(--shu);
+}
+.swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
 }

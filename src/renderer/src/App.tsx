@@ -5,13 +5,15 @@ import { useApp, type PageId } from './store'
 import { Home } from './pages/Home'
 import { Schedule } from './pages/Schedule'
 import { Replay } from './pages/Replay'
+import { Settings } from './pages/Settings'
 import { AssignmentSheet } from './components/AssignmentSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
   schedule: Schedule,
-  replay: Replay
+  replay: Replay,
+  settings: Settings
 }
 
 export function App() {

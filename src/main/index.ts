@@ -4,7 +4,9 @@ import { registerIpc } from './ipc'
 import { initializeDiagnostics } from './diagnostics'
 
 // 打包后应用名取 productName（"ZJU All in One"），数据目录会随之改变；固定到开发时的目录，登录态与 Whisper 模型共用
-app.setPath('userData', join(app.getPath('appData'), 'zju-all-in-one'))
+// ZJU_PROFILE=xxx 可另开一套数据目录（与已安装版并行调试，不撞单实例锁）
+const profile = process.env['ZJU_PROFILE']
+app.setPath('userData', join(app.getPath('appData'), profile ? `zju-all-in-one-${profile}` : 'zju-all-in-one'))
 
 // Windows 回放暂用软件解码，规避 D3D11 解码路径；界面 GPU 合成与 Whisper CUDA 保持原设置。
 if (process.platform === 'win32') app.commandLine.appendSwitch('disable-accelerated-video-decode')

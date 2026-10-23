@@ -30,7 +30,8 @@ export function Reveal({ i = 0, children, className }: { i?: number; children: R
     <motion.div
       className={className}
       initial={{ opacity: 0, y: 14, filter: 'blur(5px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      // 动画结束后去掉 filter/transform：它们会让内部 position: fixed（如铺满的播放器）只相对本块定位
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none', transform: 'none' } }}
       transition={{ duration: 1.1, ease: EASE, delay: i * 0.06 }}
     >
       {children}

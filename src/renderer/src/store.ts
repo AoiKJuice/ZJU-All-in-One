@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import type { Assignment, AuthState, LectureReplay, TaskProgress, TranscriptSegment } from '@shared/types'
-import { applyTheme, initialTheme, type Theme } from './lib/theme'
+import type { Theme } from './lib/theme'
+import { applySettings, initialSettings, type Settings } from './lib/settings'
 
-export type PageId = 'home' | 'schedule' | 'replay'
+export type PageId = 'home' | 'schedule' | 'replay' | 'settings'
 
 interface AppStore {
   page: PageId
@@ -16,6 +17,8 @@ interface AppStore {
   partials: Record<string, TranscriptSegment[]>
   clearPartials: (key: string) => void
   theme: Theme
+  settings: Settings
+  setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void
   auth: AuthState
   authBusy: boolean
   /** 首次 auth:state 返回前为 false，数据 hook 等它再决定是否取数 */
@@ -44,8 +47,8 @@ export const useApp = create<AppStore>((set, get) => {
     }
   }
 
-  const theme = initialTheme()
-  applyTheme(theme)
+  const settings = initialSettings()
+  applySettings(settings)
 
   return {
     page: 'home',
@@ -54,7 +57,13 @@ export const useApp = create<AppStore>((set, get) => {
     tasks: {},
     partials: {},
     clearPartials: (key) => set((s) => ({ partials: { ...s.partials, [key]: [] } })),
-    theme,
+    theme: settings.theme,
+    settings,
+    setSetting: (key, value) => {
+      const next = { ...get().settings, [key]: value }
+      applySettings(next)
+      set({ settings: next, theme: next.theme })
+    },
     auth: { loggedIn: false, user: null },
     authBusy: false,
     authReady: false,
@@ -63,11 +72,7 @@ export const useApp = create<AppStore>((set, get) => {
     openReplay: (replay) => set({ replay, page: 'replay' }),
     openAssignment: (assignment) => set({ assignment }),
     refresh: () => set((s) => ({ epoch: s.epoch + 1 })),
-    toggleTheme: () => {
-      const next = get().theme === 'dark' ? 'light' : 'dark'
-      applyTheme(next)
-      set({ theme: next })
-    },
+    toggleTheme: () => get().setSetting('theme', get().theme === 'dark' ? 'light' : 'dark'),
     refreshAuth: () => runAuth(() => window.zju['auth:state']()),
     login: () => runAuth(() => window.zju['auth:login']()),
     logout: () => runAuth(() => window.zju['auth:logout']())

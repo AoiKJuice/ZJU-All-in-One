@@ -6,6 +6,7 @@ import { OutlineWord, Reveal, SectionHead } from '@renderer/components/Type'
 import { dotDate } from '@renderer/lib/format'
 import { Player } from '@renderer/components/Player'
 import { TranscribeProgress } from '@renderer/components/TranscribeProgress'
+import { LectureStrip } from '@renderer/components/LectureStrip'
 
 const hms = (sec: number): string =>
   [Math.floor(sec / 3600), Math.floor((sec % 3600) / 60), Math.floor(sec % 60)].map((n) => String(n).padStart(2, '0')).join(':')
@@ -34,6 +35,11 @@ export function Replay() {
   // 只有停在底部时才跟随新结果；用户往上翻阅时刷新不动滚动位置
   const following = useRef(true)
   const onPlayerError = useCallback((m: string) => setSrcError(m), [])
+  // 铺满：播放器占满整个窗口（不是系统全屏），Esc 还原
+  const [expanded, setExpanded] = useState(false)
+  // 字幕：用已有文字稿叠在画面下方
+  const [captions, setCaptions] = useState(true)
+  const subtitle = useRef<HTMLParagraphElement>(null)
   const title = `${replay.courseName} ${replay.title}`.trim()
 
   useEffect(() => {
@@ -87,6 +93,11 @@ export function Replay() {
         if (!highlighted.has(i)) rows[i]?.setAttribute('data-now', '')
       }
       highlighted = next
+      // 字幕直接写 DOM，不触发 React 重渲染
+      if (subtitle.current) {
+        const [i] = next
+        subtitle.current.textContent = i === undefined ? '' : segments[i].text
+      }
     }
     update()
     player.addEventListener('timeupdate', update)
@@ -96,7 +107,16 @@ export function Replay() {
       player.removeEventListener('seeking', update)
       for (const i of highlighted) rows[i]?.removeAttribute('data-now')
     }
-  }, [segments, src])
+  }, [segments, src, captions])
+
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setExpanded(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [expanded])
 
   const running = task !== undefined && task.stage !== 'done' && task.stage !== 'error'
 
@@ -153,15 +173,22 @@ export function Replay() {
             </a>
           )}
         </p>
+        <LectureStrip current={replay} />
       </Reveal>
 
       <div className="panes grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Reveal i={2} className="pane gap-5">
-          <div className="player">
+          <div className="player" data-expanded={expanded || undefined}>
             {src ? (
               <Player ref={video} source={src} onError={onPlayerError} />
             ) : (
               <p className="quiet">{srcError ?? '…'}</p>
+            )}
+            {captions && segments && <p ref={subtitle} className="subtitle" />}
+            {src && (
+              <button className="player-expand" onClick={() => setExpanded((x) => !x)}>
+                {expanded ? '还原' : '铺满'}
+              </button>
             )}
           </div>
           {src && srcError && <p className="quiet">{srcError}</p>}
@@ -200,6 +227,9 @@ export function Replay() {
             note={
               segments ? (
                 <span className="acts">
+                  <button className="act" data-on={captions || undefined} onClick={() => setCaptions((x) => !x)}>
+                    {captions ? '字幕 ·' : '字幕'}
+                  </button>
                   {(['txt', 'srt', 'md'] as const).map((f) => (
                     <button key={f} className="act" onClick={() => exportText(f)}>
                       {f.toUpperCase()}

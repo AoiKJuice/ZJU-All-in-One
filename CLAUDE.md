@@ -13,6 +13,8 @@ ZJU All in One：聚合浙江大学学业信息（课表、考试、作业、智
 ```bash
 npm run dev                  # 开发模式
 ZJU_DEMO=1 npm run dev       # 演示数据模式：不登录即可调前端（数据通道全部换成 services/demo.ts）
+ZJU_PROFILE=test npm run dev # 另开一套数据目录（zju-all-in-one-test），可与已安装版并行，不撞单实例锁
+npm run dist                 # 打包 Windows 安装包 + 便携版到 release/（先设 ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/）
 ZJU_DEBUG=1 npm run dev      # 主进程打印每个 zjuFetch 请求的最终落点、状态码与响应开头，用于对照真实接口
 npm run build                # 构建到 out/
 npm run typecheck            # node（main/preload/shared）与 web（renderer）两套 tsconfig
@@ -70,7 +72,9 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 纸与墨配色 + 朱色（`--shu`）为唯一强调色；EB Garamond + 方正书宋（字体文件在 `src/renderer/public/type/`）；颗粒纸纹；空心描边大字（`OutlineWord`）作页面水印；进入动画为"上浮 + 去模糊"（`Reveal`，按 `i` 错落）。
 - **界面不放解释性、冗余文字**：不写副标题、计数、来源注记、功能描述；空状态只写"无"。
 - **不要用卡片**：信息用 `.rows/.row`（时间 · 正文 · 尾注，细线分隔）呈现，区块标题用 `SectionHead`；空/错/未登录状态统一用 `Quiet` 一行小字。样式类集中在 `styles.css`，颜色只用 CSS 变量（`--paper/--ink/--ink-2/--ink-3/--rule/--tint/--shu`）。
-- 主题由 `html[data-theme]` 决定（`lib/theme.ts`，存 localStorage），刊头"昼/夜"切换。
+- 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。
+- 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
+- `Reveal` 动画结束会清掉 filter/transform：带 filter 的祖先会让 `position: fixed` 的后代（如铺满的播放器）只相对它定位。
 - 导航只有主页、课表；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
 - 节次作息表在 `lib/periods.ts`。
 - 窗口无边框（`titleBarOverlay` 高 56px，与刊头同高），刊头右侧为系统按钮留出 140px；可拖动区域加 `.drag`。
