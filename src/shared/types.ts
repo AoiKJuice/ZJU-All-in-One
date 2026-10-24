@@ -12,8 +12,15 @@ export interface AuthState {
   account: string | null
 }
 
-/** 本地 MCP 服务的工具分组，设置页逐组开关 */
-export type McpToolGroup = 'query' | 'refresh' | 'transcribe' | 'submit'
+/** 本地 MCP 服务的工具分组，设置页逐组开关：查询 / 下载与导出 / 操作界面（刷新、打开页面）/ 转写 / 提交作业 */
+export type McpToolGroup = 'query' | 'download' | 'app' | 'transcribe' | 'submit'
+
+/** 主进程要界面打开的内容（MCP 的 open_in_app） */
+export type OpenRequest =
+  | { page: 'home' | 'schedule' | 'settings' }
+  | { login: true }
+  | { assignment: Assignment }
+  | { replay: LectureReplay }
 
 export interface McpState {
   enabled: boolean
@@ -141,15 +148,39 @@ export interface AssignmentDetail {
   /** 作业说明（HTML，来自学在浙大） */
   descriptionHtml: string
   attachments: Attachment[]
-  /** 已有提交，最新在前 */
+  /** 已有提交（不含草稿），最新在前 */
   submissions: {
     id: string
     /** ISO 8601 */
     submittedAt: string
     comment: string
     files: Attachment[]
+    /** 评分前且作业允许时可撤回；撤回后变成草稿 */
+    canRetract: boolean
   }[]
+  /** 草稿（如撤回的提交）；再次提交会覆盖它 */
+  draft: { id: string; comment: string; files: Attachment[] } | null
   url: string
+}
+
+/** 应用内预览本机文件：图片 / PDF / 文本直接显示，其余交给系统默认程序 */
+export interface FilePreview {
+  name: string
+  kind: 'image' | 'pdf' | 'text' | 'other'
+  mime: string
+  /** other 或文件过大时不带内容 */
+  data?: Uint8Array
+}
+
+/** 本地 Agent 经 MCP 发起、需用户在应用内确认的操作 */
+export interface ConfirmRequest {
+  id: string
+  action: 'submit' | 'retract'
+  courseName: string
+  title: string
+  /** 提交：要上传的本机文件；撤回：被撤回那次提交的文件 */
+  files: (PickedFile | Attachment)[]
+  comment: string
 }
 
 /** 主进程弹出的文件选择结果 */

@@ -61,12 +61,17 @@ export function AssignmentSheet() {
 // 作业以 prop 传入而非从 store 读：关闭时 store 先清空，退场动画期间这里仍要渲染原来的作业
 function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
   const openAssignment = useApp((s) => s.openAssignment)
+  const openPreview = useApp((s) => s.openPreview)
+  const notify = useApp((s) => s.notify)
   const [detail, setDetail] = useState<AssignmentDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [comment, setComment] = useState('')
   const [files, setFiles] = useState<PickedFile[]>([])
   const [armed, setArmed] = useState(false)
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  // 撤回同样两次点击：先点"撤回"，3 秒内再点"确认撤回"
+  const [retractArmed, setRetractArmed] = useState<string | null>(null)
+  const [retracting, setRetracting] = useState<string | null>(null)
 
   const load = (): void => {
     window.zju['homework:detail'](a.id).then(setDetail, (e) => setError(errorText(e)))
@@ -78,6 +83,29 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
     const timer = setTimeout(() => setArmed(false), 3000)
     return () => clearTimeout(timer)
   }, [armed])
+
+  useEffect(() => {
+    if (!retractArmed) return
+    const timer = setTimeout(() => setRetractArmed(null), 3000)
+    return () => clearTimeout(timer)
+  }, [retractArmed])
+
+  const retract = async (id: string): Promise<void> => {
+    if (retractArmed !== id) return setRetractArmed(id)
+    setRetractArmed(null)
+    setRetracting(id)
+    setError(null)
+    try {
+      await window.zju['homework:retract'](id)
+      notify('已撤回')
+      load()
+      onSubmitted()
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setRetracting(null)
+    }
+  }
 
   const pick = async (): Promise<void> => {
     const picked = await window.zju['homework:pick']()
@@ -151,13 +179,32 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
                 <h3 className="section-note">已提交</h3>
                 <ul className="rows">
                   {detail.submissions.map((s) => (
-                    <li key={s.id} className="row !grid-cols-[6.5em_minmax(0,1fr)] !py-2">
+                    <li key={s.id} className="row !grid-cols-[6.5em_minmax(0,1fr)_auto] !py-2">
                       <span className="row-time">
                         {dotDate(s.submittedAt)} {clock(s.submittedAt)}
                       </span>
                       <span className="text-[0.9375rem]"><Joined parts={[s.comment, ...s.files.map((f) => f.name)]} /></span>
+                      {s.canRetract ? (
+                        <button className="act" data-on={retractArmed === s.id || undefined} disabled={retracting !== null} onClick={() => void retract(s.id)}>
+                          {retracting === s.id ? '撤回中' : retractArmed === s.id ? '确认撤回' : '撤回'}
+                        </button>
+                      ) : (
+                        <span />
+                      )}
                     </li>
                   ))}
+                </ul>
+              </div>
+            )}
+            {detail.draft && (
+              <div className="mt-8">
+                <h3 className="section-note">草稿</h3>
+                <ul className="rows">
+                  <li className="row !grid-cols-[minmax(0,1fr)] !py-2">
+                    <span className="text-[0.9375rem] text-[var(--ink-2)]">
+                      <Joined parts={[detail.draft.comment, ...detail.draft.files.map((f) => f.name)]} />
+                    </span>
+                  </li>
                 </ul>
               </div>
             )}
@@ -172,7 +219,9 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
             <ul className="rows">
               {files.map((f) => (
                 <li key={f.path} className="row !grid-cols-[minmax(0,1fr)_auto_auto] !py-1.5">
-                  <span className="truncate text-[0.9375rem]">{f.name}</span>
+                  <button className="truncate text-left text-[0.9375rem] hover:text-[var(--shu)]" onClick={() => openPreview(f.path)}>
+                    {f.name}
+                  </button>
                   <span className="row-end">{size(f.size)}</span>
                   <button className="act" onClick={() => setFiles((x) => x.filter((y) => y.path !== f.path))}>
                     移除

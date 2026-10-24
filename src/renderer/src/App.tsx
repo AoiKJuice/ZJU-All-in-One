@@ -10,6 +10,8 @@ import { AssignmentSheet } from './components/AssignmentSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Toast } from './components/Toast'
 import { LoginPanel } from './components/LoginPanel'
+import { AgentConfirm } from './components/AgentConfirm'
+import { FilePreview } from './components/FilePreview'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
@@ -66,6 +68,8 @@ export function App() {
         <AssignmentSheet />
       </ErrorBoundary>
       <LoginPanel />
+      <AgentConfirm />
+      <FilePreview />
       <Toast />
     </>
   )

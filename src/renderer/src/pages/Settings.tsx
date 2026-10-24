@@ -13,9 +13,10 @@ const FAMILY: Record<FontStyle, string> = {
 
 const MCP_TOOLS: { id: McpToolGroup; label: string }[] = [
   { id: 'query', label: '查询' },
-  { id: 'refresh', label: '刷新' },
+  { id: 'download', label: '下载' },
+  { id: 'app', label: '界面' },
   { id: 'transcribe', label: '转写' },
-  { id: 'submit', label: '提交作业' }
+  { id: 'submit', label: '提交与撤回' }
 ]
 
 export function Settings() {

@@ -29,7 +29,9 @@ function createWindow(): void {
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       sandbox: true,
-      contextIsolation: true
+      contextIsolation: true,
+      // 应用内预览 PDF 用 Chromium 内置查看器
+      plugins: true
     }
   })
 

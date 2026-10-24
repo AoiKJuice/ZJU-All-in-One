@@ -1,4 +1,4 @@
-import type { Assignment, CourseSession, DataResult, Exam, LectureReplay, Slide, TranscriptSegment } from '@shared/types'
+import type { Assignment, CourseSession, DataResult, Exam, LectureReplay, Slide, TranscriptSegment, AssignmentDetail, PickedFile } from '@shared/types'
 
 // 演示数据：ZJU_DEMO=1 时替代全部数据通道，便于不登录调前端
 
@@ -52,3 +52,40 @@ export const mockTranscript: TranscriptSegment[] = Array.from({ length: 40 }, (_
   end: i * 20 + 18,
   text: `演示文字稿第 ${i + 1} 段，用来查看侧栏的排版与滚动。`
 }))
+
+// 演示作业的提交记录：a3 已交一次且可撤回；撤回后变草稿，再交覆盖草稿
+type DemoSubmission = AssignmentDetail['submissions'][number]
+const demoSubmissions = new Map<string, DemoSubmission[]>([
+  ['a3', [{ id: 's1', submittedAt: day(-2, 21), comment: '', files: [{ name: '作业7.pdf', url: '' }], canRetract: true }]]
+])
+const demoDrafts = new Map<string, AssignmentDetail['draft']>()
+
+export function demoDetail(activityId: string): AssignmentDetail {
+  const a = mockAssignments.find((x) => x.id === activityId) ?? mockAssignments[0]
+  return {
+    ...a,
+    descriptionHtml: '<p>演示作业</p>',
+    attachments: [],
+    submissions: demoSubmissions.get(a.id) ?? [],
+    draft: demoDrafts.get(a.id) ?? null,
+    url: ''
+  }
+}
+
+export function demoSubmit(activityId: string, comment: string, files: PickedFile[]): void {
+  demoDrafts.delete(activityId)
+  const list = demoSubmissions.get(activityId) ?? []
+  list.unshift({ id: `s${Date.now()}`, submittedAt: new Date().toISOString(), comment, files: files.map((f) => ({ name: f.name, url: '' })), canRetract: true })
+  demoSubmissions.set(activityId, list)
+}
+
+export function demoRetract(submissionId: string): void {
+  for (const [activityId, list] of demoSubmissions) {
+    const i = list.findIndex((s) => s.id === submissionId)
+    if (i < 0) continue
+    const [s] = list.splice(i, 1)
+    demoDrafts.set(activityId, { id: s.id, comment: s.comment, files: s.files })
+    return
+  }
+  throw new Error('未找到该提交')
+}

@@ -43,6 +43,8 @@ interface Activity {
     description: string
     homework_type: string
     mode: string
+    /** 作业是否允许学生在评分前撤回 */
+    allow_retract?: boolean
   }
   // 推测：作业附件位于顶层 uploads，每项含 id、name。
   uploads?: Upload[]
@@ -55,6 +57,11 @@ interface Submission {
   submitted_at?: string
   comment: string
   uploads?: Upload[]
+  // 以下与网页端判定撤回按钮、草稿的字段一致（逆向自学在浙大前端 homework 页）
+  is_draft?: boolean
+  can_retract?: boolean
+  is_redo?: boolean
+  submit_by_instructor?: boolean
 }
 
 interface UploadResponse {
@@ -257,6 +264,8 @@ export async function getAssignmentDetail(
     )
   ])
 
+  const draft = submissions.list.find(submission => submission.is_draft)
+
   return {
     id: activityId,
     title: activity.title,
@@ -265,15 +274,20 @@ export async function getAssignmentDetail(
     descriptionHtml: activity.data.description,
     attachments: (activity.uploads ?? []).map(toAttachment),
     submissions: submissions.list
+      .filter(submission => !submission.is_draft)
       .map(submission => ({
         id: String(submission.id),
         submittedAt: new Date(
           (submission.submitted_at ?? submission.created_at)!
         ).toISOString(),
         comment: submission.comment,
-        files: (submission.uploads ?? []).map(toAttachment)
+        files: (submission.uploads ?? []).map(toAttachment),
+        canRetract: !!(submission.can_retract && !submission.is_redo && !submission.submit_by_instructor && activity.data.allow_retract)
       }))
       .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+    draft: draft
+      ? { id: String(draft.id), comment: draft.comment, files: (draft.uploads ?? []).map(toAttachment) }
+      : null,
     url: activityUrl(activity.course_id, activityId)
   }
 }
@@ -381,13 +395,31 @@ export async function submitHomework(
     uploads.push(await uploadFile(file))
   }
 
-  await postJson(`/api/course/activities/${activityId}/submissions`, {
-    comment,
-    uploads,
-    slides: [],
-    is_draft: false,
-    mode: 'normal',
-    other_resources: [],
-    uploads_in_rich_text: []
+  // 已有草稿（如撤回过）时网页端用 PUT 并带 submission_id 覆盖草稿，这里一致
+  const userId = await getStudentId()
+  const { list } = await getJson<{ list: Submission[] }>(
+    `/api/activities/${activityId}/students/${userId}/submission_list`
+  )
+  const draft = list.find(submission => submission.is_draft)
+
+  await request(`${BASE}/api/course/activities/${activityId}/submissions`, 'application/json', {
+    method: draft ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      comment,
+      uploads,
+      slides: [],
+      is_draft: false,
+      mode: 'normal',
+      other_resources: [],
+      uploads_in_rich_text: [],
+      ...(draft ? { submission_id: draft.id } : {})
+    })
   })
+}
+
+/** 撤回一次提交（评分前、作业允许时）：网页端为 PUT /api/submissions/{id}/retract，撤回后该提交变为草稿 */
+export async function retractSubmission(submissionId: string): Promise<void> {
+  await ensureLogin()
+  await request(`${BASE}/api/submissions/${submissionId}/retract`, 'application/json', { method: 'PUT' })
 }

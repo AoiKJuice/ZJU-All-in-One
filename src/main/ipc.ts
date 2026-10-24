@@ -7,14 +7,14 @@ import {
   type OpenDialogOptions,
   type SaveDialogOptions
 } from 'electron'
-import { stat } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { readFile, stat } from 'node:fs/promises'
+import { basename, extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
-import type { AuthState, TaskProgress } from '@shared/types'
+import type { AuthState, FilePreview, TaskProgress } from '@shared/types'
 import { hasCasCookie, login, logout } from './auth/zjuam'
 import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
-import { getMcpState, setMcp } from './mcp'
+import { answerConfirm, getMcpState, setMcp } from './mcp'
 import { onCasExpired } from './http'
 import {
   fetchSchedule,
@@ -26,6 +26,7 @@ import {
   fetchAssignments,
   getAssignmentDetail,
   submitHomework,
+  retractSubmission,
   reset as resetCourses
 } from './services/courses'
 import {
@@ -42,7 +43,7 @@ import { transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { downloadToFile } from './download'
-import { mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript } from './services/demo'
+import { demoDetail, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript } from './services/demo'
 
 type Handlers = {
   [K in ZjuChannel]: (
@@ -83,6 +84,23 @@ async function getAuthState(): Promise<AuthState> {
     // 教务个人信息字段尚待实测，其他失败不否定 CAS 登录态
     return { loggedIn: true, user: null, account }
   }
+}
+
+// 应用内预览：按扩展名分类，超过 50MB 不读内容（交给默认程序）
+const PREVIEW_KINDS: Record<string, [FilePreview['kind'], string]> = {
+  '.png': ['image', 'image/png'], '.jpg': ['image', 'image/jpeg'], '.jpeg': ['image', 'image/jpeg'],
+  '.gif': ['image', 'image/gif'], '.webp': ['image', 'image/webp'], '.bmp': ['image', 'image/bmp'], '.svg': ['image', 'image/svg+xml'],
+  '.pdf': ['pdf', 'application/pdf']
+}
+const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.csv', '.json', '.log', '.tex', '.py', '.c', '.cpp', '.h', '.hpp', '.java', '.js', '.ts', '.html', '.css', '.xml', '.m', '.r', '.go', '.rs', '.sql', '.yaml', '.yml'])
+const PREVIEW_LIMIT = 50 * 1024 * 1024
+
+async function previewFile(path: string): Promise<FilePreview> {
+  const ext = extname(path).toLowerCase()
+  const [kind, mime] = PREVIEW_KINDS[ext] ?? (TEXT_EXTENSIONS.has(ext) ? ['text', 'text/plain'] : ['other', 'application/octet-stream'])
+  const name = basename(path)
+  if (kind === 'other' || (await stat(path)).size > PREVIEW_LIMIT) return { name, kind: 'other', mime }
+  return { name, kind, mime, data: await readFile(path) }
 }
 
 async function chooseSavePath(
@@ -136,6 +154,11 @@ const handlers: Handlers = {
     return result.filePath
   },
   'file:reveal': async (_win, path) => shell.showItemInFolder(path),
+  'file:preview': (_win, path) => previewFile(path),
+  'file:open': async (_win, path) => {
+    const error = await shell.openPath(path)
+    if (error) throw new Error(error)
+  },
 
   'homework:detail': (_win, activityId) => getAssignmentDetail(activityId),
   'homework:pick': async (win) => {
@@ -156,6 +179,7 @@ const handlers: Handlers = {
   },
   'homework:submit': (_win, activityId, comment, files) =>
     submitHomework(activityId, comment, files),
+  'homework:retract': (_win, submissionId) => retractSubmission(submissionId),
 
   'replay:playback': (_win, courseId, subId) => getPlaybackSource(courseId, subId),
   'replay:slides': (_win, courseId, subId) => listSlides(courseId, subId),
@@ -207,7 +231,8 @@ const handlers: Handlers = {
   },
 
   'mcp:state': async () => getMcpState(),
-  'mcp:set': (_win, patch) => setMcp(patch)
+  'mcp:set': (_win, patch) => setMcp(patch),
+  'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve)
 }
 
 if (process.env['ZJU_DEMO'] === '1') {
@@ -220,12 +245,10 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:lectures': async () => mockReplays,
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,
-    'homework:detail': async (_win, activityId) => {
-      const a = mockAssignments.find((x) => x.id === activityId) ?? mockAssignments[0]
-      return { ...a, descriptionHtml: '<p>演示作业</p>', attachments: [], submissions: [], url: '' }
-    },
-    // 演示模式不真正提交
-    'homework:submit': async () => {},
+    // 演示作业的提交 / 撤回只记在内存里，不连学在浙大
+    'homework:detail': async (_win, activityId) => demoDetail(activityId),
+    'homework:submit': async (_win, activityId, comment, files) => demoSubmit(activityId, comment, files),
+    'homework:retract': async (_win, submissionId) => demoRetract(submissionId),
     // ZJU_DEMO_VIDEO 指向本地视频文件时用它调播放器，否则无视频
     'replay:playback': async () => {
       const file = process.env['ZJU_DEMO_VIDEO']

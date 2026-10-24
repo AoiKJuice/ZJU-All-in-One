@@ -61,7 +61,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 
 ### 本地 MCP 服务
 
-`src/main/mcp.ts`：供本机 Agent（Claude Code 等）调用的 MCP 服务，Streamable HTTP 无状态模式，只监听 `127.0.0.1:17321/mcp`，请求须带 `Authorization: Bearer <token>`（token 随机生成，与开关一起存 userData/mcp.json）。默认关闭，设置页开关；工具按组开关：查询（状态、课表含起止时刻、校历、考试、作业、作业详情、课次、课件、文字稿）/ 刷新（重查登录并经 `app:refresh` 事件让界面重拉）/ 转写 / 提交作业（默认关）。工具一律经 `ipc.ts` 导出的 `call()` 复用通道实现，共用登录会话，演示模式也生效。**提交作业必须先在应用内弹原生确认框，用户点"提交"才真正提交**；测试时只触发弹窗，由用户自己点，不要模拟按键操作用户桌面。节次作息在 `src/shared/periods.ts`，主进程与界面共用。
+`src/main/mcp.ts`：供本机 Agent（Claude Code 等）调用的 MCP 服务，Streamable HTTP 无状态模式，只监听 `127.0.0.1:17321/mcp`，请求须带 `Authorization: Bearer <token>`（token 随机生成，与开关一起存 userData/mcp.json）。默认关闭，设置页开关；工具按组开关：查询（状态、课表含起止时刻、校历、考试、作业、作业详情、课次、课件、播放地址、文字稿）/ 下载（`download_file` 仅限 *.zju.edu.cn，用登录会话下附件、已交文件、课件图、回放视频；`export_slides_pdf`、`export_transcript`；默认存到"下载/ZJU All in One"，重名加序号，不弹保存框）/ 界面（`open_in_app` 经 `app:open` 事件打开页面、课次、作业侧页或登录面板；`refresh` 经 `app:refresh` 让界面重拉）/ 转写 / 提交与撤回（默认关）。**应用新增能力时同步补对应的 MCP 工具**（用户要求覆盖到位）。开发版与已安装版同时开 MCP 会抢端口，开发时设 `ZJU_MCP_PORT=17399`。工具一律经 `ipc.ts` 导出的 `call()` 复用通道实现，共用登录会话，演示模式也生效。**提交与撤回必须先经用户在应用内确认**：`askUser` 经 `app:confirm` 事件把请求推给界面（`components/AgentConfirm.tsx`，排队、文件可点开预览），用户答复经 `mcp:answer` 回到主进程，10 分钟无答复按取消。不用系统原生对话框（用户要求本软件风格）。测试只能在演示模式里点开发版窗口内的按钮，不要用模拟按键操作用户桌面。节次作息在 `src/shared/periods.ts`，主进程与界面共用。
 
 ### 回放、转写、作业提交
 
@@ -73,7 +73,9 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 回放页布局：左列视频（`.player-wrap` 用容器查询取 min(列宽, 可用高 × 16/9)），右侧栏在 课件 / 文字稿 / 选集 间切换，三个面板始终挂载只隐藏（字幕依赖文字稿 DOM）。播放器控制条的「课件」按钮把视频位置切成当前讲解页（`useCurrentSlide`，声音照常），再点「画面」切回；不在视频下方另放课件区（用户明确不要）。右键视频切换铺满。
 - **主进程请求校内 `http://` 地址会挂起不返回**（智云课件图 `pptimgurl` 就是 http）：渲染端靠 CSP `upgrade-insecure-requests` 才正常；主进程下载 / 导出前用 `download.ts` 的 `upgrade()` 升成 https。
 - **下载一律在应用内完成**：`file:download`（保存框 + `main/download.ts` 用登录会话流式写盘，cmc 域补 Referer）与 `file:reveal`；不要用 `<a target=_blank>` 指向文件（会被 `setWindowOpenHandler` 交给浏览器）。作业说明里的文件链接也被拦截走应用内下载。
-- 作业提交（`courses.submitHomework`）流程逆向自学在浙大前端：`POST /api/uploads` → `PUT upload_url` → `POST /api/course/activities/{id}/submissions`。**真实提交不可撤回，调试时不要替用户点提交**；界面上需两次点击确认。
+- 作业提交（`courses.submitHomework`）流程逆向自学在浙大前端：`POST /api/uploads` → `PUT upload_url` → `POST /api/course/activities/{id}/submissions`；已有草稿时与网页一致改用 `PUT` 并带 `submission_id` 覆盖草稿。**调试时不要替用户点真实提交**；界面上需两次点击确认。
+- 撤回（`courses.retractSubmission`）逆向自学在浙大前端 homework 页（公开课程页 `courses.zju.edu.cn/course/<id>` 会加载完整前端代码，懒加载块在 runtime 的映射表里）：`PUT /api/submissions/{id}/retract`，错误码 40001 为撤回失败。可撤回条件与网页一致：`can_retract && !is_redo && !submit_by_instructor && activity.data.allow_retract`。撤回后该提交变成草稿（`submission_list` 里 `is_draft: true`），详情把草稿单列为 `draft`，不算已提交。
+- 本机文件预览（`file:preview` / `components/FilePreview.tsx`）：图片、PDF、常见文本在应用内显示（blob 地址，CSP 放行 `img-src blob:` 与 `frame-src blob:`，PDF 依赖 `webPreferences.plugins: true` 的内置查看器），其余或超过 50MB 交给 `file:open`（系统默认程序）。
 - 直播：`sub_status` 1 直播中 / 2 未开始 / 3 回放生成中 / 5 无回放 / 6 回放；直播流为 `search-live-course-list` 的 `sub_content.output.m3u8` + `clientUUID`，渲染端用 hls.js 播放（CSP 需 `connect-src`，主进程对 cmc 域补 CORS 头）。
 - 课表按周翻页依赖 Celechron 公开校历 `calendar.celechron.top/<学年-学期>.json`；`exchange` 键前 8 位为放假日、后 8 位为调休上课日（上课日按放假日课表排）。
 

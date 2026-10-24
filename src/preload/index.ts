@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import { PROGRESS_EVENT, REFRESH_EVENT, ZJU_CHANNELS, type ZjuBridge } from '@shared/ipc'
-import type { TaskProgress } from '@shared/types'
+import { CONFIRM_EVENT, OPEN_EVENT, PROGRESS_EVENT, REFRESH_EVENT, ZJU_CHANNELS, type ZjuBridge } from '@shared/ipc'
+import type { ConfirmRequest, OpenRequest, TaskProgress } from '@shared/types'
 
 const api = Object.fromEntries(
   ZJU_CHANNELS.map((channel) => [channel, (...args: unknown[]) => ipcRenderer.invoke(channel, ...args)])
@@ -18,4 +18,16 @@ const onRefresh: ZjuBridge['onRefresh'] = (listener) => {
   return () => ipcRenderer.off(REFRESH_EVENT, handler)
 }
 
-contextBridge.exposeInMainWorld('zju', { ...api, onProgress, onRefresh } as ZjuBridge)
+const onOpen: ZjuBridge['onOpen'] = (listener) => {
+  const handler = (_e: IpcRendererEvent, request: OpenRequest): void => listener(request)
+  ipcRenderer.on(OPEN_EVENT, handler)
+  return () => ipcRenderer.off(OPEN_EVENT, handler)
+}
+
+const onConfirm: ZjuBridge['onConfirm'] = (listener) => {
+  const handler = (_e: IpcRendererEvent, request: ConfirmRequest): void => listener(request)
+  ipcRenderer.on(CONFIRM_EVENT, handler)
+  return () => ipcRenderer.off(CONFIRM_EVENT, handler)
+}
+
+contextBridge.exposeInMainWorld('zju', { ...api, onProgress, onRefresh, onOpen, onConfirm } as ZjuBridge)

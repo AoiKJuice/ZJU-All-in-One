@@ -1,22 +1,25 @@
-import { app, BrowserWindow, dialog } from 'electron'
-import { randomBytes } from 'node:crypto'
+import { app, BrowserWindow } from 'electron'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { stat, writeFile } from 'node:fs/promises'
+import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
-import { basename, join } from 'node:path'
+import { basename, extname, isAbsolute, join } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
-import { REFRESH_EVENT } from '@shared/ipc'
+import { CONFIRM_EVENT, OPEN_EVENT, REFRESH_EVENT } from '@shared/ipc'
 import { PERIOD_TIMES } from '@shared/periods'
-import type { McpState, McpToolGroup } from '@shared/types'
+import type { ConfirmRequest, McpState, McpToolGroup, OpenRequest } from '@shared/types'
 import { call } from './ipc'
+import { downloadToFile } from './download'
+import { exportSlidesPdf, writeTranscript } from './export'
 
 // 本地 MCP 服务：让本机的 Agent（Claude Code 等）调用课表、作业、回放等信息与工具。
 // 只监听 127.0.0.1，请求需带 Authorization: Bearer <token>；无状态模式，每个请求新建一个 McpServer。
-// 工具复用 ipc.ts 的通道实现（call），与界面共用登录会话；提交作业另需在应用内弹窗确认。
+// 工具复用 ipc.ts 的通道实现（call），与界面共用登录会话；提交 / 撤回作业须用户在应用内确认（askUser）。
 
-const PORT = 17321
+// ZJU_MCP_PORT 可换端口：开发版与已安装版同时开着 MCP 时避免抢端口
+const PORT = Number(process.env['ZJU_MCP_PORT']) || 17321
 
 interface Config {
   enabled: boolean
@@ -31,16 +34,69 @@ function loadConfig(): Config {
     enabled: false,
     token: randomBytes(24).toString('base64url'),
     // 提交作业不可撤回，默认关
-    tools: { query: true, refresh: true, transcribe: true, submit: false }
+    tools: { query: true, download: true, app: true, transcribe: true, submit: false }
   }
   if (!existsSync(configPath())) return defaults
   const saved = JSON.parse(readFileSync(configPath(), 'utf8')) as Partial<Config>
-  return { ...defaults, ...saved, tools: { ...defaults.tools, ...saved.tools } }
+  // 只取现有分组的键，旧版本存下的分组名丢弃
+  const tools = Object.fromEntries(Object.entries(defaults.tools).map(([k, v]) => [k, saved.tools?.[k as McpToolGroup] ?? v]))
+  return { ...defaults, ...saved, tools: tools as Config['tools'] }
 }
 
 let config: Config | undefined
 let server: Server | undefined
 let error: string | null = null
+
+/** 下载与导出的默认目录 */
+const outputDir = (): string => join(app.getPath('downloads'), 'ZJU All in One')
+
+/** dir 下不与已有文件重名的路径：重名时加 (1)、(2)… */
+async function freePath(dir: string | undefined, name: string): Promise<string> {
+  const folder = dir ?? outputDir()
+  if (!isAbsolute(folder)) throw new Error('save_dir 须为绝对路径')
+  await mkdir(folder, { recursive: true })
+  const clean = name.replace(/[\\/:*?"<>|]/g, '_')
+  const ext = extname(clean)
+  const stem = basename(clean, ext)
+  let path = join(folder, clean)
+  for (let i = 1; existsSync(path); i++) path = join(folder, `${stem} (${i})${ext}`)
+  return path
+}
+
+const isZju = (url: string): boolean => {
+  const host = new URL(url).hostname
+  return host === 'zju.edu.cn' || host.endsWith('.zju.edu.cn')
+}
+
+const focusWindow = (): BrowserWindow | undefined => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (win?.isMinimized()) win.restore()
+  win?.show()
+  return win
+}
+
+// 等待用户在应用内确认的请求；10 分钟无答复按取消处理
+const CONFIRM_TIMEOUT = 10 * 60_000
+const confirms = new Map<string, (approve: boolean) => void>()
+
+function askUser(request: Omit<ConfirmRequest, 'id'>): Promise<boolean> {
+  const win = focusWindow()
+  if (!win) return Promise.resolve(false)
+  const id = randomUUID()
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => answerConfirm(id, false), CONFIRM_TIMEOUT)
+    confirms.set(id, (approve) => {
+      clearTimeout(timer)
+      confirms.delete(id)
+      resolve(approve)
+    })
+    win.webContents.send(CONFIRM_EVENT, { id, ...request } satisfies ConfirmRequest)
+  })
+}
+
+export function answerConfirm(id: string, approve: boolean): void {
+  confirms.get(id)?.(approve)
+}
 
 const json = (value: unknown): { content: { type: 'text'; text: string }[] } => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }]
@@ -101,6 +157,12 @@ function buildServer(tools: Config['tools']): McpServer {
       annotations: read
     }, async ({ course_id, sub_id }) => json(await call('replay:slides', course_id, sub_id)))
 
+    mcp.registerTool('get_playback', {
+      description: '某次课的播放地址：回放为已签名的 mp4 直链（可交给 download_file 下载），直播中为 hls 流',
+      inputSchema: { course_id: z.string(), sub_id: z.string() },
+      annotations: read
+    }, async ({ course_id, sub_id }) => json(await call('replay:playback', course_id, sub_id)))
+
     mcp.registerTool('get_transcript', {
       description: '某次课已转写的文字稿（本地 Whisper 结果）；尚未转写时返回 null',
       inputSchema: { sub_id: z.string() },
@@ -108,7 +170,88 @@ function buildServer(tools: Config['tools']): McpServer {
     }, async ({ sub_id }) => json(await call('replay:transcript', sub_id)))
   }
 
-  if (tools.refresh) {
+  if (tools.download) {
+    mcp.registerTool('download_file', {
+      description: '用登录会话把浙大站点上的文件下载到本机：作业附件与已交文件（get_assignment_detail 的 attachments / submissions[].files）、作业说明里的文件链接、课件图片（get_slides）、回放视频（get_playback）。返回本机路径',
+      inputSchema: {
+        url: z.string().describe('文件地址，须为 *.zju.edu.cn'),
+        file_name: z.string().optional().describe('保存的文件名，建议传附件名；缺省取地址末段'),
+        save_dir: z.string().optional().describe('保存目录（绝对路径），缺省为"下载/ZJU All in One"')
+      },
+      annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true }
+    }, async ({ url, file_name, save_dir }) => {
+      if (!isZju(url)) throw new Error('只能下载浙大站点（*.zju.edu.cn）上的文件')
+      const path = await freePath(save_dir, file_name ?? (decodeURIComponent(basename(new URL(url).pathname)) || 'download'))
+      await downloadToFile(url, path)
+      return json({ path, size: (await stat(path)).size })
+    })
+
+    mcp.registerTool('export_slides_pdf', {
+      description: '把某次课的全部课件页导出为一个 PDF，返回本机路径',
+      inputSchema: {
+        course_id: z.string(),
+        sub_id: z.string(),
+        title: z.string().optional().describe('文件名（不含扩展名），缺省为"课件-<sub_id>"'),
+        save_dir: z.string().optional().describe('保存目录（绝对路径），缺省为"下载/ZJU All in One"')
+      },
+      annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true }
+    }, async ({ course_id, sub_id, title, save_dir }) => {
+      const name = title ?? `课件-${sub_id}`
+      const path = await freePath(save_dir, `${name}.pdf`)
+      await exportSlidesPdf(await call('replay:slides', course_id, sub_id), name, path)
+      return json({ path })
+    })
+
+    mcp.registerTool('export_transcript', {
+      description: '把某次课已转写的文字稿导出为 txt / srt / md 文件（需先 transcribe_lecture），返回本机路径',
+      inputSchema: {
+        sub_id: z.string(),
+        format: z.enum(['txt', 'srt', 'md']),
+        title: z.string().optional().describe('文件名（不含扩展名），缺省为"文字稿-<sub_id>"'),
+        save_dir: z.string().optional().describe('保存目录（绝对路径），缺省为"下载/ZJU All in One"')
+      },
+      annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false }
+    }, async ({ sub_id, format, title, save_dir }) => {
+      const segments = await call('replay:transcript', sub_id)
+      if (!segments) throw new Error('尚未转写，先调用 transcribe_lecture')
+      const name = title ?? `文字稿-${sub_id}`
+      const path = await freePath(save_dir, `${name}.${format}`)
+      await writeTranscript(segments, format, name, path)
+      return json({ path })
+    })
+  }
+
+  if (tools.app) {
+    mcp.registerTool('open_in_app', {
+      description: '在应用窗口里打开内容给用户看：主页 / 课表 / 设置、某节课的回放或直播页、某项作业的详情侧页，或登录面板（未登录时让用户自己输入账号密码）',
+      inputSchema: {
+        target: z.enum(['home', 'schedule', 'settings', 'login', 'lecture', 'assignment']),
+        course_id: z.string().optional().describe('target 为 lecture 时必填'),
+        sub_id: z.string().optional().describe('target 为 lecture 时必填'),
+        activity_id: z.string().optional().describe('target 为 assignment 时必填')
+      },
+      annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+    }, async ({ target, course_id, sub_id, activity_id }) => {
+      let request: OpenRequest
+      if (target === 'login') request = { login: true }
+      else if (target === 'assignment') {
+        const assignment = (await call('data:assignments')).data.find((a) => a.id === activity_id)
+        if (!assignment) throw new Error('未找到该作业')
+        request = { assignment }
+      } else if (target === 'lecture') {
+        // 先找近期回放，再找本学期全部课次
+        const match = (l: { id: string; courseId: string }): boolean => l.id === sub_id && l.courseId === course_id
+        const term = await call('data:calendar')
+        const today = new Date().toISOString().slice(0, 10)
+        const replay = (await call('data:replays')).data.find(match)
+          ?? (await call('data:lectures', term.halves[0]?.start ?? today, today)).find(match)
+        if (!replay) throw new Error('未找到该课次')
+        request = { replay }
+      } else request = { page: target }
+      focusWindow()?.webContents.send(OPEN_EVENT, request)
+      return json({ opened: target })
+    })
+
     mcp.registerTool('refresh', {
       description: '重新检查登录状态（登录过期时用保存的账号自动重登），并让应用界面重新拉取所有数据',
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true }
@@ -129,7 +272,7 @@ function buildServer(tools: Config['tools']): McpServer {
 
   if (tools.submit) {
     mcp.registerTool('submit_assignment', {
-      description: '向学在浙大提交作业（附件为本机文件路径）。提交不可撤回，应用会弹窗请用户确认；用户取消则返回未提交',
+      description: '向学在浙大提交作业（附件为本机文件路径）。应用内会请用户确认（可预览文件）；用户取消则返回未提交。已有草稿（如撤回过）时覆盖草稿',
       inputSchema: {
         activity_id: z.string().describe('作业 id'),
         file_paths: z.array(z.string()).describe('要上传的本机文件绝对路径'),
@@ -139,21 +282,30 @@ function buildServer(tools: Config['tools']): McpServer {
     }, async ({ activity_id, file_paths, comment = '' }) => {
       const detail = await call('homework:detail', activity_id)
       const files = await Promise.all(file_paths.map(async (path) => ({ path, name: basename(path), size: (await stat(path)).size })))
-      const win = BrowserWindow.getAllWindows()[0]
-      win?.show()
-      const options = {
-        type: 'question' as const,
-        title: '提交作业',
-        message: `本地 Agent 请求提交作业：${detail.courseName} ${detail.title}`,
-        detail: [...files.map((f) => f.name), comment && `说明：${comment}`].filter(Boolean).join('\n'),
-        buttons: ['提交', '取消'],
-        defaultId: 1,
-        cancelId: 1
+      if (!(await askUser({ action: 'submit', courseName: detail.courseName, title: detail.title, files, comment }))) {
+        return json({ submitted: false, reason: '用户取消' })
       }
-      const { response } = await (win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options))
-      if (response !== 0) return json({ submitted: false, reason: '用户取消' })
       await call('homework:submit', activity_id, comment, files)
       return json({ submitted: true })
+    })
+
+    mcp.registerTool('retract_submission', {
+      description: '撤回某项作业的一次提交（get_assignment_detail 中 canRetract 为 true 的那次；评分前且作业允许时可用）。撤回后该提交变为草稿，可再提交。应用内会请用户确认',
+      inputSchema: {
+        activity_id: z.string().describe('作业 id'),
+        submission_id: z.string().describe('要撤回的提交 id（submissions[].id）')
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
+    }, async ({ activity_id, submission_id }) => {
+      const detail = await call('homework:detail', activity_id)
+      const submission = detail.submissions.find((x) => x.id === submission_id)
+      if (!submission) throw new Error('未找到该提交')
+      if (!submission.canRetract) throw new Error('这次提交不能撤回（已评分或作业不允许撤回）')
+      if (!(await askUser({ action: 'retract', courseName: detail.courseName, title: detail.title, files: submission.files, comment: submission.comment }))) {
+        return json({ retracted: false, reason: '用户取消' })
+      }
+      await call('homework:retract', submission_id)
+      return json({ retracted: true })
     })
   }
 

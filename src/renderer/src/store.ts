@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Assignment, AuthState, LectureReplay, TaskProgress, TranscriptSegment } from '@shared/types'
+import type { Assignment, AuthState, ConfirmRequest, LectureReplay, TaskProgress, TranscriptSegment } from '@shared/types'
 import type { Theme } from './lib/theme'
 import { applySettings, initialSettings, type Settings } from './lib/settings'
 
@@ -46,6 +46,12 @@ interface AppStore {
   notify: (text: string, action?: { label: string; run: () => void }) => void
   toggleTheme: () => void
   refreshAuth: () => Promise<void>
+  /** 正在预览的本机文件路径 */
+  preview: string | null
+  openPreview: (path: string | null) => void
+  /** 待用户确认的 Agent 提交 / 撤回，排队逐个显示 */
+  confirms: ConfirmRequest[]
+  answerConfirm: (id: string, approve: boolean) => void
   /** 登录面板是否展开 */
   loginOpen: boolean
   setLoginOpen: (open: boolean) => void
@@ -121,6 +127,13 @@ export const useApp = create<AppStore>((set, get) => {
     },
     toggleTheme: () => get().setSetting('theme', get().theme === 'dark' ? 'light' : 'dark'),
     refreshAuth: () => runAuth(() => window.zju['auth:state']()),
+    preview: null,
+    openPreview: (preview) => set({ preview }),
+    confirms: [],
+    answerConfirm: (id, approve) => {
+      void window.zju['mcp:answer'](id, approve)
+      set((s) => ({ confirms: s.confirms.filter((c) => c.id !== id) }))
+    },
     loginOpen: false,
     setLoginOpen: (loginOpen) => set({ loginOpen }),
     login: async (account) => {
@@ -136,6 +149,18 @@ window.zju.onRefresh(() => {
   void useApp.getState().refreshAuth()
   useApp.getState().refresh()
 })
+
+// 本地 Agent 经 MCP 的 open_in_app 打开页面 / 课次 / 作业 / 登录面板
+window.zju.onOpen((request) => {
+  const s = useApp.getState()
+  if ('page' in request) s.go(request.page)
+  else if ('login' in request) s.setLoginOpen(true)
+  else if ('assignment' in request) s.openAssignment(request.assignment)
+  else s.openReplay(request.replay)
+})
+
+// Agent 发起的提交 / 撤回进入确认队列
+window.zju.onConfirm((request) => useApp.setState((s) => ({ confirms: [...s.confirms, request] })))
 
 // 进度事件全局订阅一次，离开回放页也不丢
 window.zju.onProgress((p) =>

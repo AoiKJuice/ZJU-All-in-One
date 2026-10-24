@@ -27,6 +27,11 @@ export async function exportSlidesPdf(
   // 图片先通过认证会话读取，打印窗口只加载内联数据。
   const images: string[] = []
   for (const slide of slides) {
+    // 演示数据的课件本身就是 data: 图片
+    if (slide.imageUrl.startsWith('data:')) {
+      images.push(slide.imageUrl)
+      continue
+    }
     const response = await zjuSession().fetch(upgrade(slide.imageUrl), {
       headers: { Referer: 'https://classroom.zju.edu.cn/' }
     })

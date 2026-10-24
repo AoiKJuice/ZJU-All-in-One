@@ -2,7 +2,10 @@ import type {
   Assignment,
   AssignmentDetail,
   AuthState,
+  ConfirmRequest,
+  FilePreview,
   McpState,
+  OpenRequest,
   McpToolGroup,
   CourseSession,
   DataResult,
@@ -45,11 +48,17 @@ export interface ZjuApi {
   'file:download': (url: string, name: string) => Promise<string | null>
   /** 在资源管理器中显示文件 */
   'file:reveal': (path: string) => Promise<void>
+  /** 读取本机文件供应用内预览（图片 / PDF / 文本） */
+  'file:preview': (path: string) => Promise<FilePreview>
+  /** 用系统默认程序打开本机文件 */
+  'file:open': (path: string) => Promise<void>
 
   'homework:detail': (activityId: string) => Promise<AssignmentDetail>
   /** 打开系统文件选择框；取消时返回空数组 */
   'homework:pick': () => Promise<PickedFile[]>
   'homework:submit': (activityId: string, comment: string, files: PickedFile[]) => Promise<void>
+  /** 撤回一次提交（评分前、作业允许时），撤回后变为草稿 */
+  'homework:retract': (submissionId: string) => Promise<void>
 
   /** 已签名、可直接给 <video> 播放的回放地址 */
   /** 回放为 mp4 直链；直播中返回 hls */
@@ -66,6 +75,8 @@ export interface ZjuApi {
   /** 本地 MCP 服务（供本机 Agent 调用）的状态与开关 */
   'mcp:state': () => Promise<McpState>
   'mcp:set': (patch: { enabled?: boolean; tools?: Partial<Record<McpToolGroup, boolean>> }) => Promise<McpState>
+  /** 用户对 Agent 发起的提交 / 撤回给出答复 */
+  'mcp:answer': (id: string, approve: boolean) => Promise<void>
 }
 
 export type ZjuChannel = keyof ZjuApi
@@ -83,9 +94,12 @@ export const ZJU_CHANNELS = [
   'system:stats',
   'file:download',
   'file:reveal',
+  'file:preview',
+  'file:open',
   'homework:detail',
   'homework:pick',
   'homework:submit',
+  'homework:retract',
   'replay:playback',
   'replay:slides',
   'replay:exportSlides',
@@ -93,16 +107,23 @@ export const ZJU_CHANNELS = [
   'replay:transcribe',
   'replay:exportTranscript',
   'mcp:state',
-  'mcp:set'
+  'mcp:set',
+  'mcp:answer'
 ] as const satisfies readonly ZjuChannel[]
 
 /** 主进程 → 渲染进程的推送事件 */
 export const PROGRESS_EVENT = 'task:progress'
 /** 主进程要求界面重新拉取数据（MCP 的 refresh 工具） */
 export const REFRESH_EVENT = 'app:refresh'
+/** 主进程要求界面打开某页 / 某节课 / 某项作业 / 登录面板（MCP 的 open_in_app） */
+export const OPEN_EVENT = 'app:open'
+/** 主进程请界面确认 Agent 发起的提交 / 撤回 */
+export const CONFIRM_EVENT = 'app:confirm'
 
 export type ZjuBridge = ZjuApi & {
   /** 订阅长任务进度，返回取消订阅函数 */
   onProgress: (listener: (progress: TaskProgress) => void) => () => void
   onRefresh: (listener: () => void) => () => void
+  onOpen: (listener: (request: OpenRequest) => void) => () => void
+  onConfirm: (listener: (request: ConfirmRequest) => void) => () => void
 }
