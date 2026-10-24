@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuBridge } from '@shared/ipc'
+import { PROGRESS_EVENT, REFRESH_EVENT, ZJU_CHANNELS, type ZjuBridge } from '@shared/ipc'
 import type { TaskProgress } from '@shared/types'
 
 const api = Object.fromEntries(
@@ -12,4 +12,10 @@ const onProgress: ZjuBridge['onProgress'] = (listener) => {
   return () => ipcRenderer.off(PROGRESS_EVENT, handler)
 }
 
-contextBridge.exposeInMainWorld('zju', { ...api, onProgress } as ZjuBridge)
+const onRefresh: ZjuBridge['onRefresh'] = (listener) => {
+  const handler = (): void => listener()
+  ipcRenderer.on(REFRESH_EVENT, handler)
+  return () => ipcRenderer.off(REFRESH_EVENT, handler)
+}
+
+contextBridge.exposeInMainWorld('zju', { ...api, onProgress, onRefresh } as ZjuBridge)

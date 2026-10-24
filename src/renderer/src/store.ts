@@ -89,7 +89,7 @@ export const useApp = create<AppStore>((set, get) => {
       applySettings(next)
       set({ settings: next, theme: next.theme })
     },
-    auth: { loggedIn: false, user: null },
+    auth: { loggedIn: false, user: null, account: null },
     authBusy: false,
     authReady: false,
     epoch: 0,
@@ -129,6 +129,12 @@ export const useApp = create<AppStore>((set, get) => {
     },
     logout: () => runAuth(() => window.zju['auth:logout']())
   }
+})
+
+// 本地 Agent 经 MCP 调 refresh 时，界面跟着重拉
+window.zju.onRefresh(() => {
+  void useApp.getState().refreshAuth()
+  useApp.getState().refresh()
 })
 
 // 进度事件全局订阅一次，离开回放页也不丢

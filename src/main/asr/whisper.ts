@@ -1,5 +1,6 @@
 import { app } from 'electron'
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { promisify } from 'node:util'
 import { existsSync, createWriteStream } from 'node:fs'
 import {
   mkdir,
@@ -18,6 +19,7 @@ import { performance } from 'node:perf_hooks'
 import ffmpegPath from 'ffmpeg-static'
 import type { TaskProgress, TranscriptSegment } from '@shared/types'
 import { zjuSession } from '../auth/zjuam'
+import { throttle } from './throttle'
 
 const ENGINE_URL =
   'https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip'
@@ -25,6 +27,13 @@ const MODEL_URL =
   'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin'
 const MODEL_NAME = 'ggml-large-v3-turbo-q5_0.bin'
 const REFERER = 'https://classroom.zju.edu.cn/'
+const execFileAsync = promisify(execFile)
+
+// 显卡占用上限（运行时间占空比）：其余时间让给界面渲染。实测 10 分钟音频平均占用 64% → 49%，耗时约 1.5 倍
+const GPU_DUTY = 0.6
+// large-v3-turbo q5_0 在显卡上的显存峰值实测约 1.1GB（束搜索与贪心解码相差无几）
+const GPU_MIB = 1200
+
 const PROMPT = '以下是普通话的课堂录音，请使用简体中文并加上标点符号。'
 
 type Report = (progress: Omit<TaskProgress, 'key'>) => void
@@ -225,7 +234,9 @@ function run(
   args: string[],
   onStderr: (line: string) => void = () => {},
   onStdout: (line: string) => void = () => {},
-  track = false
+  track = false,
+  /** 显卡占用上限（占空比），见 throttle.ts */
+  duty = 1
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
@@ -243,7 +254,9 @@ function run(
       }
     }
 
+    const release = child.pid !== undefined ? throttle(child.pid, duty) : () => {}
     const forget = (): void => {
+      release()
       if (child.pid !== undefined) childPids.delete(child.pid)
     }
 
@@ -448,6 +461,22 @@ async function extractAudio(
   return audioDuration > 0 ? audioDuration : duration
 }
 
+/**
+ * 按本机显存决定用不用显卡：显存预算 = 总显存的 30%，且给其他程序至少留 1GB 空闲；
+ * 预算放得下模型就上显卡（限占空比），放不下或没有 NVIDIA 显卡就用 CPU。
+ */
+async function gpuPlan(): Promise<{ args: string[]; duty: number }> {
+  try {
+    const { stdout } = await execFileAsync('nvidia-smi', ['--query-gpu=memory.total,memory.used', '--format=csv,noheader,nounits'], { windowsHide: true })
+    const [total, used] = stdout.trim().split(/\r?\n/)[0].split(',').map(Number)
+    const budget = Math.min(total * 0.3, total - used - 1024)
+    if (budget >= GPU_MIB) return { args: [], duty: GPU_DUTY }
+  } catch {
+    // 没有 nvidia-smi：非 NVIDIA 显卡
+  }
+  return { args: ['-ng'], duty: 1 }
+}
+
 async function recognize(
   cli: string,
   model: string,
@@ -520,7 +549,9 @@ async function recognize(
   }
 
   report({ stage: 'transcribe', ratio: 0, message: '本地 Whisper 转写' })
+  const plan = await gpuPlan()
   const result = await run(cli, [
+    ...plan.args,
     '-m', model,
     '-f', wav,
     '-l', 'zh',
@@ -528,7 +559,7 @@ async function recognize(
     '-of', output,
     '-pp',
     '--prompt', PROMPT
-  ], onStderr, onStdout, true).finally(flush)
+  ], onStderr, onStdout, true, plan.duty).finally(flush)
 
   if (result.code !== 0) {
     throw new Error(`Whisper 转写失败：${result.stderr.trim()}`)

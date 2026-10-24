@@ -1,6 +1,7 @@
 import { app, BrowserWindow, nativeTheme, session, shell } from 'electron'
 import { join } from 'node:path'
 import { registerIpc } from './ipc'
+import { initMcp } from './mcp'
 import { initializeDiagnostics } from './diagnostics'
 
 // 打包后应用名取 productName（"ZJU All in One"），数据目录会随之改变；固定到开发时的目录，登录态与 Whisper 模型共用
@@ -8,9 +9,9 @@ import { initializeDiagnostics } from './diagnostics'
 const profile = process.env['ZJU_PROFILE']
 app.setPath('userData', join(app.getPath('appData'), profile ? `zju-all-in-one-${profile}` : 'zju-all-in-one'))
 
-// Windows 上界面不用 GPU：Whisper CUDA 占满显卡时，Chromium 的 GPU 进程被饿住，
-// 它挂在主窗口下的子窗口会把主窗口一起拖进"未响应"（AppHang，转写约一分半后出现）。软件合成后两者不再争用。
-if (process.platform === 'win32') app.disableHardwareAcceleration()
+// Windows 回放用软件解码，规避 D3D11 解码路径。界面保留 GPU 合成（全软件渲染太卡）；
+// 与 Whisper CUDA 的争用由 asr/throttle.ts 限制 Whisper 的显卡占空比解决。
+if (process.platform === 'win32') app.commandLine.appendSwitch('disable-accelerated-video-decode')
 
 let mainWindow: BrowserWindow | null = null
 
@@ -90,6 +91,7 @@ if (!app.requestSingleInstanceLock()) {
     )
 
     registerIpc()
+    initMcp()
     createWindow()
     app.on('activate', showMainWindow)
   })

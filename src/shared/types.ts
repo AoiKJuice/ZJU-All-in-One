@@ -8,6 +8,21 @@ export interface UserProfile {
 export interface AuthState {
   loggedIn: boolean
   user: UserProfile | null
+  /** 学号：教务个人信息取不到时用保存的登录账号 */
+  account: string | null
+}
+
+/** 本地 MCP 服务的工具分组，设置页逐组开关 */
+export type McpToolGroup = 'query' | 'refresh' | 'transcribe' | 'submit'
+
+export interface McpState {
+  enabled: boolean
+  /** 已在监听时的地址 */
+  url: string | null
+  token: string
+  tools: Record<McpToolGroup, boolean>
+  /** 启动失败原因（如端口被占用） */
+  error: string | null
 }
 
 /** Every data fetch is wrapped so the UI can tell live data from placeholders. */

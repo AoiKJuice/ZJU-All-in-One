@@ -13,7 +13,8 @@ import { pathToFileURL } from 'node:url'
 import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
 import type { AuthState, TaskProgress } from '@shared/types'
 import { hasCasCookie, login, logout } from './auth/zjuam'
-import { clearCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
+import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
+import { getMcpState, setMcp } from './mcp'
 import { onCasExpired } from './http'
 import {
   fetchSchedule,
@@ -65,21 +66,22 @@ onCasExpired(async () => {
 
 async function getAuthState(): Promise<AuthState> {
   if (!(await hasCasCookie()) && !(await relogin())) {
-    return { loggedIn: false, user: null }
+    return { loggedIn: false, user: null, account: null }
   }
 
+  const account = (await loadCredentials())?.username ?? null
   try {
     const { data: user } = await fetchProfile()
-    return { loggedIn: true, user }
+    return { loggedIn: true, user, account: user.studentId || account }
   } catch (error) {
     // 服务器端 CAS 会话已过期且无法用保存的密码重登：按未登录处理并清掉残留 cookie
     if (error instanceof Error && error.message === '未登录') {
       await logout()
       resetServices()
-      return { loggedIn: false, user: null }
+      return { loggedIn: false, user: null, account: null }
     }
     // 教务个人信息字段尚待实测，其他失败不否定 CAS 登录态
-    return { loggedIn: true, user: null }
+    return { loggedIn: true, user: null, account }
   }
 }
 
@@ -115,7 +117,7 @@ const handlers: Handlers = {
     await logout()
     await clearCredentials()
     resetServices()
-    return { loggedIn: false, user: null }
+    return { loggedIn: false, user: null, account: null }
   },
 
   'data:schedule': () => fetchSchedule(),
@@ -202,7 +204,10 @@ const handlers: Handlers = {
 
     await writeTranscript(segments, format, title, filePath)
     return filePath
-  }
+  },
+
+  'mcp:state': async () => getMcpState(),
+  'mcp:set': (_win, patch) => setMcp(patch)
 }
 
 if (process.env['ZJU_DEMO'] === '1') {
@@ -215,6 +220,12 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:lectures': async () => mockReplays,
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,
+    'homework:detail': async (_win, activityId) => {
+      const a = mockAssignments.find((x) => x.id === activityId) ?? mockAssignments[0]
+      return { ...a, descriptionHtml: '<p>演示作业</p>', attachments: [], submissions: [], url: '' }
+    },
+    // 演示模式不真正提交
+    'homework:submit': async () => {},
     // ZJU_DEMO_VIDEO 指向本地视频文件时用它调播放器，否则无视频
     'replay:playback': async () => {
       const file = process.env['ZJU_DEMO_VIDEO']
@@ -233,6 +244,12 @@ function registerChannel<K extends ZjuChannel>(channel: K): void {
   ipcMain.handle(channel, (e, ...args: Parameters<ZjuApi[K]>) =>
     handler(BrowserWindow.fromWebContents(e.sender), ...args)
   )
+}
+
+/** 主进程内直接调用某个通道（MCP 工具复用渲染端同一套实现，演示模式也随之生效） */
+export function call<K extends ZjuChannel>(channel: K, ...args: Parameters<ZjuApi[K]>): ReturnType<ZjuApi[K]> {
+  const handler = handlers[channel] as (win: BrowserWindow | null, ...args: Parameters<ZjuApi[K]>) => ReturnType<ZjuApi[K]>
+  return handler(BrowserWindow.getAllWindows()[0] ?? null, ...args)
 }
 
 export function registerIpc(): void {

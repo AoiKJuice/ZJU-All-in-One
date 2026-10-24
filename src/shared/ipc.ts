@@ -2,6 +2,8 @@ import type {
   Assignment,
   AssignmentDetail,
   AuthState,
+  McpState,
+  McpToolGroup,
   CourseSession,
   DataResult,
   Exam,
@@ -60,6 +62,10 @@ export interface ZjuApi {
   /** 本地 Whisper 转写（首次会下载引擎与模型），进度经 task:progress 推送 */
   'replay:transcribe': (courseId: string, subId: string) => Promise<TranscriptSegment[]>
   'replay:exportTranscript': (subId: string, format: TranscriptFormat, title: string) => Promise<string | null>
+
+  /** 本地 MCP 服务（供本机 Agent 调用）的状态与开关 */
+  'mcp:state': () => Promise<McpState>
+  'mcp:set': (patch: { enabled?: boolean; tools?: Partial<Record<McpToolGroup, boolean>> }) => Promise<McpState>
 }
 
 export type ZjuChannel = keyof ZjuApi
@@ -85,13 +91,18 @@ export const ZJU_CHANNELS = [
   'replay:exportSlides',
   'replay:transcript',
   'replay:transcribe',
-  'replay:exportTranscript'
+  'replay:exportTranscript',
+  'mcp:state',
+  'mcp:set'
 ] as const satisfies readonly ZjuChannel[]
 
 /** 主进程 → 渲染进程的推送事件 */
 export const PROGRESS_EVENT = 'task:progress'
+/** 主进程要求界面重新拉取数据（MCP 的 refresh 工具） */
+export const REFRESH_EVENT = 'app:refresh'
 
 export type ZjuBridge = ZjuApi & {
   /** 订阅长任务进度，返回取消订阅函数 */
   onProgress: (listener: (progress: TaskProgress) => void) => () => void
+  onRefresh: (listener: () => void) => () => void
 }

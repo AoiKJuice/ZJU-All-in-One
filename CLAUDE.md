@@ -48,7 +48,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 
 - `auth/zjuam.ts` 只负责 CAS：弹出真实 `BrowserWindow` 让用户在 `zjuam.zju.edu.cn` 登录，cookie 存于持久分区 `persist:zju`，以 `iPlanetDirectoryPro` cookie 判定已登录。它**不得 import services**（避免循环依赖）。
 - 账号密码登录在 `auth/password.ts`（流程照 Celechron：登录页取 execution → `/cas/v2/getPubKey` → 无填充 RSA → 表单提交；失败提示在登录页 `#errormsg`，页面始终带隐藏的验证码区，不能据 captcha 字样判断）。凭据用 `safeStorage` 加密存 userData/credentials.bin；只有密码被拒才清掉，网络错误不清。`zjuFetch` 被 SSO 弹回 `/cas/login` 时调用 `onCasExpired` 注册的回调（ipc.ts 接上 `relogin`）重登并重试一次，http.ts 不直接 import password.ts。网页登录（`auth:login` 不带参数）保留作验证码兜底。**调试时不要替用户输入账号密码**，真实登录只能由用户验证。
-- 登录态组合在 `ipc.ts`：`auth:state` = 有 CAS cookie 时调 `zdbk.fetchProfile()` 取姓名（失败时 `user: null` 但仍算已登录）；`auth:logout` 清 cookie 后调用各 service 的 `reset()`。
+- 登录态组合在 `ipc.ts`：`auth:state` = 有 CAS cookie 时调 `zdbk.fetchProfile()` 取姓名学号（失败时 `user: null` 但仍算已登录）；`account` 为学号（教务取不到时用保存的登录账号），刊头登录后显示它；`auth:logout` 清 cookie 后调用各 service 的 `reset()`。
 - 每个 service 自己维护一次性的 `ensureLogin()` 与 `reset()`，请求一律走 `src/main/http.ts` 的 `zjuFetch`。**不要用 `session.fetch`**：Electron 45 下它跟随跳转后 `response.url` 恒为空串，`redirect: 'manual'` 则直接抛错；`zjuFetch` 基于 `net.request` 的 `redirect` 事件记录最终 URL。重定向后不在目标站点即视为未登录，抛 `Error('未登录')`。渲染进程把这类错误显示为"登录后显示"。
 
 ### 数据源（未以登录态实测，字段处有"推测"注释）
@@ -59,10 +59,14 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - `services/courses.ts` 学在浙大（TronClass）：经 `identity.zju.edu.cn`（Keycloak，broker 到 zjuam）SSO，待办来自 `/api/todos`。
 - `services/classroom.ts` 智云课堂：以下从其前端 bundle 逆向得到，可信度较高——token 在 `.zju.edu.cn` 的 `_token` cookie（PHP 序列化，正则提取），请求头 `Authorization: Bearer <token>`；无 token 时访问 `https://tgmedia.cmc.zju.edu.cn?forward=…&tenant_code=112` 走 CAS 换取。课程月历 `courseapi/v2/course-live/get-my-course-month`，课件 `pptnote/v1/schedule/search-ppt`，平台自带 AI 转写 `courseapi/v3/web-socket/search-trans-result`，回放页 `/livingpage?course_id&sub_id&tenant_code=112`。`listSlides`/`getTranscript` 已实现但尚未接 IPC，是两个课堂工具的内核。
 
+### 本地 MCP 服务
+
+`src/main/mcp.ts`：供本机 Agent（Claude Code 等）调用的 MCP 服务，Streamable HTTP 无状态模式，只监听 `127.0.0.1:17321/mcp`，请求须带 `Authorization: Bearer <token>`（token 随机生成，与开关一起存 userData/mcp.json）。默认关闭，设置页开关；工具按组开关：查询（状态、课表含起止时刻、校历、考试、作业、作业详情、课次、课件、文字稿）/ 刷新（重查登录并经 `app:refresh` 事件让界面重拉）/ 转写 / 提交作业（默认关）。工具一律经 `ipc.ts` 导出的 `call()` 复用通道实现，共用登录会话，演示模式也生效。**提交作业必须先在应用内弹原生确认框，用户点"提交"才真正提交**；测试时只触发弹窗，由用户自己点，不要模拟按键操作用户桌面。节次作息在 `src/shared/periods.ts`，主进程与界面共用。
+
 ### 回放、转写、作业提交
 
 - 回放页（`pages/Replay.tsx`）：`<video>` 直接播放 `replay:playback` 返回的签名地址（`vod.cmc.zju.edu.cn`，签名见 `classroom.getPlaybackUrl`，部分账号 `phone` 为空按空串签）；默认 session 对 `*.cmc.zju.edu.cn` 补 Referer。课件图是 http 地址，靠 CSP 的 `upgrade-insecure-requests` 升级为 https。
-- 转写：`src/main/asr/whisper.ts`，首次使用下载 whisper.cpp CUDA 12.4 构建（b5454，约 684MB）与 `ggml-large-v3-turbo-q5_0`（hf-mirror，约 574MB）到 userData/whisper；ffmpeg 来自 `ffmpeg-static`（安装时设 `FFMPEG_BINARIES_URL=https://registry.npmmirror.com/-/binary/ffmpeg-static`）。GPU 失败时以 `-ng` 重跑一次。结果缓存在 userData/transcripts。**不使用智云自带转写**（用户认为效果差）。
+- 转写：`src/main/asr/whisper.ts`，首次使用下载 whisper.cpp CUDA 12.4 构建（b5454，约 684MB）与 `ggml-large-v3-turbo-q5_0`（hf-mirror，约 574MB）到 userData/whisper；ffmpeg 来自 `ffmpeg-static`（安装时设 `FFMPEG_BINARIES_URL=https://registry.npmmirror.com/-/binary/ffmpeg-static`）。`gpuPlan` 按显存决定用不用显卡：预算 = 总显存 30%（且至少给别的程序留 1GB 空闲），放得下模型（实测峰值约 1.1GB，束搜索与贪心相差无几）就上显卡，否则 `-ng` 走 CPU。上显卡时由 `asr/throttle.ts` 限制显卡占用：常驻 PowerShell 用 NtSuspendProcess / NtResumeProcess 按 200ms 周期、60% 占空比挂起与恢复 whisper-cli（实测 10 分钟音频平均占用 64% → 49%，耗时约 1.5 倍）；它的 stdin 关闭时会先恢复再退出。结果缓存在 userData/transcripts。**不使用智云自带转写**（用户认为效果差）。
 - 导出：`src/main/export.ts`，课件用隐藏窗口 `printToPDF`，文字稿 txt/srt/md。
 - 播放器（`components/Player.tsx`）为自绘控制条：回放有播放/进度/倍速，直播（hls）不允许暂停与拖动、被暂停会立即恢复；铺满窗口与全屏按钮相邻，全屏作用于整个播放器容器（字幕、控制条一起进全屏）。
 - 课件区（`components/SlideViewer.tsx`）：缩略图 / 大图切换，大图可翻页、默认跟随当前讲解页（直播取最新一页，回放取 `created_sec` ≤ 播放时间的最后一页）；点击课件不影响播放，右键菜单"全窗口查看 / 下载"。
@@ -93,7 +97,8 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 2026-10 排查结论：主进程事件循环从未阻塞（`diagnostics.ts` 有 >1s 卡顿监测，日志在 userData/logs/app.log；Windows 事件日志里是 `Application Hang`/AppHangB1，而非崩溃）。卡死总伴随 GPU 重负载（视频解码、Whisper CUDA ~80%）叠加昂贵的合成：全窗 `mix-blend-mode` 覆盖层、上千行逐行 `filter: blur` 动画、每条新结果整表重渲染。因此：
 - 不要加全窗 blend/filter 覆盖层；纸纹画在 `body` 背景上（`--grain`）。
 - 长列表与流式结果用普通元素，不做逐行 filter 动画；主进程推送需节流（转写 partial 每 250ms 合并一次）。
-- Windows 上**整个界面关闭硬件加速**（`app.disableHardwareAcceleration()`）：2026-10-23 再次在 Whisper 识别约一分半后 AppHang——CUDA 占满显卡时 Chromium GPU 进程被饿住，它挂在主窗口下的子窗口把主窗口拖成未响应。只关硬件视频解码不够。Whisper/ffmpeg 子进程以低于正常优先级运行。
+- 2026-10-23 再次在 Whisper 识别约一分半后 AppHang：CUDA 占满显卡时 Chromium GPU 进程被饿住，它挂在主窗口下的子窗口把主窗口拖成未响应。曾试过整个界面关闭硬件加速（`disableHardwareAcceleration`），转写不再卡死但界面明显卡顿，用户否决；现保留 GPU 合成、只关硬件视频解码，改为限制 Whisper 的显卡占空比（见上文转写）。Whisper/ffmpeg 子进程以低于正常优先级运行。
+- **Claude 桌面版是 MSIX 包**：从会话里启动的 shell 及其子进程（含 `npm run dev`、手动启动的安装版）读写 `%APPDATA%` 会被重定向到 `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming`，看到的 userData（日志、cookie、Whisper 临时目录）不是用户真实使用的那份；用户自己启动的应用写在真实 `%APPDATA%`。要读真实日志，用 `Invoke-CimMethod Win32_Process Create` 起一个包外进程把文件复制到工作区外，读完即删。
 - 排查时：转写临时目录 userData/whisper/task-* 里剩下的文件能看出卡在哪一步（有 audio.wav 无 transcript.json = 识别阶段）。
 - 隐藏/最小化窗口时动画帧暂停，`AnimatePresence mode="wait"` 的页面切换会停在退场阶段，脚本化测试前先 `Page.bringToFront`。
 

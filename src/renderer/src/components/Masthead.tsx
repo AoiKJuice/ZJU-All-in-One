@@ -61,7 +61,7 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
           data-armed={armed || loginOpen || undefined}
           className="data-[armed]:text-[var(--shu)]"
         >
-          {!auth.loggedIn ? '登录' : armed ? '退出' : (auth.user?.name ?? '已登录')}
+          {!auth.loggedIn ? '登录' : armed ? '退出' : (auth.account ?? '已登录')}
         </button>
         <button onClick={toggleTheme} aria-label="切换昼夜" className="grid w-5 place-items-center">
           <AnimatePresence mode="popLayout" initial={false}>

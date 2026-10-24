@@ -1,6 +1,6 @@
 {
   "name": "zju-all-in-one",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "聚合浙江大学学业信息与实用工具的桌面应用",
   "main": "./out/main/index.js",
@@ -16,6 +16,7 @@
     "ffmpeg-static": "^5.3.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
@@ -31,6 +32,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
+    "zod": "^4.6.7",
     "zustand": "^5.0.15"
   }
 }
