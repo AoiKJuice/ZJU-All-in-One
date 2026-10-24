@@ -1,5 +1,6 @@
 import { net } from 'electron'
-import { zjuSession } from './auth/zjuam'
+import { hasCasCookie, zjuSession } from './auth/zjuam'
+import { logDiagnostic } from './diagnostics'
 
 export interface ZjuFetchInit {
   method?: string
@@ -33,7 +34,16 @@ const landedOnCasLogin = (url: string): boolean => {
 export async function zjuFetch(url: string, init: ZjuFetchInit = {}): Promise<ZjuResponse> {
   const response = await send(url, init)
   if (init.relogin === false || !onExpired || !landedOnCasLogin(response.url) || landedOnCasLogin(url)) return response
+  logDiagnostic('cas-expired', { host: new URL(url).hostname })
   return (await onExpired()) ? send(url, init) : response
+}
+
+/** 各 service 登录前调用：统一身份认证 cookie 不在时先用保存的账号重登，仍没有才算未登录 */
+export async function ensureCas(): Promise<void> {
+  if (await hasCasCookie()) return
+  logDiagnostic('cas-expired', { host: 'cookie-missing' })
+  if (onExpired && (await onExpired())) return
+  throw new Error('未登录')
 }
 
 function send(

@@ -119,6 +119,8 @@ export const REFRESH_EVENT = 'app:refresh'
 export const OPEN_EVENT = 'app:open'
 /** 主进程请界面确认 Agent 发起的提交 / 撤回 */
 export const CONFIRM_EVENT = 'app:confirm'
+/** 后台自动重登成功（或密码被拒）后请界面重取登录态 */
+export const AUTH_EVENT = 'app:auth'
 
 export type ZjuBridge = ZjuApi & {
   /** 订阅长任务进度，返回取消订阅函数 */
@@ -126,4 +128,5 @@ export type ZjuBridge = ZjuApi & {
   onRefresh: (listener: () => void) => () => void
   onOpen: (listener: (request: OpenRequest) => void) => () => void
   onConfirm: (listener: (request: ConfirmRequest) => void) => () => void
+  onAuth: (listener: () => void) => () => void
 }

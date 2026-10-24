@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { zjuFetch } from '../http'
-import { CAS_BASE, hasCasCookie, zjuSession } from './zjuam'
+import { logDiagnostic } from '../diagnostics'
+import { CAS_BASE, casCookieValue } from './zjuam'
 
 // 统一身份认证账号密码登录。流程照 Celechron（lib/http/zjuServices/zjuam.dart）：
 // 登录页取 execution → getPubKey 取 RSA 公钥 → 教科书 RSA 加密密码 → 表单提交，写入 iPlanetDirectoryPro 即成功。
@@ -40,13 +41,13 @@ function errorMessage(html: string): string {
 }
 
 async function submit(username: string, password: string): Promise<void> {
-  const cookies = zjuSession().cookies
-  for (const cookie of await cookies.get({ name: 'iPlanetDirectoryPro' })) {
-    await cookies.remove(`https://${cookie.domain!.replace(/^\./, '')}${cookie.path ?? '/'}`, cookie.name)
-  }
+  // 不先删旧 cookie：删掉的那一刻，并发中的请求会误判为未登录。改为比较提交前后的值，变了才算登录成功
+  const before = await casCookieValue()
 
   const page = await (await zjuFetch(`${CAS_BASE}/login`, { relogin: false })).text()
   const execution = page.match(/name="execution" value="(.*?)"/)?.[1]
+  // 没有登录表单：CAS 认得现有 cookie，本来就是登录状态
+  if (!execution && before) return
   if (!execution) throw new Error('统一身份认证页面异常')
 
   const key = await (await zjuFetch(`${CAS_BASE}/v2/getPubKey`, { relogin: false })).json<{ modulus: string; exponent: string }>()
@@ -63,7 +64,8 @@ async function submit(username: string, password: string): Promise<void> {
     body: body.toString(),
     relogin: false
   })
-  if (await hasCasCookie()) return
+  const after = await casCookieValue()
+  if (after && after !== before) return
   const message = errorMessage(await response.text())
   // 多次失败后要求验证码：交给网页登录，凭据不算失效
   if (message.includes('验证码')) throw new Error('需要验证码，请用网页登录')
@@ -93,19 +95,26 @@ export async function clearCredentials(): Promise<void> {
   await rm(credentialsPath(), { force: true })
 }
 
-let relogging: Promise<boolean> | undefined
+/** ok 重登成功；none 没有保存的账号；rejected 密码被拒（已清掉凭据）；failed 其他失败（多半是网络），凭据保留 */
+export type ReloginResult = 'ok' | 'none' | 'rejected' | 'failed'
 
-/** 用保存的凭据重登；没有凭据返回 false，凭据失效（密码已改）则清掉后返回 false */
-export function relogin(): Promise<boolean> {
-  relogging ??= (async () => {
+let relogging: Promise<ReloginResult> | undefined
+
+/** 用保存的凭据重登，并发调用共享同一次 */
+export function relogin(): Promise<ReloginResult> {
+  relogging ??= (async (): Promise<ReloginResult> => {
     const saved = await loadCredentials()
-    if (!saved) return false
+    if (!saved) return 'none'
     try {
       await passwordLogin(saved.username, saved.password)
-      return true
+      logDiagnostic('auth-relogin', { result: 'ok' })
+      return 'ok'
     } catch (error) {
-      if (error instanceof RejectedError) await clearCredentials()
-      return false
+      const rejected = error instanceof RejectedError
+      if (rejected) await clearCredentials()
+      // 只记 CAS 的提示语或网络错误，不含账号
+      logDiagnostic('auth-relogin', { result: rejected ? 'rejected' : 'failed', message: error instanceof Error ? error.message : String(error) })
+      return rejected ? 'rejected' : 'failed'
     }
   })().finally(() => {
     relogging = undefined

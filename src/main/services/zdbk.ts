@@ -1,6 +1,5 @@
 import type { CourseSession, DataResult, Exam, UserProfile } from '@shared/types'
-import { hasCasCookie } from '../auth/zjuam'
-import { zjuFetch, type ZjuResponse } from '../http'
+import { ensureCas, zjuFetch, type ZjuResponse } from '../http'
 
 const BASE = 'https://zdbk.zju.edu.cn/jwglxt'
 // 推测：所给参考摘录未覆盖 SSO 地址。
@@ -85,10 +84,10 @@ function checkResponse(response: ZjuResponse): void {
 }
 
 async function ensureLogin(): Promise<void> {
-  if (!await hasCasCookie()) {
+  await ensureCas().catch((error: unknown) => {
     reset()
-    throw new Error('未登录')
-  }
+    throw error
+  })
   if (loggedIn) return
 
   const response = await zjuFetch(SSO_URL)

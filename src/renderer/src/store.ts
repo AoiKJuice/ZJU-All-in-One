@@ -159,6 +159,18 @@ window.zju.onOpen((request) => {
   else s.openReplay(request.replay)
 })
 
+// 后台自动重登成功后主进程通知，刊头与数据随之更新
+window.zju.onAuth(() => void useApp.getState().refreshAuth())
+
+// 未登录时（如开机网络还没好导致自动重登失败）在这些时机重试；没有保存账号时主进程只查一下 cookie，开销很小
+const retryAuth = (): void => {
+  const s = useApp.getState()
+  if (s.authReady && !s.auth.loggedIn && !s.authBusy) void s.refreshAuth()
+}
+window.addEventListener('focus', retryAuth)
+window.addEventListener('online', retryAuth)
+setInterval(retryAuth, 60_000)
+
 // Agent 发起的提交 / 撤回进入确认队列
 window.zju.onConfirm((request) => useApp.setState((s) => ({ confirms: [...s.confirms, request] })))
 

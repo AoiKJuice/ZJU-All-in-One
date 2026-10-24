@@ -8,8 +8,8 @@ import type {
   DataResult,
   PickedFile
 } from '@shared/types'
-import { hasCasCookie, zjuSession } from '../auth/zjuam'
-import { zjuFetch, type ZjuFetchInit, type ZjuResponse } from '../http'
+import { zjuSession } from '../auth/zjuam'
+import { ensureCas, zjuFetch, type ZjuFetchInit, type ZjuResponse } from '../http'
 
 const BASE = 'https://courses.zju.edu.cn'
 
@@ -173,10 +173,10 @@ async function login(): Promise<void> {
 }
 
 export async function ensureLogin(): Promise<void> {
-  if (!await hasCasCookie()) {
+  await ensureCas().catch((error: unknown) => {
     reset()
-    throw new Error('未登录')
-  }
+    throw error
+  })
 
   if (!loginPromise) {
     loginPromise = login().catch((error: unknown) => {

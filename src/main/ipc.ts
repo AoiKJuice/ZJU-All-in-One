@@ -10,7 +10,7 @@ import {
 import { readFile, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
+import { AUTH_EVENT, PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
 import type { AuthState, FilePreview, TaskProgress } from '@shared/types'
 import { hasCasCookie, login, logout } from './auth/zjuam'
 import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
@@ -58,28 +58,36 @@ function resetServices(): void {
   resetClassroom()
 }
 
-// 任何请求被 SSO 弹回登录页时，用保存的账号密码重登；各 service 的一次性登录态随之作废
+// 任何请求被 SSO 弹回登录页（或 cookie 已不在）时，用保存的账号密码重登；各 service 的一次性登录态随之作废。
+// 重登成功或密码被拒时通知界面重取登录态（刊头随之更新）；网络失败不通知，避免界面重取又触发重登的循环
 onCasExpired(async () => {
-  const ok = await relogin()
-  if (ok) resetServices()
-  return ok
+  const result = await relogin()
+  if (result === 'ok') resetServices()
+  if (result === 'ok' || result === 'rejected') {
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send(AUTH_EVENT)
+  }
+  return result === 'ok'
 })
 
+const SIGNED_OUT: AuthState = { loggedIn: false, user: null, account: null }
+
 async function getAuthState(): Promise<AuthState> {
-  if (!(await hasCasCookie()) && !(await relogin())) {
-    return { loggedIn: false, user: null, account: null }
-  }
+  if (!(await hasCasCookie()) && (await relogin()) !== 'ok') return SIGNED_OUT
 
   const account = (await loadCredentials())?.username ?? null
   try {
     const { data: user } = await fetchProfile()
     return { loggedIn: true, user, account: user.studentId || account }
   } catch (error) {
-    // 服务器端 CAS 会话已过期且无法用保存的密码重登：按未登录处理并清掉残留 cookie
+    // 被弹回登录页且自动重登也没成功（zjuFetch 已试过）。没有保存的账号时清掉失效的 cookie；
+    // 有账号多半是网络问题，cookie 与凭据都保留，界面稍后重试
     if (error instanceof Error && error.message === '未登录') {
-      await logout()
-      resetServices()
-      return { loggedIn: false, user: null, account: null }
+      logDiagnostic('auth-state', { loggedIn: false, credentials: account !== null })
+      if (account === null) {
+        await logout()
+        resetServices()
+      }
+      return SIGNED_OUT
     }
     // 教务个人信息字段尚待实测，其他失败不否定 CAS 登录态
     return { loggedIn: true, user: null, account }
@@ -135,7 +143,7 @@ const handlers: Handlers = {
     await logout()
     await clearCredentials()
     resetServices()
-    return { loggedIn: false, user: null, account: null }
+    return SIGNED_OUT
   },
 
   'data:schedule': () => fetchSchedule(),

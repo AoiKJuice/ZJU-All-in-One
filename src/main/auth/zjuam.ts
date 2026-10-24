@@ -12,13 +12,18 @@ export function casLoginUrl(service: string): string {
   return `${CAS_BASE}/login?service=${encodeURIComponent(service)}`
 }
 
-export async function hasCasCookie(): Promise<boolean> {
+/** 当前统一身份认证 cookie 的值；没有则 undefined */
+export async function casCookieValue(): Promise<string | undefined> {
   const cookies = await zjuSession().cookies.get({
     url: `${CAS_BASE}/login`,
     name: CAS_COOKIE
   })
 
-  return cookies.length > 0
+  return cookies.find((cookie) => cookie.value)?.value
+}
+
+export async function hasCasCookie(): Promise<boolean> {
+  return (await casCookieValue()) !== undefined
 }
 
 // 总是打开登录窗口：cookie 可能已在服务器端过期；若 CAS 仍有效，登录页会立即跳转写回 cookie 并自动关窗

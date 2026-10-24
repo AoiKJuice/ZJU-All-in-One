@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { DataResult, LectureReplay, PlaybackSource, Slide } from '@shared/types'
-import { hasCasCookie, zjuSession } from '../auth/zjuam'
-import { zjuFetch } from '../http'
+import { zjuSession } from '../auth/zjuam'
+import { ensureCas, zjuFetch } from '../http'
 
 const BASE_URL = 'https://classroom.zju.edu.cn'
 const LOGIN_URL = 'https://tgmedia.cmc.zju.edu.cn/index.php'
@@ -86,10 +86,10 @@ async function readToken(): Promise<string | undefined> {
 }
 
 export async function ensureLogin(): Promise<void> {
-  if (!await hasCasCookie()) {
+  await ensureCas().catch((error: unknown) => {
     reset()
-    throw new Error('未登录')
-  }
+    throw error
+  })
   if (token) return
 
   token = await readToken()
