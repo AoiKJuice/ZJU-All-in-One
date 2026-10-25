@@ -69,7 +69,9 @@ export interface ZjuApi {
   /** 已缓存的转写结果；没有则 null */
   'replay:transcript': (subId: string) => Promise<TranscriptSegment[] | null>
   /** 本地 Whisper 转写（首次会下载引擎与模型），进度经 task:progress 推送 */
-  'replay:transcribe': (courseId: string, subId: string) => Promise<TranscriptSegment[]>
+  'replay:transcribe': (courseId: string, subId: string, force?: boolean) => Promise<TranscriptSegment[]>
+  /** 缓存的文字稿是否已不对应当前回放视频（智云课后会重新生成回放） */
+  'replay:transcriptStale': (courseId: string, subId: string) => Promise<boolean>
   'replay:exportTranscript': (subId: string, format: TranscriptFormat, title: string) => Promise<string | null>
 
   /** 本地 MCP 服务（供本机 Agent 调用）的状态与开关 */
@@ -105,6 +107,7 @@ export const ZJU_CHANNELS = [
   'replay:exportSlides',
   'replay:transcript',
   'replay:transcribe',
+  'replay:transcriptStale',
   'replay:exportTranscript',
   'mcp:state',
   'mcp:set',

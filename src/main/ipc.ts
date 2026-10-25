@@ -39,7 +39,7 @@ import {
 } from './services/classroom'
 import { fetchCalendar } from './services/calendar'
 import { getSystemStats } from './stats'
-import { transcribe, readTranscript } from './asr/whisper'
+import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { downloadToFile } from './download'
@@ -200,7 +200,9 @@ const handlers: Handlers = {
     return filePath
   },
   'replay:transcript': (_win, subId) => readTranscript(subId),
-  'replay:transcribe': async (win, courseId, subId) => {
+  'replay:transcriptStale': async (_win, courseId, subId) =>
+    isTranscriptStale(subId, await getPlaybackUrl(courseId, subId)),
+  'replay:transcribe': async (win, courseId, subId, force) => {
     const started = Date.now()
     let stage: TaskProgress['stage'] | undefined
     logDiagnostic('transcription-started')
@@ -215,7 +217,7 @@ const handlers: Handlers = {
 
     try {
       const url = await getPlaybackUrl(courseId, subId)
-      const segments = await transcribe(url, subId, report)
+      const segments = await transcribe(url, subId, report, force)
       logDiagnostic('transcription-complete', { segments: segments.length, elapsedMs: Date.now() - started })
       report({ stage: 'done', ratio: 1 })
       return segments
@@ -253,6 +255,7 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:lectures': async () => mockReplays,
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,
+    'replay:transcriptStale': async () => false,
     // 演示作业的提交 / 撤回只记在内存里，不连学在浙大
     'homework:detail': async (_win, activityId) => demoDetail(activityId),
     'homework:submit': async (_win, activityId, comment, files) => demoSubmit(activityId, comment, files),

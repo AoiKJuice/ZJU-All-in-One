@@ -66,7 +66,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 ### 回放、转写、作业提交
 
 - 回放页（`pages/Replay.tsx`）：`<video>` 直接播放 `replay:playback` 返回的签名地址（`vod.cmc.zju.edu.cn`，签名见 `classroom.getPlaybackUrl`，部分账号 `phone` 为空按空串签）；默认 session 对 `*.cmc.zju.edu.cn` 补 Referer。课件图是 http 地址，靠 CSP 的 `upgrade-insecure-requests` 升级为 https。
-- 转写：`src/main/asr/whisper.ts`，首次使用下载 whisper.cpp CUDA 12.4 构建（b5454，约 684MB）与 `ggml-large-v3-turbo-q5_0`（hf-mirror，约 574MB）到 userData/whisper；ffmpeg 来自 `ffmpeg-static`（安装时设 `FFMPEG_BINARIES_URL=https://registry.npmmirror.com/-/binary/ffmpeg-static`）。`gpuPlan` 按显存决定用不用显卡：预算 = 总显存 30%（且至少给别的程序留 1GB 空闲），放得下模型（实测峰值约 1.1GB，束搜索与贪心相差无几）就上显卡，否则 `-ng` 走 CPU。上显卡时由 `asr/throttle.ts` 限制显卡占用：常驻 PowerShell 用 NtSuspendProcess / NtResumeProcess 按 200ms 周期、60% 占空比挂起与恢复 whisper-cli（实测 10 分钟音频平均占用 64% → 49%，耗时约 1.5 倍）；它的 stdin 关闭时会先恢复再退出。结果缓存在 userData/transcripts。**不使用智云自带转写**（用户认为效果差）。
+- 转写：`src/main/asr/whisper.ts`，首次使用下载 whisper.cpp CUDA 12.4 构建（b5454，约 684MB）与 `ggml-large-v3-turbo-q5_0`（hf-mirror，约 574MB）到 userData/whisper；ffmpeg 来自 `ffmpeg-static`（安装时设 `FFMPEG_BINARIES_URL=https://registry.npmmirror.com/-/binary/ffmpeg-static`）。`gpuPlan` 按显存决定用不用显卡：预算 = 总显存 30%（且至少给别的程序留 1GB 空闲），放得下模型（实测峰值约 1.1GB，束搜索与贪心相差无几）就上显卡，否则 `-ng` 走 CPU。上显卡时由 `asr/throttle.ts` 限制显卡占用：常驻 PowerShell 用 NtSuspendProcess / NtResumeProcess 按 200ms 周期、60% 占空比挂起与恢复 whisper-cli（实测 10 分钟音频平均占用 64% → 49%，耗时约 1.5 倍）；它的 stdin 关闭时会先恢复再退出。结果缓存在 userData/transcripts，旁边的 `<subId>.json.meta.json` 记下转写所用视频的路径。**智云会在课后重新生成回放并替换同一课次的视频**（实测：课后先给出较短的版本，次日 0 点左右换成完整的 1080p 文件，路径里多一层生成日期 `…/<录制日>/<生成日>/<hash>_1920_1080.mp4`），所以 `isTranscriptStale` 比对来源路径（旧缓存无记录时看文字稿是否覆盖不到视频时长的 85%），回放页文字稿栏的「重新转写」在过期时以主题色提示，`replay:transcribe` 的 `force` 忽略缓存重转，失败时保留原文字稿。**不使用智云自带转写**（用户认为效果差）。
 - 导出：`src/main/export.ts`，课件用隐藏窗口 `printToPDF`，文字稿 txt/srt/md。
 - 播放器（`components/Player.tsx`）为自绘控制条：回放有播放/进度/倍速，直播（hls）不允许暂停与拖动、被暂停会立即恢复；铺满窗口与全屏按钮相邻，全屏作用于整个播放器容器（字幕、控制条一起进全屏）。
 - 课件区（`components/SlideViewer.tsx`）：缩略图 / 大图切换，大图可翻页、默认跟随当前讲解页（直播取最新一页，回放取 `created_sec` ≤ 播放时间的最后一页）；点击课件不影响播放，右键菜单"全窗口查看 / 下载"。
@@ -91,6 +91,8 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
 - `Reveal` 动画结束会清掉 filter/transform：带 filter 的祖先会让 `position: fixed` 的后代（如铺满的播放器）只相对它定位。
 - 导航只有主页、课表；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态，`go`/`openReplay` 记入 `past`/`future`，鼠标侧键（button 3/4）返回 / 前进，作业侧页开着时返回先关侧页；主页滚到顶后继续上滚约三格触发刷新（`usePullRefresh`，刊头下一道细线示意）；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
+- **数据缓存**（`lib/cache.ts`）：`useZju` 与课表页的校历、各周课次先显示缓存，只有过期（5 分钟）或 `epoch` 变化（登录变化、下拉刷新）才在后台静默重取，切页面不重新加载；`useZju` 的结果同时存 localStorage，冷启动先显示上次数据；确认未登录时整体清空。
+- 课表页（`pages/Schedule.tsx`）：一屏布局，网格行高 `minmax(2.2rem, 1fr)` 占满可用高度；滚轮翻周（累计 60px 翻一周、冷却 380ms），鼠标中键回本周；预取前后一周课次。教务会把连上的课拆成几条，`lib/calendar.mergeSessions` 把同一天、同名、同教室、节次相接且只隔普通课间（≤10 分钟，不跨大课间 / 午休 / 晚饭）的合成一节，主页今日课程同样合并。
 - 节次作息表在 `lib/periods.ts`。
 - 窗口无边框（`titleBarOverlay` 高 56px，与刊头同高），刊头右侧为系统按钮留出 140px；可拖动区域加 `.drag`。
 

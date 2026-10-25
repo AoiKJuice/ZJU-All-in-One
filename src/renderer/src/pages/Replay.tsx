@@ -37,6 +37,8 @@ export function Replay() {
   const [slides, setSlides] = useState<Slide[] | null>(null)
   const [slidesError, setSlidesError] = useState<string | null>(null)
   const [segments, setSegments] = useState<TranscriptSegment[] | null>(null)
+  // 智云课后会重新生成回放、换掉视频：缓存的文字稿对应旧视频时提示重新转写
+  const [stale, setStale] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [src, setSrc] = useState<PlaybackSource | null>(null)
@@ -59,6 +61,7 @@ export function Replay() {
     let active = true
     setSlides(null)
     setSegments(null)
+    setStale(false)
     setSrc(null)
     setSrcError(null)
     setSlidesError(null)
@@ -72,7 +75,13 @@ export function Replay() {
       (e) => { if (active) setSlidesError(errorText(e)) }
     )
     window.zju['replay:transcript'](replay.id).then(
-      (value) => { if (active) setSegments(value) },
+      (value) => {
+        if (!active) return
+        setSegments(value)
+        if (value && !live) {
+          window.zju['replay:transcriptStale'](replay.courseId, replay.id).then((v) => { if (active) setStale(v) }, () => {})
+        }
+      },
       (e) => { if (active) setError(errorText(e)) }
     )
     const timer = live
@@ -138,14 +147,23 @@ export function Replay() {
     if (running && partial?.length && el && following.current) el.scrollTop = el.scrollHeight
   }, [running, partial?.length])
 
-  const transcribe = async (): Promise<void> => {
+  // force：忽略缓存重新转写；进行中显示实时结果，失败时恢复原文字稿
+  const transcribe = async (force = false): Promise<void> => {
+    const previous = segments
     setError(null)
     clearPartials(key)
     setTab('transcript')
+    if (force) setSegments(null)
     try {
-      setSegments(await window.zju['replay:transcribe'](replay.courseId, replay.id))
+      setSegments(await window.zju['replay:transcribe'](replay.courseId, replay.id, force))
+      setStale(false)
     } catch (e) {
       setError(errorText(e))
+      // 恢复原文字稿后错误行不显示，改用轻提示
+      if (force) {
+        setSegments(previous)
+        notify(errorText(e))
+      }
     }
   }
 
@@ -258,6 +276,11 @@ export function Replay() {
                     字幕
                   </button>
                   <span className="flex-1" />
+                  {!live && (
+                    <button className="act" data-on={stale || undefined} title={stale ? '视频已更新' : undefined} onClick={() => void transcribe(true)}>
+                      重新转写
+                    </button>
+                  )}
                   {(['txt', 'srt', 'md'] as const).map((f) => (
                     <button key={f} className="act" onClick={() => void exportText(f)}>
                       {f.toUpperCase()}
@@ -266,7 +289,7 @@ export function Replay() {
                 </>
               ) : (
                 !live && (
-                  <button className="act" disabled={running} onClick={transcribe}>
+                  <button className="act" disabled={running} onClick={() => void transcribe()}>
                     转写
                   </button>
                 )

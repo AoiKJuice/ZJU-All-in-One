@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { LectureReplay, TermCalendar } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
@@ -6,48 +6,82 @@ import { useApp } from '@renderer/store'
 import { Quiet, Reveal, Sep } from '@renderer/components/Type'
 import { PERIOD_COUNT, periodStart } from '@renderer/lib/periods'
 import { weekdayLabel } from '@renderer/lib/format'
-import { addDays, findLecture, mondayOf, sessionsOn, teachingWeek, ymd } from '@renderer/lib/calendar'
+import { addDays, findLecture, mergeSessions, mondayOf, sessionsOn, teachingWeek, ymd } from '@renderer/lib/calendar'
+import { cached, peek } from '@renderer/lib/cache'
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7]
 const EASE = [0.22, 1, 0.36, 1] as const
 
-/** 周视图：按周翻页；细线网格，课程是排在格子里的文字；有智云课次的课可点进视频 */
+// 滚轮累计到这么多像素翻一周；翻页后冷却一段时间，一次快速滑动只翻一周
+const WHEEL_STEP = 60
+const WHEEL_COOLDOWN = 380
+
+const lecturesKey = (monday: string): string => `lectures:${monday}`
+
+/** 周视图：按周翻页（按钮、滚轮，中键回本周）；细线网格占满可用高度；有智云课次的课可点进视频。校历与各周课次走缓存 */
 export function Schedule() {
   const { data, loading, error } = useZju('data:schedule')
-  const loggedIn = useApp((s) => s.auth.loggedIn)
+  // 演示模式不登录也取数，与 useZju 一致
+  const loggedIn = useApp((s) => s.auth.loggedIn) || import.meta.env.VITE_ZJU_DEMO === '1'
+  const epoch = useApp((s) => s.epoch)
   const openReplay = useApp((s) => s.openReplay)
-  const [cal, setCal] = useState<TermCalendar | null>(null)
+  const [cal, setCal] = useState<TermCalendar | null>(() => peek<TermCalendar>('calendar', true) ?? null)
   const [offset, setOffset] = useState(0)
   const [dir, setDir] = useState(0)
-  const [lectures, setLectures] = useState<LectureReplay[]>([])
 
   const monday = useMemo(() => addDays(mondayOf(new Date()), offset * 7), [offset])
   const dates = DAYS.map((d) => ymd(addDays(monday, d - 1)))
   const today = ymd(new Date())
+  const [lectures, setLectures] = useState<LectureReplay[]>(() => peek<LectureReplay[]>(lecturesKey(dates[0])) ?? [])
 
   useEffect(() => {
-    if (loggedIn) void window.zju['data:calendar']().then(setCal, () => {})
-  }, [loggedIn])
+    if (loggedIn) void cached('calendar', epoch, () => window.zju['data:calendar'](), true).then(setCal, () => {})
+  }, [loggedIn, epoch])
 
+  // 本周课次先用缓存，过期再取；顺带预取前后一周，翻页时不必等
   useEffect(() => {
     if (!loggedIn) return
     let alive = true
-    setLectures([])
-    window.zju['data:lectures'](dates[0], dates[6]).then((l) => alive && setLectures(l), () => {})
+    const load = (start: string): Promise<LectureReplay[]> =>
+      cached(lecturesKey(start), epoch, () => window.zju['data:lectures'](start, ymd(addDays(new Date(start + 'T00:00'), 6))))
+    setLectures(peek<LectureReplay[]>(lecturesKey(dates[0])) ?? [])
+    load(dates[0]).then((l) => alive && setLectures(l), () => {})
+    for (const step of [-7, 7]) void load(ymd(addDays(monday, step))).catch(() => {})
     return () => {
       alive = false
     }
-  }, [loggedIn, dates[0]])
+  }, [loggedIn, epoch, dates[0]])
 
   const page = (step: number): void => {
     setDir(step)
     setOffset((o) => (step === 0 ? 0 : o + step))
   }
 
+  // 滚轮翻周：向下下一周，向上上一周
+  const wheel = useRef({ acc: 0, until: 0 })
+  const onWheel = (e: React.WheelEvent): void => {
+    const w = wheel.current
+    if (Date.now() < w.until) return
+    w.acc += e.deltaY
+    if (Math.abs(w.acc) < WHEEL_STEP) return
+    page(w.acc > 0 ? 1 : -1)
+    w.acc = 0
+    w.until = Date.now() + WHEEL_COOLDOWN
+  }
+
   const tw = cal && dates.map((d) => teachingWeek(cal, d)).find(Boolean)
 
   return (
-    <div className="page page-wide">
+    <div
+      className="page page-wide page-fit schedule-page"
+      onWheel={onWheel}
+      // 中键回本周；按下时就拦住，免得出现自动滚动
+      onMouseDown={(e) => {
+        if (e.button !== 1) return
+        e.preventDefault()
+        if (offset !== 0) page(0)
+      }}
+    >
       <Reveal className="mt-2 flex items-end justify-between">
         <h1 className="page-title !text-[clamp(1.75rem,2.5vw+1.5vh,2.75rem)]">
           {tw ? (
@@ -75,7 +109,7 @@ export function Schedule() {
         </div>
       </Reveal>
 
-      <Reveal i={1} className="mt-4">
+      <Reveal i={1} className="mt-4 flex min-h-0 flex-1 flex-col">
         {!data?.length || !cal ? (
           <Quiet loading={loading || (loggedIn && !cal)} error={error} empty="无" />
         ) : (
@@ -87,8 +121,8 @@ export function Schedule() {
               animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, x: dir * -24, filter: 'blur(4px)' }}
               transition={{ duration: 0.45, ease: EASE }}
-              className="grid border-t border-[var(--rule)]"
-              style={{ gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))', gridTemplateRows: `3.25rem repeat(${PERIOD_COUNT}, 2.6rem)` }}
+              className="grid flex-1 border-t border-[var(--rule)]"
+              style={{ gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))', gridTemplateRows: `3.25rem repeat(${PERIOD_COUNT}, minmax(2.2rem, 1fr))` }}
             >
               {dates.map((date, i) =>
                 date === today ? <div key="today" className="bg-[var(--tint)]" style={{ gridColumn: i + 2, gridRow: `1 / ${PERIOD_COUNT + 2}` }} /> : null
@@ -112,7 +146,7 @@ export function Schedule() {
                 </div>
               ))}
               {dates.flatMap((date, i) =>
-                sessionsOn(cal, data, date).map((c) => {
+                mergeSessions(sessionsOn(cal, data, date)).map((c) => {
                   const lecture = findLecture(lectures, c, date)
                   const playable = lecture && (lecture.status === 'replay' || lecture.status === 'live')
                   const Tag = playable ? 'button' : 'div'

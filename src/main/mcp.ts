@@ -164,10 +164,14 @@ function buildServer(tools: Config['tools']): McpServer {
     }, async ({ course_id, sub_id }) => json(await call('replay:playback', course_id, sub_id)))
 
     mcp.registerTool('get_transcript', {
-      description: '某次课已转写的文字稿（本地 Whisper 结果）；尚未转写时返回 null',
-      inputSchema: { sub_id: z.string() },
+      description: '某次课已转写的文字稿（本地 Whisper 结果），尚未转写时 segments 为 null。给 course_id 时同时检查 stale：智云课后会重新生成回放、换掉视频，stale 为 true 表示文字稿对应的是旧视频，应以 force 重新转写',
+      inputSchema: { sub_id: z.string(), course_id: z.string().optional() },
       annotations: read
-    }, async ({ sub_id }) => json(await call('replay:transcript', sub_id)))
+    }, async ({ sub_id, course_id }) => {
+      const segments = await call('replay:transcript', sub_id)
+      const stale = segments && course_id ? await call('replay:transcriptStale', course_id, sub_id) : undefined
+      return json({ stale, segments })
+    })
   }
 
   if (tools.download) {
@@ -264,10 +268,10 @@ function buildServer(tools: Config['tools']): McpServer {
 
   if (tools.transcribe) {
     mcp.registerTool('transcribe_lecture', {
-      description: '用本地 Whisper 转写某次课的回放（长课需数分钟，进度显示在应用内），返回文字稿；已转写过则直接返回缓存',
-      inputSchema: { course_id: z.string(), sub_id: z.string() },
+      description: '用本地 Whisper 转写某次课的回放（长课需数分钟，进度显示在应用内），返回文字稿；已转写过则直接返回缓存，force 为 true 时忽略缓存重新转写（视频被替换后用）',
+      inputSchema: { course_id: z.string(), sub_id: z.string(), force: z.boolean().optional() },
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true }
-    }, async ({ course_id, sub_id }) => json(await call('replay:transcribe', course_id, sub_id)))
+    }, async ({ course_id, sub_id, force }) => json(await call('replay:transcribe', course_id, sub_id, force)))
   }
 
   if (tools.submit) {

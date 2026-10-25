@@ -3,6 +3,7 @@ import type { CourseSession } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
 import { useApp } from '@renderer/store'
 import { usePullRefresh } from '@renderer/hooks/usePullRefresh'
+import { mergeSessions } from '@renderer/lib/calendar'
 import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isUrgent, relativeTo, todayWeekday, weekdayLabel } from '@renderer/lib/format'
@@ -19,7 +20,7 @@ export function Home() {
   const now = new Date()
   const wd = todayWeekday()
   const byDay = (d: number): CourseSession[] =>
-    (schedule.data ?? []).filter((c) => c.weekday === d).sort((a, b) => a.startPeriod - b.startPeriod)
+    mergeSessions((schedule.data ?? []).filter((c) => c.weekday === d))
   const today = byDay(wd)
   const remaining = today.filter((c) => classState(c.startPeriod, c.endPeriod) !== 'past')
   // 今天的课上完了就看明天

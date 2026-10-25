@@ -18,6 +18,11 @@ export const mockSchedule: CourseSession[] = [
   { id: 'c2', name: '线性代数（甲）', teacher: '李老师', location: '东2-302', weekday: 2, startPeriod: 3, endPeriod: 5, semesterPart: '秋冬', weekRange: [1, 8], weekParity: 'all' },
   { id: 'c3', name: '程序设计基础', teacher: '王老师', location: '曹西-501', weekday: 3, startPeriod: 6, endPeriod: 8, semesterPart: '秋', weekRange: [1, 8], weekParity: 'all' },
   { id: 'c4', name: '大学物理（甲）Ⅰ', teacher: '赵老师', location: '东3-104', weekday: 4, startPeriod: 1, endPeriod: 2, semesterPart: '秋冬', weekRange: [1, 8], weekParity: 'all' },
+  // 教务把连上的课拆成两条的情况：6、7 节应合成一节；8、9 节隔着大课间不合并
+  { id: 'c6a', name: '中国近现代史纲要', teacher: '周老师', location: '西2-105', weekday: 1, startPeriod: 6, endPeriod: 6, semesterPart: '秋冬', weekRange: [1, 16], weekParity: 'all' },
+  { id: 'c6b', name: '中国近现代史纲要', teacher: '周老师', location: '西2-105', weekday: 1, startPeriod: 7, endPeriod: 7, semesterPart: '秋冬', weekRange: [1, 16], weekParity: 'all' },
+  { id: 'c7a', name: '体育（篮球）', teacher: '吴老师', location: '风雨操场', weekday: 4, startPeriod: 8, endPeriod: 8, semesterPart: '秋冬', weekRange: [1, 16], weekParity: 'all' },
+  { id: 'c7b', name: '体育（篮球）', teacher: '吴老师', location: '风雨操场', weekday: 4, startPeriod: 9, endPeriod: 9, semesterPart: '秋冬', weekRange: [1, 16], weekParity: 'all' },
   { id: 'c5', name: '思想道德与法治', teacher: '陈老师', location: '西1-210', weekday: 5, startPeriod: 11, endPeriod: 13, semesterPart: '秋冬', weekRange: [1, 8], weekParity: 'all' }
 ]
 

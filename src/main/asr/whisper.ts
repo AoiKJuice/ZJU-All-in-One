@@ -588,12 +588,50 @@ export async function readTranscript(
   )
 }
 
+// 文字稿旁存一份来源记录：转写所用视频的路径（不含签名参数）。智云会在课后重新生成回放、换掉同一课次的视频
+// （路径里的生成日期与文件名随之改变），据此判断缓存的文字稿是否对应当前视频
+interface TranscriptMeta {
+  source: string
+  transcribedAt: string
+}
+
+const metaPath = (cacheKey: string): string => `${transcriptPath(cacheKey)}.meta.json`
+
+/** 回放视频的时长（秒）：ffmpeg 只读文件头 */
+async function mediaDuration(mediaUrl: string): Promise<number> {
+  let duration = 0
+  await run(ffmpegPath!.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1'), [
+    '-headers', `Referer: ${REFERER}\r\n`,
+    '-i', mediaUrl
+  ], line => {
+    const match = line.match(/Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/)
+    if (match) duration = seconds(match[1])
+  })
+  return duration
+}
+
+/**
+ * 缓存的文字稿是否已不对应当前回放视频：有来源记录时比视频路径；
+ * 旧缓存没有记录，就看文字稿是否明显短于视频（覆盖不到 85%）
+ */
+export async function isTranscriptStale(cacheKey: string, mediaUrl: string): Promise<boolean> {
+  const segments = await readTranscript(cacheKey)
+  if (!segments?.length) return false
+  if (existsSync(metaPath(cacheKey))) {
+    const meta = JSON.parse(await readFile(metaPath(cacheKey), 'utf8')) as TranscriptMeta
+    return meta.source !== new URL(mediaUrl).pathname
+  }
+  const duration = await mediaDuration(mediaUrl)
+  return duration > 0 && segments[segments.length - 1].end < duration * 0.85
+}
+
 async function execute(
   mediaUrl: string,
   cacheKey: string,
-  report: Report
+  report: Report,
+  force: boolean
 ): Promise<TranscriptSegment[]> {
-  const cached = await readTranscript(cacheKey)
+  const cached = force ? null : await readTranscript(cacheKey)
   if (cached) return cached
 
   const cli = await ensureEngine(report)
@@ -618,21 +656,27 @@ async function execute(
     await mkdir(directory, { recursive: true })
     await writeFile(`${target}.part`, JSON.stringify(segments), 'utf8')
     await rename(`${target}.part`, target)
+    await writeFile(metaPath(cacheKey), JSON.stringify({
+      source: new URL(mediaUrl).pathname,
+      transcribedAt: new Date().toISOString()
+    } satisfies TranscriptMeta), 'utf8')
     return segments
   } finally {
     await rm(temporary, { recursive: true, force: true })
   }
 }
 
+/** force：忽略缓存重新转写（视频被替换后用），成功后覆盖旧文字稿 */
 export function transcribe(
   mediaUrl: string,
   cacheKey: string,
-  report: Report
+  report: Report,
+  force = false
 ): Promise<TranscriptSegment[]> {
   const existing = tasks.get(cacheKey)
   if (existing) return existing
 
-  const task = execute(mediaUrl, cacheKey, report).finally(() => {
+  const task = execute(mediaUrl, cacheKey, report, force).finally(() => {
     tasks.delete(cacheKey)
   })
   tasks.set(cacheKey, task)

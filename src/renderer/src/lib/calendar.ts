@@ -1,4 +1,5 @@
 import type { CourseSession, LectureReplay, TermCalendar } from '@shared/types'
+import { PERIOD_TIMES } from '@shared/periods'
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
@@ -56,4 +57,32 @@ export function findLecture(lectures: LectureReplay[], session: CourseSession, d
     candidates.find((l) => l.startPeriod === undefined || (l.startPeriod <= session.endPeriod && (l.endPeriod ?? l.startPeriod) >= session.startPeriod)) ??
     candidates[0]
   )
+}
+
+const minutes = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** 第 a 节下课到第 b 节上课之间的分钟数 */
+const breakBetween = (a: number, b: number): number => minutes(PERIOD_TIMES[b - 1][0]) - minutes(PERIOD_TIMES[a - 1][1])
+
+/**
+ * 教务有时把连上的课拆成几条（如 6、7 节各一条）。同一天、同名、同教室、节次相接，
+ * 且中间只隔普通课间（不超过 10 分钟，即不隔大课间、午休、晚饭）的合成一节；节次重叠的重复条目也合并
+ */
+export function mergeSessions(sessions: CourseSession[]): CourseSession[] {
+  const merged: CourseSession[] = []
+  for (const s of [...sessions].sort((a, b) => a.weekday - b.weekday || a.startPeriod - b.startPeriod)) {
+    const prev = merged.at(-1)
+    const joins =
+      prev &&
+      prev.weekday === s.weekday &&
+      norm(prev.name) === norm(s.name) &&
+      prev.location === s.location &&
+      (s.startPeriod <= prev.endPeriod || (s.startPeriod === prev.endPeriod + 1 && breakBetween(prev.endPeriod, s.startPeriod) <= 10))
+    if (joins) merged[merged.length - 1] = { ...prev, endPeriod: Math.max(prev.endPeriod, s.endPeriod), id: `${prev.id}+${s.id}` }
+    else merged.push(s)
+  }
+  return merged
 }
