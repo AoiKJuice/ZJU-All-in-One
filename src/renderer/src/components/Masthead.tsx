@@ -4,7 +4,8 @@ import { useApp, type PageId } from '@renderer/store'
 
 const NAV: { id: PageId; label: string }[] = [
   { id: 'home', label: '主页' },
-  { id: 'schedule', label: '课表' }
+  { id: 'schedule', label: '课表' },
+  { id: 'settings', label: '设置' }
 ]
 
 /** 刊头：字标、三项导航（朱点随切换滑动）、登录与昼夜切换 */
@@ -51,9 +52,6 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
         ))}
       </nav>
       <div className="mast-meta">
-        <button onClick={() => go('settings')} data-active={page === 'settings' || undefined} className="data-[active]:text-[var(--shu)]">
-          设置
-        </button>
         <button
           data-login-toggle
           disabled={authBusy}

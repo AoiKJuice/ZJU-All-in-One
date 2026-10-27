@@ -6,6 +6,7 @@ import type {
   FilePreview,
   McpState,
   OpenRequest,
+  PtaState,
   McpToolGroup,
   CourseSession,
   DataResult,
@@ -74,6 +75,12 @@ export interface ZjuApi {
   'replay:transcriptStale': (courseId: string, subId: string) => Promise<boolean>
   'replay:exportTranscript': (subId: string, format: TranscriptFormat, title: string) => Promise<string | null>
 
+  /** PTA：开关、登录（带账号密码为程序内登录并加密保存，不带为网页登录）、退出；题目集并入 data:assignments */
+  'pta:state': () => Promise<PtaState>
+  'pta:enable': (enabled: boolean) => Promise<PtaState>
+  'pta:login': (account?: { username: string; password: string }) => Promise<PtaState>
+  'pta:logout': () => Promise<PtaState>
+
   /** 本地 MCP 服务（供本机 Agent 调用）的状态与开关 */
   'mcp:state': () => Promise<McpState>
   'mcp:set': (patch: { enabled?: boolean; tools?: Partial<Record<McpToolGroup, boolean>> }) => Promise<McpState>
@@ -109,6 +116,10 @@ export const ZJU_CHANNELS = [
   'replay:transcribe',
   'replay:transcriptStale',
   'replay:exportTranscript',
+  'pta:state',
+  'pta:enable',
+  'pta:login',
+  'pta:logout',
   'mcp:state',
   'mcp:set',
   'mcp:answer'

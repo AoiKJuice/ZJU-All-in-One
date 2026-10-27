@@ -1,4 +1,4 @@
-import type { Assignment, CourseSession, DataResult, Exam, LectureReplay, Slide, TranscriptSegment, AssignmentDetail, PickedFile } from '@shared/types'
+import type { Assignment, CourseSession, DataResult, Exam, LectureReplay, Slide, TranscriptSegment, AssignmentDetail, PickedFile, PtaState } from '@shared/types'
 
 // 演示数据：ZJU_DEMO=1 时替代全部数据通道，便于不登录调前端
 
@@ -34,7 +34,8 @@ export const mockExams: Exam[] = [
 export const mockAssignments: Assignment[] = [
   { id: 'a1', courseId: 'demo', type: 'homework', courseName: '程序设计基础', title: '实验 3：链表', deadline: day(1, 23, 59), submitted: false },
   { id: 'a2', courseId: 'demo', type: 'homework', courseName: '大学物理（甲）Ⅰ', title: '第五章习题', deadline: day(3, 22), submitted: false },
-  { id: 'a3', courseId: 'demo', type: 'homework', courseName: '数学分析（甲）Ⅰ', title: '作业 7', deadline: day(-1, 23, 59), submitted: true }
+  { id: 'a3', courseId: 'demo', type: 'homework', courseName: '数学分析（甲）Ⅰ', title: '作业 7', deadline: day(-1, 23, 59), submitted: true },
+  { id: 'pta-demo', courseId: 'pta', type: 'pta', courseName: 'PTA', title: '第 6 周编程题：链表', deadline: day(2, 22), submitted: false, url: 'https://pintia.cn/problem-sets/dashboard', progress: { done: 3, total: 5 } }
 ]
 
 export const mockReplays: LectureReplay[] = [
@@ -94,3 +95,5 @@ export function demoRetract(submissionId: string): void {
   }
   throw new Error('未找到该提交')
 }
+
+export const demoPta: PtaState = { enabled: true, loggedIn: true, user: '演示用户' }

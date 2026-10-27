@@ -50,11 +50,48 @@ export function AssignmentSheet() {
             exit={{ x: '100%' }}
             transition={{ duration: 0.6, ease: EASE }}
           >
-            <Body key={assignment.id} a={assignment} onSubmitted={refresh} />
+            {assignment.type === 'pta' ? (
+              <PtaBody key={assignment.id} a={assignment} />
+            ) : (
+              <Body key={assignment.id} a={assignment} onSubmitted={refresh} />
+            )}
           </motion.aside>
         </>
       )}
     </AnimatePresence>
+  )
+}
+
+/** PTA 题目集：做题在 PTA 网页完成，这里只给截止、进度与入口 */
+function PtaBody({ a }: { a: Assignment }) {
+  const openAssignment = useApp((s) => s.openAssignment)
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="section-title !tracking-[0.06em]">{a.title}</h2>
+        <button className="act shrink-0" onClick={() => openAssignment(null)}>
+          关闭
+        </button>
+      </div>
+      <p className="quiet !py-2">
+        <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />
+      </p>
+      <div className="sheet-body mt-4 border-t border-[var(--rule)] pt-5">
+        <ul className="rows">
+          <li className="row !grid-cols-[6.5em_minmax(0,1fr)] !py-2">
+            <span className="row-time">进度</span>
+            <span>{a.progress ? `已通过 ${a.progress.done} / ${a.progress.total} 题` : '尚未进入'}</span>
+          </li>
+        </ul>
+      </div>
+      {a.url && (
+        <div className="acts mt-4 justify-end">
+          <a className="act !text-[var(--shu)]" href={a.url} target="_blank" rel="noreferrer">
+            在 PTA 打开 ↗
+          </a>
+        </div>
+      )}
+    </>
   )
 }
 

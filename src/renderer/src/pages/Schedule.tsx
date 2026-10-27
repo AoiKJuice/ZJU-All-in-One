@@ -18,6 +18,15 @@ const WHEEL_COOLDOWN = 380
 
 const lecturesKey = (monday: string): string => `lectures:${monday}`
 
+// 翻页动效：下一周从右进、向左出，上一周反之。用 variants + AnimatePresence 的 custom，
+// 退场的那一周按"当前"方向离开（直接写在 exit 里会用它渲染时的旧方向）
+const SLIDE = 36
+const weekSlide = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * SLIDE, filter: 'blur(4px)' }),
+  center: { opacity: 1, x: 0, filter: 'blur(0px)' },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -SLIDE, filter: 'blur(4px)' })
+}
+
 /** 周视图：按周翻页（按钮、滚轮，中键回本周）；细线网格占满可用高度；有智云课次的课可点进视频。校历与各周课次走缓存 */
 export function Schedule() {
   const { data, loading, error } = useZju('data:schedule')
@@ -52,8 +61,9 @@ export function Schedule() {
     }
   }, [loggedIn, epoch, dates[0]])
 
+  // step 0 为回本周：从未来几周回来算向前翻（-1），从过去几周回来算向后翻（+1）
   const page = (step: number): void => {
-    setDir(step)
+    setDir(step !== 0 ? step : offset > 0 ? -1 : 1)
     setOffset((o) => (step === 0 ? 0 : o + step))
   }
 
@@ -117,10 +127,11 @@ export function Schedule() {
             <motion.div
               key={dates[0]}
               custom={dir}
-              initial={{ opacity: 0, x: dir * 24, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: dir * -24, filter: 'blur(4px)' }}
-              transition={{ duration: 0.45, ease: EASE }}
+              variants={weekSlide}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.4, ease: EASE }}
               className="grid flex-1 border-t border-[var(--rule)]"
               style={{ gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))', gridTemplateRows: `3.25rem repeat(${PERIOD_COUNT}, minmax(2.2rem, 1fr))` }}
             >

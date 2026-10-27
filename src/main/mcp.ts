@@ -132,7 +132,7 @@ function buildServer(tools: Config['tools']): McpServer {
     }, async () => json((await call('data:exams')).data))
 
     mcp.registerTool('get_assignments', {
-      description: '学在浙大的作业与待办，含截止时间与是否已提交',
+      description: '待办：学在浙大的作业与活动，以及（设置里开启并登录后）PTA 未截止的题目集（type 为 pta，progress 为已通过 / 总题数）；含截止时间与是否已完成',
       annotations: read
     }, async () => json((await call('data:assignments')).data))
 

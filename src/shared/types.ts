@@ -94,6 +94,16 @@ export interface Assignment {
   deadline: string
   submitted: boolean
   url?: string
+  /** PTA 题目集的完成情况：已通过题数 / 总题数（没进入过的题目集取不到） */
+  progress?: { done: number; total: number }
+}
+
+/** PTA（pintia.cn）接入状态：设置里的开关与登录 */
+export interface PtaState {
+  enabled: boolean
+  loggedIn: boolean
+  /** 昵称，取不到时用邮箱或手机号 */
+  user: string | null
 }
 
 /** 智云课次（回放 / 直播 / 未开始统一用它） */

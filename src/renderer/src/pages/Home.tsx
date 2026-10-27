@@ -88,7 +88,9 @@ export function Home() {
                     </span>
                     <span>
                       <span className="row-title">{a.title}</span>
-                      <span className="row-sub">{a.courseName}</span>
+                      <span className="row-sub">
+                        <Joined parts={[a.courseName, a.progress && `${a.progress.done}/${a.progress.total} 题`]} />
+                      </span>
                     </span>
                     <span className="row-end" data-hot={isUrgent(a.deadline) || undefined}>
                       {relativeTo(a.deadline)}

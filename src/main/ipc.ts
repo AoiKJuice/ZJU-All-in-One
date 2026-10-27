@@ -38,12 +38,13 @@ import {
   reset as resetClassroom
 } from './services/classroom'
 import { fetchCalendar } from './services/calendar'
+import * as pta from './services/pta'
 import { getSystemStats } from './stats'
 import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { downloadToFile } from './download'
-import { demoDetail, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript } from './services/demo'
+import { demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript } from './services/demo'
 
 type Handlers = {
   [K in ZjuChannel]: (
@@ -148,7 +149,17 @@ const handlers: Handlers = {
 
   'data:schedule': () => fetchSchedule(),
   'data:exams': () => fetchExams(),
-  'data:assignments': () => fetchAssignments(),
+  // 学在浙大待办 + PTA 题目集：PTA 出错不影响学在浙大；学在浙大失败但 PTA 有内容时照样给出 PTA 部分
+  'data:assignments': async () => {
+    const [courses, tasks] = await Promise.allSettled([fetchAssignments(), pta.fetchTasks()])
+    if (tasks.status === 'rejected') logDiagnostic('pta-error', { message: tasks.reason instanceof Error ? tasks.reason.message : String(tasks.reason) })
+    const extra = tasks.status === 'fulfilled' ? tasks.value : []
+    if (courses.status === 'rejected') {
+      if (extra.length === 0) throw courses.reason
+      return { data: extra, source: 'live' as const, fetchedAt: Date.now() }
+    }
+    return { ...courses.value, data: [...courses.value.data, ...extra] }
+  },
   'data:replays': () => fetchReplays(),
   'data:calendar': () => fetchCalendar(),
   'data:lectures': (_win, from, to) => fetchLectures(from, to),
@@ -240,6 +251,20 @@ const handlers: Handlers = {
     return filePath
   },
 
+  'pta:state': () => pta.getState(),
+  'pta:enable': async (_win, enabled) => {
+    await pta.setEnabled(enabled)
+    return pta.getState()
+  },
+  'pta:login': async (win, account) => {
+    await pta.login(win ?? undefined, account)
+    return pta.getState()
+  },
+  'pta:logout': async () => {
+    await pta.logout()
+    return pta.getState()
+  },
+
   'mcp:state': async () => getMcpState(),
   'mcp:set': (_win, patch) => setMcp(patch),
   'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve)
@@ -257,6 +282,10 @@ if (process.env['ZJU_DEMO'] === '1') {
     'replay:transcript': async () => mockTranscript,
     'replay:transcriptStale': async () => false,
     // 演示作业的提交 / 撤回只记在内存里，不连学在浙大
+    'pta:state': async () => demoPta,
+    'pta:enable': async (_win, enabled) => Object.assign(demoPta, { enabled }),
+    'pta:login': async () => Object.assign(demoPta, { loggedIn: true, user: '演示用户' }),
+    'pta:logout': async () => Object.assign(demoPta, { loggedIn: false, user: null }),
     'homework:detail': async (_win, activityId) => demoDetail(activityId),
     'homework:submit': async (_win, activityId, comment, files) => demoSubmit(activityId, comment, files),
     'homework:retract': async (_win, submissionId) => demoRetract(submissionId),
