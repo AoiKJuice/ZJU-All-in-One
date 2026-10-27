@@ -1303,3 +1303,24 @@ button.row {
   top: 0.75rem;
   right: 1.25rem;
 }
+
+/* 钟鹰衬底：放大的钟鹰（无外环）压在窗口左下角，越出左、下两条边，半透明铺在内容之下；回放页不放，设置里可关 */
+.page-emblem {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: -1;
+  width: min(92vh, 70vw);
+  aspect-ratio: 1;
+  translate: -24% 30%;
+  pointer-events: none;
+}
+.page-emblem svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.06;
+}
+html[data-theme='dark'] .page-emblem svg {
+  opacity: 0.09;
+}

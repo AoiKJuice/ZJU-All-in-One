@@ -9,6 +9,8 @@ export interface Settings {
   font: FontStyle
   accent: Accent
   size: FontSize
+  /** 主页左侧的钟鹰衬底 */
+  emblem: boolean
 }
 
 // name 为字体本身的名字，设置页以该字体显示它
@@ -35,14 +37,15 @@ export const SIZE_OPTIONS: { id: FontSize; label: string; scale: number }[] = [
 const KEY = 'zju-settings'
 
 export function initialSettings(): Settings {
-  const defaults: Settings = { theme: initialTheme(), font: 'song', accent: 'blue', size: 'm' }
+  const defaults: Settings = { theme: initialTheme(), font: 'song', accent: 'blue', size: 'm', emblem: true }
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
     return {
       theme: defaults.theme,
       font: FONT_OPTIONS.some((o) => o.id === stored.font) ? stored.font! : defaults.font,
       accent: ACCENT_OPTIONS.some((o) => o.id === stored.accent) ? stored.accent! : defaults.accent,
-      size: SIZE_OPTIONS.some((o) => o.id === stored.size) ? stored.size! : defaults.size
+      size: SIZE_OPTIONS.some((o) => o.id === stored.size) ? stored.size! : defaults.size,
+      emblem: stored.emblem ?? defaults.emblem
     }
   } catch {
     return defaults
@@ -55,6 +58,6 @@ export function applySettings(s: Settings): void {
   document.documentElement.dataset.accent = s.accent
   document.documentElement.style.setProperty('--scale', String(SIZE_OPTIONS.find((o) => o.id === s.size)!.scale))
   try {
-    localStorage.setItem(KEY, JSON.stringify({ font: s.font, accent: s.accent, size: s.size }))
+    localStorage.setItem(KEY, JSON.stringify({ font: s.font, accent: s.accent, size: s.size, emblem: s.emblem }))
   } catch {}
 }

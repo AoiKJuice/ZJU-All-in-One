@@ -50,6 +50,13 @@ export function Settings() {
             ))}
           </Row>
           <Mcp />
+          <Row label="徽标">
+            {([true, false] as const).map((on) => (
+              <Option key={String(on)} active={settings.emblem === on} onClick={() => setSetting('emblem', on)}>
+                {on ? '显示' : '隐藏'}
+              </Option>
+            ))}
+          </Row>
           <Row label="昼夜">
             {(['light', 'dark'] as const).map((t) => (
               <Option key={t} active={settings.theme === t} onClick={() => setSetting('theme', t)}>

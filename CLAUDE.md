@@ -94,6 +94,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - **数据缓存**（`lib/cache.ts`）：`useZju` 与课表页的校历、各周课次先显示缓存，只有过期（5 分钟）或 `epoch` 变化（登录变化、下拉刷新）才在后台静默重取，切页面不重新加载；`useZju` 的结果同时存 localStorage，冷启动先显示上次数据；确认未登录时整体清空。
 - 课表页（`pages/Schedule.tsx`）：一屏布局，网格行高 `minmax(2.2rem, 1fr)` 占满可用高度；滚轮翻周（累计 60px 翻一周、冷却 380ms），鼠标中键回本周；预取前后一周课次。教务会把连上的课拆成几条，`lib/calendar.mergeSessions` 把同一天、同名、同教室、节次相接且只隔普通课间（≤10 分钟，不跨大课间 / 午休 / 晚饭）的合成一节，主页今日课程同样合并。
 - 节次作息表在 `lib/periods.ts`。
+- **徽标「钟鹰」**：粗外环 + 主题色浅底表盘，右半边是几何化的求是鹰（倒三角、四层羽、朝右的鹰头，照校标特征抽象，不照搬原图），左半边两根主题色指针。几何在 `components/Logo.tsx`（颜色全取主题变量，随昼夜与主题色变化）。界面上不放在刊头，而是 `App.tsx` 里的衬底 `.page-emblem`：`bare`（无外环与表盘底色）放大压在左下角、越出左下两边、低不透明度，回放页不放；它挂在页面外层，在有衬底的页面之间切换不重播，出现时用与 `Reveal` 相同的"上浮 + 去模糊"；设置页「徽标」可隐藏（`settings.emblem`）。软件图标 `build/icon.svg` 用同一组几何、固定昼间求是蓝，改动后 `npx electron scripts/make-icon.cjs` 重新生成 `build/icon.png`。求是鹰图形浙大已申请商标，用户知情后选定此方案。
 - 窗口无边框（`titleBarOverlay` 高 56px，与刊头同高），刊头右侧为系统按钮留出 140px；可拖动区域加 `.drag`。
 
 ### 窗口卡死（AppHang）教训

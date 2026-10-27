@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="1024" height="1024">
+  <!-- 钟鹰软件图标：几何与 src/renderer/src/components/Logo.tsx 一致，颜色固定为昼间求是蓝 -->
+  <circle cx="100" cy="100" r="91" fill="#F3EEE4"/>
+  <circle cx="100" cy="100" r="91" fill="#003F88" fill-opacity="0.16" stroke="#26221D" stroke-width="10"/>
+  <path fill="#26221D" d="M100 58 L176 58 L168 70 Q164 76 156.2 76 L138.5 76 A2.5 2.5 0 0 0 138.5 81 L160.67 81 L152.67 93 Q148.67 99 140.87 99 L128.17 99 A2.5 2.5 0 0 0 128.17 104 L145.33 104 L137.33 116 Q133.33 122 125.53 122 L117.83 122 A2.5 2.5 0 0 0 117.83 127 L130 127 L100 172 Z"/>
+  <path fill="#26221D" d="M100 61 L100 45 C100 35 108 28 117 29 C123 30 128 35 132 42 L120 45 L113 61 Z"/>
+  <line x1="100" y1="100" x2="40.48" y2="67.11" stroke="#003F88" stroke-width="12" stroke-linecap="round"/>
+  <line x1="100" y1="100" x2="64.58" y2="126.1" stroke="#003F88" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="100" cy="100" r="9.5" fill="#003F88"/>
+</svg>
