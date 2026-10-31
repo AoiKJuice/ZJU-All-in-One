@@ -62,16 +62,36 @@ export function AssignmentSheet() {
   )
 }
 
+/** 侧页右上：忽略（主页隐藏、不提醒；再点恢复）与关闭 */
+function SheetActs({ a }: { a: Assignment }) {
+  const { openAssignment, todos, ignoreTodo } = useApp()
+  const ignored = todos.ignored.includes(a.id)
+  return (
+    <span className="acts shrink-0">
+      <button
+        className="act"
+        data-on={ignored || undefined}
+        onClick={() => {
+          void ignoreTodo(a.id, !ignored)
+          if (!ignored) openAssignment(null)
+        }}
+      >
+        {ignored ? '恢复' : '忽略'}
+      </button>
+      <button className="act" onClick={() => openAssignment(null)}>
+        关闭
+      </button>
+    </span>
+  )
+}
+
 /** PTA 题目集：做题在 PTA 网页完成，这里只给截止、进度与入口 */
 function PtaBody({ a }: { a: Assignment }) {
-  const openAssignment = useApp((s) => s.openAssignment)
   return (
     <>
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="section-title !tracking-[0.06em]">{a.title}</h2>
-        <button className="act shrink-0" onClick={() => openAssignment(null)}>
-          关闭
-        </button>
+        <SheetActs a={a} />
       </div>
       <p className="quiet !py-2">
         <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />
@@ -97,7 +117,6 @@ function PtaBody({ a }: { a: Assignment }) {
 
 // 作业以 prop 传入而非从 store 读：关闭时 store 先清空，退场动画期间这里仍要渲染原来的作业
 function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
-  const openAssignment = useApp((s) => s.openAssignment)
   const openPreview = useApp((s) => s.openPreview)
   const notify = useApp((s) => s.notify)
   const [detail, setDetail] = useState<AssignmentDetail | null>(null)
@@ -175,9 +194,7 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
     <>
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="section-title !tracking-[0.06em]">{a.title}</h2>
-        <button className="act shrink-0" onClick={() => openAssignment(null)}>
-          关闭
-        </button>
+        <SheetActs a={a} />
       </div>
       <p className="quiet !py-2">
         <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />

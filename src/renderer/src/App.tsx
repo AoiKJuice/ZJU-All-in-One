@@ -6,6 +6,7 @@ import { Home } from './pages/Home'
 import { Schedule } from './pages/Schedule'
 import { Replay } from './pages/Replay'
 import { Settings } from './pages/Settings'
+import { Tools } from './pages/Tools'
 import { AssignmentSheet } from './components/AssignmentSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Toast } from './components/Toast'
@@ -18,6 +19,7 @@ const PAGES: Record<PageId, ComponentType> = {
   home: Home,
   schedule: Schedule,
   replay: Replay,
+  tools: Tools,
   settings: Settings
 }
 

@@ -5,6 +5,7 @@ import { useApp, type PageId } from '@renderer/store'
 const NAV: { id: PageId; label: string }[] = [
   { id: 'home', label: '主页' },
   { id: 'schedule', label: '课表' },
+  { id: 'tools', label: '工具' },
   { id: 'settings', label: '设置' }
 ]
 

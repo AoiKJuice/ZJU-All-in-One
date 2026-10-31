@@ -50,7 +50,7 @@ function live<T>(data: T): DataResult<T> {
 }
 
 // 推测：月份划分及 xnm 的学年格式未由所给摘录验证。
-function currentTerm(): { xnm: string; xqm: string } {
+export function currentTerm(): { xnm: string; xqm: string } {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',

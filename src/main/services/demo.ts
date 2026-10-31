@@ -33,6 +33,7 @@ export const mockExams: Exam[] = [
 
 export const mockAssignments: Assignment[] = [
   { id: 'a1', courseId: 'demo', type: 'homework', courseName: '程序设计基础', title: '实验 3：链表', deadline: day(1, 23, 59), submitted: false },
+  { id: 'a4', courseId: 'demo', type: 'homework', courseName: '线性代数（甲）', title: '第 8 周作业', deadline: new Date(Date.now() + 2 * 3600_000).toISOString(), submitted: false },
   { id: 'a2', courseId: 'demo', type: 'homework', courseName: '大学物理（甲）Ⅰ', title: '第五章习题', deadline: day(3, 22), submitted: false },
   { id: 'a3', courseId: 'demo', type: 'homework', courseName: '数学分析（甲）Ⅰ', title: '作业 7', deadline: day(-1, 23, 59), submitted: true },
   { id: 'pta-demo', courseId: 'pta', type: 'pta', courseName: 'PTA', title: '第 6 周编程题：链表', deadline: day(2, 22), submitted: false, url: 'https://pintia.cn/problem-sets/dashboard', progress: { done: 3, total: 5 } }
@@ -51,6 +52,12 @@ export const mockSlides: Slide[] = Array.from({ length: 12 }, (_, i) => ({
     encodeURIComponent(
       `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="1280" height="720" fill="#fbfaf7"/><text x="80" y="160" font-size="64" font-family="serif" fill="#26221d">第 ${i + 1} 页</text><rect x="80" y="220" width="${400 + i * 40}" height="12" fill="#c9c2b6"/><rect x="80" y="260" width="620" height="12" fill="#c9c2b6"/></svg>`
     )
+}))
+
+export const mockPlatformTranscript: TranscriptSegment[] = Array.from({ length: 30 }, (_, i) => ({
+  start: i * 26,
+  end: i * 26 + 24,
+  text: `智云自带文字稿第 ${i + 1} 句。`
 }))
 
 export const mockTranscript: TranscriptSegment[] = Array.from({ length: 40 }, (_, i) => ({

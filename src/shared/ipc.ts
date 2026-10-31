@@ -7,6 +7,8 @@ import type {
   McpState,
   OpenRequest,
   PtaState,
+  TodoState,
+  TranscriptSource,
   McpToolGroup,
   CourseSession,
   DataResult,
@@ -73,7 +75,14 @@ export interface ZjuApi {
   'replay:transcribe': (courseId: string, subId: string, force?: boolean) => Promise<TranscriptSegment[]>
   /** 缓存的文字稿是否已不对应当前回放视频（智云课后会重新生成回放） */
   'replay:transcriptStale': (courseId: string, subId: string) => Promise<boolean>
-  'replay:exportTranscript': (subId: string, format: TranscriptFormat, title: string) => Promise<string | null>
+  /** 智云平台自带的转写（直播中也会随讲课更新）；还没有时为空数组 */
+  'replay:platformTranscript': (subId: string) => Promise<TranscriptSegment[]>
+  'replay:exportTranscript': (subId: string, format: TranscriptFormat, title: string, source?: TranscriptSource) => Promise<string | null>
+
+  /** 待办：忽略（隐藏且不提醒）与截止前 3 小时的系统通知 */
+  'todo:state': () => Promise<TodoState>
+  'todo:ignore': (id: string, ignored: boolean) => Promise<TodoState>
+  'todo:remind': (on: boolean) => Promise<TodoState>
 
   /** PTA：开关、登录（带账号密码为程序内登录并加密保存，不带为网页登录）、退出；题目集并入 data:assignments */
   'pta:state': () => Promise<PtaState>
@@ -115,7 +124,11 @@ export const ZJU_CHANNELS = [
   'replay:transcript',
   'replay:transcribe',
   'replay:transcriptStale',
+  'replay:platformTranscript',
   'replay:exportTranscript',
+  'todo:state',
+  'todo:ignore',
+  'todo:remind',
   'pta:state',
   'pta:enable',
   'pta:login',

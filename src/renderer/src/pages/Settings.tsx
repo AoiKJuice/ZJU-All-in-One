@@ -21,9 +21,9 @@ const MCP_TOOLS: { id: McpToolGroup; label: string }[] = [
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
-/** 设置：按 外观 / 账号 / 本地 Agent 分组，每组一列细线条目 */
+/** 设置：按 外观 / 待办 / 账号 / 本地 Agent 分组，每组一列细线条目 */
 export function Settings() {
-  const { settings, setSetting } = useApp()
+  const { settings, setSetting, todos, setRemind } = useApp()
 
   return (
     <div className="page">
@@ -71,13 +71,25 @@ export function Settings() {
         </Reveal>
 
         <Reveal i={1}>
+          <Section title="待办">
+            <Row label="截止前 3 小时提醒">
+              {([true, false] as const).map((on) => (
+                <Option key={String(on)} active={todos.remind === on} onClick={() => void setRemind(on)}>
+                  {on ? '开启' : '关闭'}
+                </Option>
+              ))}
+            </Row>
+          </Section>
+        </Reveal>
+
+        <Reveal i={2}>
           <Section title="账号">
             <ZjuAccount />
             <Pta />
           </Section>
         </Reveal>
 
-        <Reveal i={2}>
+        <Reveal i={3}>
           <Section title="本地 Agent">
             <Mcp />
           </Section>

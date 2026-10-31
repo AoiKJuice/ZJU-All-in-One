@@ -1,12 +1,12 @@
-import type { ReactNode } from 'react'
-import type { CourseSession } from '@shared/types'
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+import type { Assignment, CourseSession } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
 import { useApp } from '@renderer/store'
 import { usePullRefresh } from '@renderer/hooks/usePullRefresh'
 import { mergeSessions } from '@renderer/lib/calendar'
 import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
-import { clock, dotDate, isUrgent, relativeTo, todayWeekday, weekdayLabel } from '@renderer/lib/format'
+import { clock, dotDate, isSoon, isUrgent, relativeTo, todayWeekday, weekdayLabel, weekdayOf } from '@renderer/lib/format'
 
 /** 主页即全部：今日课程、截止、回放、考试汇在一屏；每块内部滚动，窗口再小也不必整页下滑 */
 export function Home() {
@@ -14,8 +14,22 @@ export function Home() {
   const assignments = useZju('data:assignments')
   const exams = useZju('data:exams')
   const replays = useZju('data:replays')
-  const { openReplay, openAssignment, refresh } = useApp()
+  const { openReplay, openAssignment, refresh, todos, ignoreTodo } = useApp()
   const pull = usePullRefresh(refresh)
+  // 显示已忽略的待办（淡显，可右键恢复）
+  const [showIgnored, setShowIgnored] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number; a: Assignment } | null>(null)
+
+  useEffect(() => {
+    if (!menu) return
+    const close = (): void => setMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('blur', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('blur', close)
+    }
+  }, [menu])
 
   const now = new Date()
   const wd = todayWeekday()
@@ -27,9 +41,17 @@ export function Home() {
   const showTomorrow = today.length > 0 ? remaining.length === 0 : true
   const dayList = showTomorrow ? byDay((wd % 7) + 1) : today
 
-  const pending = (assignments.data ?? [])
+  const ignored = new Set(todos.ignored)
+  const open = (assignments.data ?? [])
     .filter((a) => !a.submitted && new Date(a.deadline) > now)
     .sort((a, b) => a.deadline.localeCompare(b.deadline))
+  const pending = open.filter((a) => !ignored.has(a.id))
+  const hasIgnored = open.length > pending.length
+  const listed = showIgnored && hasIgnored ? open : pending
+  const openMenu = (e: MouseEvent, a: Assignment): void => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, a })
+  }
   const upcoming = (exams.data ?? [])
     .filter((e) => new Date(e.endTime) > now)
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -75,16 +97,51 @@ export function Home() {
           )}
         </Pane>
 
-        <Pane i={3} title="截止">
-          {pending.length === 0 ? (
+        <Pane
+          i={3}
+          title="截止"
+          note={
+            hasIgnored && (
+              <button className="act" data-on={showIgnored || undefined} onClick={() => setShowIgnored((x) => !x)}>
+                已忽略
+              </button>
+            )
+          }
+        >
+          {listed.length === 0 ? (
             <Quiet loading={assignments.loading} error={assignments.error} empty="无" />
           ) : (
             <ul className="rows">
-              {pending.map((a) => (
+              {listed.map((a) => (
                 <li key={a.id}>
-                  <button className="row" onClick={() => openAssignment(a)}>
+                  {/* 不用 button：尾注格里还要放「忽略」按钮 */}
+                  <div
+                    className="row todo"
+                    role="button"
+                    tabIndex={0}
+                    data-past={ignored.has(a.id) || undefined}
+                    onClick={() => openAssignment(a)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault()
+                        openAssignment(a)
+                      }
+                    }}
+                    onContextMenu={(e) => openMenu(e, a)}
+                  >
                     <span className="row-time">
-                      {dotDate(a.deadline)} {clock(a.deadline)}
+                      {isSoon(a.deadline) ? (
+                        <span className="swap">
+                          <span>
+                            {weekdayOf(a.deadline)} {clock(a.deadline)}
+                          </span>
+                          <span>
+                            {dotDate(a.deadline)} {clock(a.deadline)}
+                          </span>
+                        </span>
+                      ) : (
+                        `${dotDate(a.deadline)} ${clock(a.deadline)}`
+                      )}
                     </span>
                     <span>
                       <span className="row-title">{a.title}</span>
@@ -93,14 +150,41 @@ export function Home() {
                       </span>
                     </span>
                     <span className="row-end" data-hot={isUrgent(a.deadline) || undefined}>
-                      {relativeTo(a.deadline)}
+                      {/* 悬停时「忽略」与剩余时间在同一格里互换 */}
+                      <span className="swap">
+                        <span>{relativeTo(a.deadline)}</span>
+                        <button
+                          className="act"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void ignoreTodo(a.id, !ignored.has(a.id))
+                          }}
+                        >
+                          {ignored.has(a.id) ? '恢复' : '忽略'}
+                        </button>
+                      </span>
                     </span>
-                  </button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </Pane>
+
+        {menu && (
+          <ul className="context-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+            <li>
+              <button
+                onClick={() => {
+                  void ignoreTodo(menu.a.id, !ignored.has(menu.a.id))
+                  setMenu(null)
+                }}
+              >
+                {ignored.has(menu.a.id) ? '恢复' : '忽略'}
+              </button>
+            </li>
+          </ul>
+        )}
 
         <Pane i={4} title="回放">
           {recent.length === 0 ? (
@@ -156,10 +240,10 @@ export function Home() {
   )
 }
 
-function Pane({ i, title, children }: { i: number; title: string; children: ReactNode }) {
+function Pane({ i, title, note, children }: { i: number; title: string; note?: ReactNode; children: ReactNode }) {
   return (
     <Reveal i={i} className="pane">
-      <SectionHead title={title} />
+      <SectionHead title={title} note={note} />
       <div className="pane-scroll">{children}</div>
     </Reveal>
   )

@@ -432,7 +432,8 @@ body {
 }
 
 a.row .row-title,
-button.row .row-title {
+button.row .row-title,
+.row[role='button'] .row-title {
   background-image: linear-gradient(var(--shu), var(--shu));
   background-size: 0% 1px;
   background-position: 0 100%;
@@ -440,13 +441,40 @@ button.row .row-title {
   transition: color 0.45s var(--ease), background-size 0.7s var(--ease);
 }
 a.row:hover .row-title,
-button.row:hover .row-title {
+button.row:hover .row-title,
+.row[role='button']:hover .row-title {
   color: var(--shu);
   background-size: 100% 1px;
 }
 button.row {
   width: 100%;
   text-align: left;
+}
+
+/* 待办：悬停时时刻换成日期、剩余时间换成「忽略」，两者叠在同一格里同时交叉淡变、不加延迟（点错有撤销） */
+.todo {
+  cursor: pointer;
+}
+.swap {
+  display: inline-grid;
+}
+.row-end .swap {
+  justify-items: end;
+}
+.swap > * {
+  grid-area: 1 / 1;
+  transition: opacity 0.2s var(--ease);
+}
+.swap > :last-child,
+.todo:hover .swap > :first-child,
+.todo:focus-within .swap > :first-child {
+  opacity: 0;
+  pointer-events: none;
+}
+.todo:hover .swap > :last-child,
+.todo:focus-within .swap > :last-child {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .quiet {

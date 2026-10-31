@@ -17,7 +17,7 @@ export type McpToolGroup = 'query' | 'download' | 'app' | 'transcribe' | 'submit
 
 /** 主进程要界面打开的内容（MCP 的 open_in_app） */
 export type OpenRequest =
-  | { page: 'home' | 'schedule' | 'settings' }
+  | { page: 'home' | 'schedule' | 'tools' | 'settings' }
   | { login: true }
   | { assignment: Assignment }
   | { replay: LectureReplay }
@@ -214,6 +214,15 @@ export interface TranscriptSegment {
 }
 
 export type TranscriptFormat = 'txt' | 'srt' | 'md'
+
+/** 文字稿来源：本地 Whisper 转写，或智云平台自带的转写 */
+export type TranscriptSource = 'local' | 'platform'
+
+/** 待办：忽略的条目 id 与截止前提醒开关 */
+export interface TodoState {
+  ignored: string[]
+  remind: boolean
+}
 
 /** 主进程经 'task:progress' 推送的长任务进度 */
 export interface TaskProgress {

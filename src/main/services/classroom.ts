@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto'
-import type { DataResult, LectureReplay, PlaybackSource, Slide } from '@shared/types'
+import type { DataResult, LectureReplay, PlaybackSource, Slide, TranscriptSegment } from '@shared/types'
 import { zjuSession } from '../auth/zjuam'
 import { ensureCas, zjuFetch } from '../http'
 
 const BASE_URL = 'https://classroom.zju.edu.cn'
 const LOGIN_URL = 'https://tgmedia.cmc.zju.edu.cn/index.php'
+// 平台自带的语音转写（字段照 zju-learning-assistant 的 get_subtitle）
+const TRANSCRIPT_URL = 'https://yjapi.cmc.zju.edu.cn'
 const BEIJING_OFFSET = 8 * 60 * 60 * 1000
 
 interface CourseSession {
@@ -52,6 +54,17 @@ interface PlaybackResponse {
       }
     }
   }
+}
+
+interface TranscriptResponse {
+  code: number
+  list: {
+    all_content: {
+      begin_sec: number
+      end_sec: number
+      text: string
+    }[]
+  }[]
 }
 
 interface UserResponse {
@@ -117,11 +130,12 @@ export async function ensureLogin(): Promise<void> {
 async function request<T extends { code: number }>(
   path: string,
   params: Record<string, string>,
-  checkCode = true
+  checkCode = true,
+  baseUrl = BASE_URL
 ): Promise<T> {
   await ensureLogin()
 
-  const url = new URL(path, BASE_URL)
+  const url = new URL(path, baseUrl)
   url.search = new URLSearchParams(params).toString()
 
   const response = await zjuFetch(url.toString(), {
@@ -323,6 +337,24 @@ export async function getPlaybackUrl(
 
   url.searchParams.append('t', `${id}-${ts}-${hash}`)
   return url.toString()
+}
+
+/** 智云平台自带的转写；还没生成时为空数组 */
+export async function getPlatformTranscript(subId: string): Promise<TranscriptSegment[]> {
+  const result = await request<TranscriptResponse>(
+    '/courseapi/v3/web-socket/search-trans-result',
+    { sub_id: subId, format: 'json' },
+    true,
+    TRANSCRIPT_URL
+  )
+
+  return (result.list[0]?.all_content ?? [])
+    .filter(segment => segment.text.trim())
+    .map(segment => ({
+      start: segment.begin_sec,
+      end: segment.end_sec,
+      text: segment.text.trim()
+    }))
 }
 
 export function reset(): void {

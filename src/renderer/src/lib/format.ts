@@ -19,6 +19,15 @@ export const clock = (iso: string): string => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/** "周六" */
+export const weekdayOf = (iso: string): string => weekdayLabel(((new Date(iso).getDay() + 6) % 7) + 1)
+
+/** 3 天内（未过期）的时刻用星期表示 */
+export const isSoon = (iso: string): boolean => {
+  const diff = new Date(iso).getTime() - Date.now()
+  return diff > 0 && diff < 72 * 3_600_000
+}
+
 /** "3 天后" / "5 小时后" / "已过期" */
 export function relativeTo(iso: string): string {
   const diff = new Date(iso).getTime() - Date.now()

@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import type { Assignment, AuthState, ConfirmRequest, LectureReplay, TaskProgress, TranscriptSegment } from '@shared/types'
+import type { Assignment, AuthState, ConfirmRequest, LectureReplay, TaskProgress, TodoState, TranscriptSegment } from '@shared/types'
 import type { Theme } from './lib/theme'
 import { applySettings, initialSettings, type Settings } from './lib/settings'
 
-export type PageId = 'home' | 'schedule' | 'replay' | 'settings'
+export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
 
 /** 一条浏览记录：页面 + 回放页所开的课次 */
 interface Visit {
@@ -58,6 +58,11 @@ interface AppStore {
   /** 带账号密码为程序内登录，不带为网页登录；失败时抛出 */
   login: (account?: { username: string; password: string }) => Promise<void>
   logout: () => Promise<void>
+  /** 待办的忽略项与截止提醒开关（存在主进程，提醒也在主进程） */
+  todos: TodoState
+  loadTodos: () => Promise<void>
+  ignoreTodo: (id: string, ignored: boolean) => Promise<void>
+  setRemind: (on: boolean) => Promise<void>
 }
 
 export const useApp = create<AppStore>((set, get) => {
@@ -140,13 +145,28 @@ export const useApp = create<AppStore>((set, get) => {
       await runAuth(() => window.zju['auth:login'](account))
       if (get().auth.loggedIn) set({ loginOpen: false })
     },
-    logout: () => runAuth(() => window.zju['auth:logout']())
+    logout: () => runAuth(() => window.zju['auth:logout']()),
+    todos: { ignored: [], remind: false },
+    loadTodos: async () => set({ todos: await window.zju['todo:state']() }),
+    ignoreTodo: async (id, ignored) => {
+      // 先改界面再落盘，忽略后条目立即消失
+      set((s) => ({
+        todos: { ...s.todos, ignored: ignored ? [...s.todos.ignored, id] : s.todos.ignored.filter((x) => x !== id) }
+      }))
+      set({ todos: await window.zju['todo:ignore'](id, ignored) })
+      // 忽略容易点错，给一次撤销
+      if (ignored) get().notify('已忽略', { label: '撤销', run: () => void get().ignoreTodo(id, false) })
+    },
+    setRemind: async (on) => set({ todos: await window.zju['todo:remind'](on) })
   }
 })
 
 // 本地 Agent 经 MCP 调 refresh 时，界面跟着重拉
+void useApp.getState().loadTodos()
+
 window.zju.onRefresh(() => {
   void useApp.getState().refreshAuth()
+  void useApp.getState().loadTodos()
   useApp.getState().refresh()
 })
 

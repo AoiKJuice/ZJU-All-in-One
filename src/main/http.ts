@@ -8,6 +8,8 @@ export interface ZjuFetchInit {
   body?: string | Buffer
   /** false：被弹回统一身份认证登录页时不自动重登（登录流程自身的请求） */
   relogin?: false
+  /** 跳转到校内 http:// 地址时改走 https（主进程请求校内 http 会挂起；ETA 的 CAS service 只认 http） */
+  upgradeHttp?: true
 }
 
 export interface ZjuResponse {
@@ -66,6 +68,13 @@ function send(
 
     request.on('redirect', (_status, _method, redirectUrl) => {
       finalUrl = new URL(redirectUrl, finalUrl).href
+      const target = new URL(finalUrl)
+      if (init.upgradeHttp && target.protocol === 'http:' && target.hostname.endsWith('.zju.edu.cn')) {
+        target.protocol = 'https:'
+        request.abort()
+        resolve(send(target.href, { ...init, method: 'GET', body: undefined }))
+        return
+      }
       request.followRedirect()
     })
 

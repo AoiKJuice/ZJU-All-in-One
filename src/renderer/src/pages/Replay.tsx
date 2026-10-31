@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { PlaybackSource, Slide, TranscriptFormat, TranscriptSegment } from '@shared/types'
+import type { PlaybackSource, Slide, TranscriptFormat, TranscriptSegment, TranscriptSource } from '@shared/types'
 import { useApp } from '@renderer/store'
 import { Joined, OutlineWord, Reveal } from '@renderer/components/Type'
 import { dotDate } from '@renderer/lib/format'
@@ -15,6 +15,11 @@ const hms = (sec: number): string =>
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
 type Tab = 'slides' | 'transcript' | 'lectures'
+const SOURCES: { id: TranscriptSource; label: string }[] = [
+  { id: 'local', label: '本地' },
+  { id: 'platform', label: '智云' }
+]
+
 const TABS: { id: Tab; label: string }[] = [
   { id: 'slides', label: '课件' },
   { id: 'transcript', label: '文字稿' },
@@ -36,7 +41,12 @@ export function Replay() {
   const [tab, setTab] = useState<Tab>('slides')
   const [slides, setSlides] = useState<Slide[] | null>(null)
   const [slidesError, setSlidesError] = useState<string | null>(null)
-  const [segments, setSegments] = useState<TranscriptSegment[] | null>(null)
+  // 文字稿两个来源：本地 Whisper 转写与智云自带转写；没有本地稿时默认看智云的
+  const [source, setSource] = useState<TranscriptSource>('local')
+  const [local, setLocal] = useState<TranscriptSegment[] | null>(null)
+  const [platform, setPlatform] = useState<TranscriptSegment[] | null>(null)
+  const [platformError, setPlatformError] = useState<string | null>(null)
+  const segments = source === 'local' ? local : platform?.length ? platform : null
   // 智云课后会重新生成回放、换掉视频：缓存的文字稿对应旧视频时提示重新转写
   const [stale, setStale] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +70,10 @@ export function Replay() {
   useEffect(() => {
     let active = true
     setSlides(null)
-    setSegments(null)
+    setLocal(null)
+    setPlatform(null)
+    setPlatformError(null)
+    setSource('local')
     setStale(false)
     setSrc(null)
     setSrcError(null)
@@ -74,10 +87,18 @@ export function Replay() {
       (value) => { if (active) setSlides(value) },
       (e) => { if (active) setSlidesError(errorText(e)) }
     )
+    const loadPlatform = (): void => {
+      window.zju['replay:platformTranscript'](replay.id).then(
+        (value) => { if (active) setPlatform(value) },
+        (e) => { if (active) setPlatformError(errorText(e)) }
+      )
+    }
+    loadPlatform()
     window.zju['replay:transcript'](replay.id).then(
       (value) => {
         if (!active) return
-        setSegments(value)
+        setLocal(value)
+        if (!value) setSource('platform')
         if (value && !live) {
           window.zju['replay:transcriptStale'](replay.courseId, replay.id).then((v) => { if (active) setStale(v) }, () => {})
         }
@@ -87,6 +108,7 @@ export function Replay() {
     const timer = live
       ? setInterval(() => {
           window.zju['replay:slides'](replay.courseId, replay.id).then((value) => { if (active) setSlides(value) }, () => {})
+          loadPlatform()
         }, 30_000)
       : undefined
     return () => {
@@ -149,19 +171,20 @@ export function Replay() {
 
   // force：忽略缓存重新转写；进行中显示实时结果，失败时恢复原文字稿
   const transcribe = async (force = false): Promise<void> => {
-    const previous = segments
+    const previous = local
     setError(null)
     clearPartials(key)
     setTab('transcript')
-    if (force) setSegments(null)
+    setSource('local')
+    if (force) setLocal(null)
     try {
-      setSegments(await window.zju['replay:transcribe'](replay.courseId, replay.id, force))
+      setLocal(await window.zju['replay:transcribe'](replay.courseId, replay.id, force))
       setStale(false)
     } catch (e) {
       setError(errorText(e))
       // 恢复原文字稿后错误行不显示，改用轻提示
       if (force) {
-        setSegments(previous)
+        setLocal(previous)
         notify(errorText(e))
       }
     }
@@ -181,7 +204,7 @@ export function Replay() {
 
   const exportText = async (format: TranscriptFormat): Promise<void> => {
     try {
-      const path = await window.zju['replay:exportTranscript'](replay.id, format, title)
+      const path = await window.zju['replay:exportTranscript'](replay.id, format, title, source)
       if (path) notify('已导出', { label: '打开位置', run: () => void window.zju['file:reveal'](path) })
     } catch (e) {
       notify(errorText(e))
@@ -270,32 +293,36 @@ export function Replay() {
 
           <section className="tab-panel" hidden={tab !== 'transcript'}>
             <div className="acts tab-tools">
-              {segments ? (
-                <>
-                  <button className="act" data-on={captions || undefined} onClick={() => setCaptions((x) => !x)}>
-                    字幕
+              {SOURCES.map((o) => (
+                <button key={o.id} className="act" data-on={source === o.id || undefined} onClick={() => setSource(o.id)}>
+                  {o.label}
+                </button>
+              ))}
+              <span className="flex-1" />
+              {segments && (
+                <button className="act" data-on={captions || undefined} onClick={() => setCaptions((x) => !x)}>
+                  字幕
+                </button>
+              )}
+              {source === 'local' && !live && (
+                segments ? (
+                  <button className="act" data-on={stale || undefined} title={stale ? '视频已更新' : undefined} onClick={() => void transcribe(true)}>
+                    重新转写
                   </button>
-                  <span className="flex-1" />
-                  {!live && (
-                    <button className="act" data-on={stale || undefined} title={stale ? '视频已更新' : undefined} onClick={() => void transcribe(true)}>
-                      重新转写
-                    </button>
-                  )}
-                  {(['txt', 'srt', 'md'] as const).map((f) => (
-                    <button key={f} className="act" onClick={() => void exportText(f)}>
-                      {f.toUpperCase()}
-                    </button>
-                  ))}
-                </>
-              ) : (
-                !live && (
+                ) : (
                   <button className="act" disabled={running} onClick={() => void transcribe()}>
                     转写
                   </button>
                 )
               )}
+              {segments &&
+                (['txt', 'srt', 'md'] as const).map((f) => (
+                  <button key={f} className="act" onClick={() => void exportText(f)}>
+                    {f.toUpperCase()}
+                  </button>
+                ))}
             </div>
-            {running && <TranscribeProgress task={task} />}
+            {running && source === 'local' && <TranscribeProgress task={task} />}
             <div
               ref={scroller}
               className="pane-scroll scroll-bar pt-1"
@@ -315,7 +342,7 @@ export function Replay() {
                     </p>
                   ))}
                 </div>
-              ) : running && partial?.length ? (
+              ) : source === 'local' && running && partial?.length ? (
                 <div className="transcript">
                   {partial.map((s, i) => (
                     <p key={`${s.start}:${i}`}>
@@ -325,7 +352,9 @@ export function Replay() {
                   ))}
                 </div>
               ) : (
-                !running && <p className="quiet">{error ?? '无'}</p>
+                !(source === 'local' && running) && (
+                  <p className="quiet">{(source === 'local' ? error : platformError) ?? (source === 'platform' && platform === null ? '…' : '无')}</p>
+                )
               )}
             </div>
           </section>

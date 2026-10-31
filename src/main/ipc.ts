@@ -16,8 +16,10 @@ import { hasCasCookie, login, logout } from './auth/zjuam'
 import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
 import { answerConfirm, getMcpState, setMcp } from './mcp'
 import { onCasExpired } from './http'
+import * as eta from './services/eta'
+import { getTodoState, setIgnored, setRemind } from './todos'
 import {
-  fetchSchedule,
+  fetchSchedule as fetchZdbkSchedule,
   fetchExams,
   fetchProfile,
   reset as resetZdbk
@@ -35,6 +37,7 @@ import {
   listSlides,
   getPlaybackUrl,
   getPlaybackSource,
+  getPlatformTranscript,
   reset as resetClassroom
 } from './services/classroom'
 import { fetchCalendar } from './services/calendar'
@@ -44,7 +47,7 @@ import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { downloadToFile } from './download'
-import { demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript } from './services/demo'
+import { demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript, mockPlatformTranscript } from './services/demo'
 
 type Handlers = {
   [K in ZjuChannel]: (
@@ -57,6 +60,20 @@ function resetServices(): void {
   resetZdbk()
   resetCourses()
   resetClassroom()
+  eta.reset()
+}
+
+// 课表以 ETA 为主（返回干净、少出错），ETA 失败或为空（选课排课期间）时退回教务
+async function fetchSchedule(): Promise<Awaited<ReturnType<ZjuApi['data:schedule']>>> {
+  try {
+    const result = await eta.fetchSchedule()
+    if (result.data.length > 0) return result
+    logDiagnostic('schedule-source', { eta: 'empty' })
+  } catch (error) {
+    if (error instanceof Error && error.message === '未登录') throw error
+    logDiagnostic('schedule-source', { eta: 'failed', message: error instanceof Error ? error.message : String(error) })
+  }
+  return fetchZdbkSchedule()
 }
 
 // 任何请求被 SSO 弹回登录页（或 cookie 已不在）时，用保存的账号密码重登；各 service 的一次性登录态随之作废。
@@ -240,9 +257,10 @@ const handlers: Handlers = {
       throw error
     }
   },
-  'replay:exportTranscript': async (win, subId, format, title) => {
-    const segments = await readTranscript(subId)
-    if (segments === null) throw new Error('尚未转写')
+  'replay:platformTranscript': (_win, subId) => getPlatformTranscript(subId),
+  'replay:exportTranscript': async (win, subId, format, title, source) => {
+    const segments = source === 'platform' ? await getPlatformTranscript(subId) : await readTranscript(subId)
+    if (!segments?.length) throw new Error(source === 'platform' ? '智云暂无文字稿' : '尚未转写')
 
     const filePath = await chooseSavePath(win, title, format)
     if (filePath === null) return null
@@ -265,6 +283,10 @@ const handlers: Handlers = {
     return pta.getState()
   },
 
+  'todo:state': async () => getTodoState(),
+  'todo:ignore': (_win, id, ignored) => setIgnored(id, ignored),
+  'todo:remind': (_win, on) => setRemind(on),
+
   'mcp:state': async () => getMcpState(),
   'mcp:set': (_win, patch) => setMcp(patch),
   'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve)
@@ -280,6 +302,7 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:lectures': async () => mockReplays,
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,
+    'replay:platformTranscript': async () => mockPlatformTranscript,
     'replay:transcriptStale': async () => false,
     // 演示作业的提交 / 撤回只记在内存里，不连学在浙大
     'pta:state': async () => demoPta,
