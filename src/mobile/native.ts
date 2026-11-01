@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 
 // 安卓原生插件（android/app/src/main/java/top/aoikjuice/zjuallinone/ZjuNativePlugin.java）：
 // 请求不跟随跳转、cookie 与 WebView 共用 CookieManager、凭据用 Android Keystore 加密、下载写进系统"下载"目录
@@ -9,6 +9,8 @@ export interface NativeResponse {
   headers: Record<string, string>
   body?: string
   base64?: string
+  /** 大响应写在缓存文件里（本机路径），读完调 release */
+  file?: string
 }
 
 interface ZjuNative {
@@ -20,6 +22,7 @@ interface ZjuNative {
     bodyBase64?: string
     binary?: boolean
   }): Promise<NativeResponse>
+  release(options: { file: string }): Promise<void>
   cookies(options: { url: string }): Promise<{ value: string }>
   /** hosts 缺省时清空全部 cookie */
   clearCookies(options: { hosts?: string[] }): Promise<void>
@@ -79,7 +82,7 @@ export async function nativeFetch(url: string, init: FetchInit = {}): Promise<Fe
       current = next.href
       continue
     }
-    const text = response.body ?? ''
+    const text = response.file ? await readCached(response.file) : (response.body ?? '')
     return {
       url: current,
       status: response.status,
@@ -89,6 +92,14 @@ export async function nativeFetch(url: string, init: FetchInit = {}): Promise<Fe
     }
   }
   throw new Error('跳转次数过多')
+}
+
+async function readCached(file: string): Promise<string> {
+  try {
+    return await (await fetch(Capacitor.convertFileSrc(file))).text()
+  } finally {
+    void native.release({ file })
+  }
 }
 
 /** "a=1; b=2" → [{ name, value }] */

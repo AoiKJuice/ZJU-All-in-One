@@ -7,7 +7,7 @@ import { MOBILE } from '@renderer/lib/platform'
 
 // 与 styles.css 中 html[data-font] 的字体栈一致，用来让每个选项以自身字体预览
 const FAMILY: Record<FontStyle, string> = {
-  song: "'AJ Digits', 'AJ Latin', 'AJ Song', serif",
+  song: "'AJ Digits', 'AJ Latin', 'Noto Serif SC', serif",
   hei: "'AJ Sans', 'Microsoft YaHei UI', sans-serif",
   kai: "'AJ Digits', 'AJ Kai', 'KaiTi', serif"
 }
@@ -301,7 +301,7 @@ function Mcp() {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section>
+    <section className="panel">
       <SectionHead title={title} />
       <ul className="rows">{children}</ul>
     </section>

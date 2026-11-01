@@ -66,7 +66,7 @@ export function App() {
             exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
             transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
           >
-            <Logo bare />
+            <Logo />
           </motion.div>
         )}
       </AnimatePresence>

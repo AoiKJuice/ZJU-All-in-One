@@ -19,7 +19,7 @@ const densities = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 }
 for (const [name, k] of Object.entries(densities)) {
   targets.push([`mipmap-${name}/ic_launcher.png`, 48 * k, 1])
   targets.push([`mipmap-${name}/ic_launcher_round.png`, 48 * k, 1])
-  targets.push([`mipmap-${name}/ic_launcher_foreground.png`, 108 * k, 0.64])
+  targets.push([`mipmap-${name}/ic_launcher_foreground.png`, 108 * k, 0.56])
 }
 
 const page = (ratio) => `<html><head><style>

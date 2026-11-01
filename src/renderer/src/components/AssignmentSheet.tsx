@@ -96,7 +96,7 @@ function PtaBody({ a }: { a: Assignment }) {
       <p className="quiet !py-2">
         <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />
       </p>
-      <div className="sheet-body mt-4 border-t border-[var(--rule)] pt-5">
+      <div className="sheet-body mt-4">
         <ul className="rows">
           <li className="row !grid-cols-[6.5em_minmax(0,1fr)] !py-2">
             <span className="row-time">进度</span>
@@ -205,7 +205,7 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
         )}
       </p>
 
-      <div className="sheet-body mt-4 border-t border-[var(--rule)] pt-5">
+      <div className="sheet-body mt-4">
         {!detail ? (
           <p className="quiet">{error ?? '…'}</p>
         ) : (

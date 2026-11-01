@@ -16,7 +16,7 @@ export interface Settings {
 
 // name 为字体本身的名字，设置页以该字体显示它；安卓上的黑体是系统自带的思源黑体
 export const FONT_OPTIONS: { id: FontStyle; name: string }[] = [
-  { id: 'song', name: '方正书宋' },
+  { id: 'song', name: '思源宋体' },
   { id: 'hei', name: MOBILE ? '思源黑体' : '微软雅黑' },
   { id: 'kai', name: '霞鹜文楷' }
 ]

@@ -62,6 +62,7 @@ public class ZjuNativePlugin extends Plugin {
     private static final String KEY_ALIAS = "zju-secrets";
     private static final String PREFS = "zju-secure";
     private static final String FOLDER = "ZJU All in One";
+    private static final int LARGE_BODY = 256 * 1024;
 
     private final ExecutorService pool = Executors.newFixedThreadPool(6);
 
@@ -145,14 +146,31 @@ public class ZjuNativePlugin extends Plugin {
                 out.put("status", status);
                 out.put("headers", headersOf(c, url));
                 byte[] data = readAll(bodyOf(c, status));
-                if (call.getBoolean("binary", false)) out.put("base64", Base64.encodeToString(data, Base64.NO_WRAP));
-                else out.put("body", new String(data, StandardCharsets.UTF_8));
+                if (call.getBoolean("binary", false)) {
+                    out.put("base64", Base64.encodeToString(data, Base64.NO_WRAP));
+                } else if (data.length > LARGE_BODY) {
+                    // 大响应（如智云整节课的文字稿）不经桥传字符串：写进缓存文件，网页按本地地址读取后调 release 删掉
+                    File file = File.createTempFile("response", ".txt", getContext().getCacheDir());
+                    try (OutputStream o = new FileOutputStream(file)) {
+                        o.write(data);
+                    }
+                    out.put("file", file.getAbsolutePath());
+                } else {
+                    out.put("body", new String(data, StandardCharsets.UTF_8));
+                }
                 c.disconnect();
                 call.resolve(out);
             } catch (Exception e) {
                 call.reject(message(e));
             }
         });
+    }
+
+    @PluginMethod
+    public void release(PluginCall call) {
+        File file = new File(call.getString("file", ""));
+        if (file.getParentFile() != null && file.getParentFile().equals(getContext().getCacheDir())) file.delete();
+        call.resolve();
     }
 
     @PluginMethod

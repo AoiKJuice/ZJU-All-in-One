@@ -20,6 +20,8 @@ const WHEEL_COOLDOWN = 380
 const SWIPE_STEP = 56
 
 const lecturesKey = (monday: string): string => `lectures:${monday}`
+// 午间、晚间之后的第一节上方画一道浅线，其余节次之间不画
+const BREAKS = new Set([6, 11])
 
 // 翻页动效：下一周从右进、向左出，上一周反之。用 variants + AnimatePresence 的 custom，
 // 退场的那一周按"当前"方向离开（直接写在 exit 里会用它渲染时的旧方向）
@@ -142,7 +144,7 @@ export function Schedule() {
         </div>
       </Reveal>
 
-      <Reveal i={1} className="mt-4 flex min-h-0 flex-1 flex-col">
+      <Reveal i={1} className="panel schedule-board mt-4 flex min-h-0 flex-1 flex-col">
         {!data?.length || !cal ? (
           <Quiet loading={loading || (loggedIn && !cal)} error={error} empty="无" />
         ) : (
@@ -155,7 +157,7 @@ export function Schedule() {
               animate="center"
               exit="exit"
               transition={{ duration: 0.4, ease: EASE }}
-              className="grid flex-1 border-t border-[var(--rule)]"
+              className="grid flex-1"
               style={
                 MOBILE
                   ? { gridTemplateColumns: `1.75rem repeat(${shown.length}, minmax(0, 1fr))`, gridTemplateRows: `2.75rem repeat(${PERIOD_COUNT}, minmax(3.25rem, 1fr))` }
@@ -163,7 +165,7 @@ export function Schedule() {
               }
             >
               {shown.map((date, i) =>
-                date === today ? <div key="today" className="bg-[var(--tint)]" style={{ gridColumn: i + 2, gridRow: `1 / ${PERIOD_COUNT + 2}` }} /> : null
+                date === today ? <div key="today" className="rounded-[var(--r-md)] bg-[var(--tint)]" style={{ gridColumn: i + 2, gridRow: `1 / ${PERIOD_COUNT + 2}` }} /> : null
               )}
               {shown.map((date, i) => (
                 <div
@@ -179,7 +181,7 @@ export function Schedule() {
                 </div>
               ))}
               {Array.from({ length: PERIOD_COUNT }, (_, i) => (
-                <div key={i} className="period-head border-t border-[var(--rule)] pt-1 text-xs tabular-nums text-[var(--ink-3)]" style={{ gridColumn: '1 / -1', gridRow: i + 2 }}>
+                <div key={i} className={`period-head pt-1 text-xs tabular-nums text-[var(--ink-3)]${BREAKS.has(i + 1) ? ' period-break' : ''}`} style={{ gridColumn: '1 / -1', gridRow: i + 2 }}>
                   {MOBILE ? i + 1 : periodStart(i + 1)}
                 </div>
               ))}

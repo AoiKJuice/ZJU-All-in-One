@@ -2,6 +2,8 @@
 const { app, BrowserWindow } = require('electron')
 const fs = require('fs')
 const path = require('path')
+// 截图按 CSS 像素一比一，不受系统显示缩放影响
+app.commandLine.appendSwitch('force-device-scale-factor', '1')
 const svg = fs.readFileSync(path.join(__dirname, '../build/icon.svg'), 'utf8')
 const html = `<html><head><style>
 html, body { margin: 0; width: 1024px; height: 1024px; background: transparent; overflow: hidden; }

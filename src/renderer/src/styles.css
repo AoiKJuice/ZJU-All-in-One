@@ -3,7 +3,7 @@
 @source '..';
 
 /* ------------------------------------------------------------------
-   字体：EB Garamond + 方正书宋，与 AoiKJuice 主站一致
+   字体：EB Garamond + 思源宋体（Noto Serif SC，Medium 字重，由 @fontsource 按字符分片打包，见 main.tsx）
    ------------------------------------------------------------------ */
 @font-face {
   font-family: 'AJ Latin';
@@ -19,12 +19,6 @@
   font-style: italic;
   font-display: swap;
   size-adjust: 110%;
-}
-@font-face {
-  font-family: 'AJ Song';
-  src: url('/type/FZShuSong-Z01S.woff2') format('woff2');
-  font-weight: 400 700;
-  font-display: swap;
 }
 /* 数字：EB Garamond 的旧式数字高低错落、不耐看，改用 Source Serif 4 的等高数字（只接管数字与常见符号） */
 @font-face {
@@ -76,6 +70,13 @@ html[data-theme='light'] {
   --shu: #a94f35;
   --shu-rgb: 169, 79, 53;
   --outline: rgba(38, 34, 29, 0.16);
+  /* 面板：比纸面略浅，柔和投影；--surface-2 为面板内悬停 / 输入框的浅底 */
+  --surface: #fbf8f2;
+  --surface-2: rgba(38, 34, 29, 0.05);
+  --shadow: 0 1px 2px rgba(38, 34, 29, 0.05), 0 10px 28px -18px rgba(38, 34, 29, 0.28);
+  --shadow-pop: 0 2px 6px rgba(38, 34, 29, 0.06), 0 18px 40px -16px rgba(38, 34, 29, 0.32);
+  /* 钟鹰的鹰身：黛蓝 */
+  --emblem: #2a3b57;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -92,6 +93,11 @@ html[data-theme='dark'] {
   --shu: #d48a6a;
   --shu-rgb: 212, 138, 106;
   --outline: rgba(230, 223, 210, 0.14);
+  --surface: #25211d;
+  --surface-2: rgba(230, 223, 210, 0.07);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 30px -18px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.3), 0 20px 44px -16px rgba(0, 0, 0, 0.7);
+  --emblem: #aeb9cb;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.86 0 0 0 0 0.8 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -121,7 +127,7 @@ html[data-theme='dark'][data-accent='red'] {
 /* 字体风格：书宋（默认）/ 黑体 / 文楷，由 html[data-font] 决定，见 lib/settings.ts */
 :root,
 html[data-font='song'] {
-  --f-text: 'AJ Digits', 'AJ Latin', 'AJ Song', 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
+  --f-text: 'AJ Digits', 'AJ Latin', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
 }
 html[data-font='hei'] {
   --f-text: 'AJ Sans', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
@@ -1407,6 +1413,153 @@ html[data-theme='dark'] .page-emblem svg {
 }
 
 /* ------------------------------------------------------------------
+   分层：区块放进比纸面略浅、带圆角与柔和投影的面板，靠底色而不是细线区分区域；
+   条目之间不再画线，悬停 / 按下时浅底；浮层（轻提示、登录面板、菜单、侧页）一律圆角、无描边
+   ------------------------------------------------------------------ */
+:root {
+  --r-lg: 1.125rem;
+  --r-md: 0.75rem;
+  --r-sm: 0.5rem;
+}
+.pane,
+.panel {
+  padding: 1rem 0.625rem 0.375rem;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+.pane .section-head,
+.panel .section-head {
+  padding: 0 0.75rem 0.375rem;
+}
+.section-head {
+  border-bottom: 0;
+}
+.row {
+  padding: 0.6875rem 0.75rem;
+  border-bottom: 0;
+  border-radius: var(--r-md);
+  transition: opacity 0.5s var(--ease), background-color 0.3s var(--ease);
+}
+button.row:hover,
+.row[role='button']:hover {
+  background: var(--surface-2);
+}
+.settings-row {
+  padding: 1rem 0.75rem;
+}
+
+/* 课表：网格放在面板里，只在午间、晚间两处画一道浅线；课程格子为圆角浅底块，左侧一道主题色 */
+.schedule-board {
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+.period-head {
+  border-top: 1px solid transparent;
+}
+.period-head.period-break {
+  border-top-color: var(--rule);
+}
+.course-cell {
+  border-left: 0;
+  border-radius: var(--r-sm);
+  background: rgba(var(--shu-rgb), 0.08);
+  box-shadow: inset 2px 0 0 var(--shu);
+}
+
+/* 回放侧栏同为面板；标签不再拉通栏细线 */
+.replay-side {
+  padding: 0.875rem 1rem 0.25rem;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+.tabs {
+  border-bottom: 0;
+}
+.tabs button[data-active]::after {
+  bottom: -0.375rem;
+  height: 2px;
+  border-radius: 1px;
+}
+.player:not([data-expanded]) {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.slide,
+.slide-single,
+.lightbox img {
+  border-radius: var(--r-sm);
+}
+
+/* 浮层 */
+.toast {
+  padding: 0.625rem 1.375rem;
+  background: var(--surface);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: var(--shadow-pop);
+}
+.login-panel,
+.context-menu,
+.confirm {
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+.context-menu {
+  padding: 0.375rem;
+  border-radius: var(--r-md);
+}
+.context-menu button {
+  border-radius: var(--r-sm);
+}
+.sheet {
+  background: var(--surface);
+  border-left: 0;
+  border-radius: var(--r-lg) 0 0 var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+.preview-bar {
+  border-bottom: 0;
+}
+.preview-stage iframe {
+  border-radius: var(--r-md);
+}
+
+/* 输入框：浅底圆角，不再只靠一条下划线 */
+.field {
+  padding: 0.75rem 0.875rem;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+}
+.field:focus {
+  border-color: rgba(var(--shu-rgb), 0.5);
+}
+.login-field {
+  padding: 0.625rem 0.875rem;
+}
+.login-panel .login-field + .login-field {
+  margin-top: 0.5rem;
+}
+
+/* 手机主页折叠长列表的「展开 / 收起」 */
+.pane-more {
+  display: block;
+  width: 100%;
+  margin: 0.25rem 0 0.375rem;
+  padding: 0.5rem 0;
+  border-radius: var(--r-md);
+  font-size: 0.875rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.pane-more:active {
+  background: var(--surface-2);
+}
+
+/* ------------------------------------------------------------------
    安卓端（html[data-platform=android]，入口见 src/mobile）：竖屏手机布局。
    导航在底部标签栏；主页四块竖排整页滚动；课表周末没课只画五天、左右滑动翻周；
    回放页视频在上、侧栏在下；侧页与登录面板占满宽度。系统栏留白取 Capacitor 注入的安全区
@@ -1440,7 +1593,7 @@ html[data-platform='android'] .mast-meta {
   padding-bottom: var(--sab);
   background: var(--veil);
   backdrop-filter: blur(1rem) saturate(1.15);
-  border-top: 1px solid var(--rule);
+  box-shadow: 0 -10px 28px -22px rgba(0, 0, 0, 0.35);
 }
 .tabbar .mast-link {
   flex: 1;
@@ -1485,8 +1638,8 @@ html[data-platform='android'] .page-emblem svg {
 /* 条目：标题与副标题分两行，三栏收窄 */
 html[data-platform='android'] .row {
   grid-template-columns: 5.5em minmax(0, 1fr) auto;
-  gap: 0.875rem;
-  padding: 0.75rem 0;
+  gap: 0.75rem;
+  padding: 0.6875rem 0.625rem;
 }
 html[data-platform='android'] .row-title {
   font-size: 1.0625rem;
@@ -1516,8 +1669,8 @@ html[data-platform='android'] .home-page {
 html[data-platform='android'] .home-page .panes {
   display: flex;
   flex-direction: column;
-  gap: 2.25rem;
-  margin-top: 1.75rem;
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 html[data-platform='android'] .home-page .pane-scroll {
   overflow: visible;
@@ -1577,9 +1730,12 @@ html[data-platform='android'] .period-head {
 }
 html[data-platform='android'] .course-cell {
   margin: 1.5px;
-  padding: 0.25rem 0.25rem 0.25rem 0.375rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.4375rem;
   line-height: 1.3;
-  background: rgba(var(--shu-rgb), 0.07);
+}
+html[data-platform='android'] .schedule-board {
+  margin: 0 -0.5rem;
+  padding: 0.25rem 0.25rem 0.5rem;
 }
 html[data-platform='android'] .course-name {
   font-size: 0.8125rem;
@@ -1640,7 +1796,11 @@ html[data-platform='android'] .player-wrap > .player {
 }
 html[data-platform='android'] .replay-side {
   flex: 1;
-  padding: 0.75rem var(--gutter) 0;
+  margin: 0.75rem 0.625rem 0.5rem;
+  padding: 0.75rem 0.875rem 0;
+}
+html[data-platform='android'] .player:not([data-expanded]) {
+  border-radius: 0;
 }
 html[data-platform='android'] .player-bar {
   gap: 0.875rem;
@@ -1650,7 +1810,7 @@ html[data-platform='android'] .player-bar {
 html[data-platform='android'] .sheet {
   width: 100vw;
   padding: calc(var(--sat) + 1rem) var(--gutter) calc(var(--sab) + 1rem);
-  border-left: 0;
+  border-radius: 0;
 }
 html[data-platform='android'] .login-panel {
   top: calc(var(--mast-h) + var(--sat));
@@ -1665,5 +1825,6 @@ html[data-platform='android'] .toast {
 }
 html[data-platform='android'] .settings-row {
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.5rem;
+  gap: 0.375rem;
+  padding: 0.875rem 0.75rem;
 }

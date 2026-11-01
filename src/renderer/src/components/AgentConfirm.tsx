@@ -33,7 +33,7 @@ export function AgentConfirm() {
               <Joined parts={[request.courseName, request.title]} />
             </p>
             {request.files.length > 0 && (
-              <ul className="rows mt-2 border-t border-[var(--rule)]">
+              <ul className="rows mt-2">
                 {request.files.map((f) =>
                   'path' in f ? (
                     <li key={f.path} className="row !grid-cols-[minmax(0,1fr)_auto] !py-1.5">

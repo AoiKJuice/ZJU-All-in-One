@@ -97,21 +97,21 @@ npm run mobile:build         # 安卓网页资源到 out/mobile 并 cap sync 到
 `android/` 为 Capacitor 8 工程，`capacitor.config.ts` 指定网页资源 `out/mobile`。思路：渲染端原样复用，主进程的 services 搬进 WebView 运行。
 - `vite.mobile.config.ts`（vite 根 `src/mobile`）用插件把 `src/main` 下依赖 Electron / Node 的底层模块换成 `src/mobile` 里接口相同的实现：`http.ts`、`auth/zjuam.ts`、`secure.ts`、`diagnostics.ts`、`services/ptaTransport.ts`，以及 `node:crypto`（md5、randomUUID）/ `node:fs/promises`（只读刚选的文件）/ `node:path` 的替身。**services 不能直接 import electron 或 node 模块**，需要时照此拆出可替换的一层（凭据与配置读写已收进 `src/main/secure.ts`，PTA 的网络与窗口在 `ptaTransport.ts`）。
 - `src/mobile/bridge.ts` 是安卓端的 `window.zju`：通道与 `ipc.ts` 相同，另有 `platform: 'android'` 与 `immersive`（播放器全屏：横屏并隐藏系统栏）。本地转写、导出、MCP、网页登录不提供；渲染端以 `lib/platform.ts` 的 `MOBILE` 隐藏入口。`--mode demo` 构建换成演示数据（校历为编出来的秋学期第 8 周）。
-- 原生插件 `ZjuNativePlugin.java`：请求不自动跟随跳转（`native.ts` 的 `nativeFetch` 逐跳处理、记落点、`upgradeHttp`），cookie 读写系统 CookieManager（与 WebView 共用，`<video>` / `<img>` 带登录态），桌面 UA；凭据 Android Keystore AES-GCM 加密存 SharedPreferences；下载经 MediaStore 写到"下载/ZJU All in One"，`file:reveal` / `file:open` 用其他应用打开。
+- 原生插件 `ZjuNativePlugin.java`：超过 256KB 的响应（如智云整节课的文字稿）不经桥传字符串，写进缓存文件、网页按 `convertFileSrc` 地址读取后 `release`；请求不自动跟随跳转（`native.ts` 的 `nativeFetch` 逐跳处理、记落点、`upgradeHttp`），cookie 读写系统 CookieManager（与 WebView 共用，`<video>` / `<img>` 带登录态），桌面 UA；凭据 Android Keystore AES-GCM 加密存 SharedPreferences；下载经 MediaStore 写到"下载/ZJU All in One"，`file:reveal` / `file:open` 用其他应用打开。
 - 页面源设为 `https://classroom.zju.edu.cn`（`server.hostname`，本地提供、不访问该站）：智云回放与课件图校验 Referer，直接加载时据此通过。允许明文（校历是 http）。
 - 截止提醒用 `@capacitor/local-notifications` 预约系统闹钟（`src/mobile/todos.ts`），应用不在前台也会到点弹出，每次取到待办重排；点通知打开作业侧页。
 - 返回键（`src/mobile/main.tsx`）：先收起全屏播放 / 课件大图 / 文件预览（派发 Esc），再关登录面板、作业侧页、按历史返回，到头退到后台。系统栏图标随应用深浅色。
-- 手机布局全在 `styles.css` 末尾 `html[data-platform='android']` 一节：导航为底部标签栏（工具页为空暂不放），回放页收起刊头与标签栏；主页四块竖排整页滚动，考试排在回放前；课表这周周末没课只画五天、左侧只写节次、左右滑动翻周、格子浅底；回放页视频通栏在上、侧栏在下；侧页与登录面板占满宽度；触屏没有悬停，待办「忽略」只在作业侧页。安全区取 Capacitor 注入的 `--safe-area-inset-*`。桌面样式不要写成影响安卓的无前缀规则，反之亦然。
+- 手机布局全在 `styles.css` 末尾 `html[data-platform='android']` 一节：导航为底部标签栏（工具页为空暂不放），回放页收起刊头与标签栏；主页四块竖排整页滚动，考试排在回放前，每块先只显示前几条（`Home.tsx` 的 `LIMIT`），「展开 / 收起」看全部，免得一块很长把下面挤走；课表这周周末没课只画五天、左侧只写节次、左右滑动翻周、格子浅底；回放页视频通栏在上、侧栏在下；侧页与登录面板占满宽度；触屏没有悬停，待办「忽略」只在作业侧页。安全区取 Capacitor 注入的 `--safe-area-inset-*`。桌面样式不要写成影响安卓的无前缀规则，反之亦然。
 - Tailwind 在安卓构建里靠 `styles.css` 的 `@source '..'` 扫描渲染端源码。`electron-builder.yml` 排除 `out/mobile`。
 - **未在真机上验证**登录、各数据源与下载；改动后至少在演示模式下按手机尺寸看一遍。
 
 ### 渲染进程与设计语言
 
 风格沿用 AoiKJuice 主站（`C:\Project\AoiKJuice\frontend\aoi-next`）："Stay Quiet"、去卡片化、高效率。
-- 纸与墨配色 + 朱色（`--shu`）为唯一强调色；EB Garamond + 方正书宋（字体文件在 `src/renderer/public/type/`）；颗粒纸纹；空心描边大字（`OutlineWord`）作页面水印；进入动画为"上浮 + 去模糊"（`Reveal`，按 `i` 错落）。
+- 纸与墨配色 + 朱色（`--shu`）为唯一强调色；EB Garamond + 思源宋体（用户指定，Noto Serif SC，只打包 Medium 500 一档以略加字重；`@fontsource/noto-serif-sc` 按 unicode-range 分片，在渲染端 `main.tsx` 引入，两端共用），数字字体不变（其余字体文件在 `src/renderer/public/type/`）；颗粒纸纹；空心描边大字（`OutlineWord`）作页面水印；进入动画为"上浮 + 去模糊"（`Reveal`，按 `i` 错落）。
 - **界面不放解释性、冗余文字**：不写副标题、计数、来源注记、功能描述；空状态只写"无"。
 - **不用点号（·）作分隔**，用 `Sep`（细竖线）/ `Joined`（components/Type.tsx）；选中态用主题色下划线（刊头导航的滑动点除外）。
-- **不要用卡片**：信息用 `.rows/.row`（时间 · 正文 · 尾注，细线分隔）呈现，区块标题用 `SectionHead`；空/错/未登录状态统一用 `Quiet` 一行小字。样式类集中在 `styles.css`，颜色只用 CSS 变量（`--paper/--ink/--ink-2/--ink-3/--rule/--tint/--shu`）。
+- **分层靠底色，不靠细线**（用户要求：区域之间只隔一根线、背景一模一样时看不出层次，线太多显得杂乱）：区块放进 `.pane` / `.panel`——比纸面略浅的 `--surface`、圆角 `--r-lg`、柔和投影 `--shadow`；条目 `.rows/.row`（时间 · 正文 · 尾注）之间不画线，可点的条目悬停浅底 `--surface-2`；课表只在午间、晚间两处画浅线，课程格子为圆角浅底块。浮层（轻提示为胶囊形、登录面板、菜单、确认框、侧页）一律圆角、`--shadow-pop`、无描边；输入框为浅底圆角。**不要再出现尖角矩形或通栏分隔线**。区块标题用 `SectionHead`；空/错/未登录状态统一用 `Quiet` 一行小字。样式类集中在 `styles.css`，颜色只用 CSS 变量（`--paper/--surface/--surface-2/--ink/--ink-2/--ink-3/--rule/--tint/--shu/--emblem`）。
 - 主题色在播放器黑底控件上用提亮版本 `--shu-bright`（随 data-accent 定义）。
 - 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。 字号四档（小 / 标准 / 大 / 特大）写成 `--scale`，乘在根字号上，不提供自定义数值。
 - 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
@@ -120,7 +120,7 @@ npm run mobile:build         # 安卓网页资源到 out/mobile 并 cap sync 到
 - **数据缓存**（`lib/cache.ts`）：`useZju` 与课表页的校历、各周课次先显示缓存，只有过期（5 分钟）或 `epoch` 变化（登录变化、下拉刷新）才在后台静默重取，切页面不重新加载；`useZju` 的结果同时存 localStorage，冷启动先显示上次数据；确认未登录时整体清空。
 - 课表页（`pages/Schedule.tsx`）：一屏布局，网格行高 `minmax(2.2rem, 1fr)` 占满可用高度；滚轮翻周（累计 60px 翻一周、冷却 380ms），鼠标中键回本周；右上角 `.week-nav` 为大号圆形箭头（悬停浅底），「本周」只在离开本周时出现；翻页动效用 variants + `AnimatePresence custom` 让退场方向跟随当前方向（下一周从右进、向左出），回本周按来向决定方向；预取前后一周课次。教务会把连上的课拆成几条，`lib/calendar.mergeSessions` 把同一天、同名、同教室、节次相接且只隔普通课间（≤10 分钟，不跨大课间 / 午休 / 晚饭）的合成一节，主页今日课程同样合并。
 - 节次作息表在 `lib/periods.ts`。
-- **徽标「钟鹰」**：粗外环 + 主题色浅底表盘，右半边是几何化的求是鹰（倒三角、四层羽、朝右的鹰头，照校标特征抽象，不照搬原图），左半边两根主题色指针。几何在 `components/Logo.tsx`（颜色全取主题变量，随昼夜与主题色变化）。界面上不放在刊头，而是 `App.tsx` 里的衬底 `.page-emblem`：`bare`（无外环与表盘底色）放大压在左下角、越出左下两边、低不透明度，回放页不放；它挂在页面外层，在有衬底的页面之间切换不重播，出现时用与 `Reveal` 相同的"上浮 + 去模糊"；设置页「徽标」可隐藏（`settings.emblem`）。软件图标 `build/icon.svg` 用同一组几何、固定昼间求是蓝，改动后 `npx electron scripts/make-icon.cjs` 重新生成 `build/icon.png`。求是鹰图形浙大已申请商标，用户知情后选定此方案。
+- **徽标「钟鹰」**：无外环、无底色，右半边是几何化的求是鹰（倒三角、四层羽、朝右的鹰头，照校标特征抽象，不照搬原图），左半边两根主题色指针；鹰身不用黑色，用 `--emblem`（昼间黛蓝 #2A3B57、夜间浅灰蓝）。几何在 `components/Logo.tsx`。界面上不放在刊头，而是 `App.tsx` 里的衬底 `.page-emblem`：放大压在左下角、越出左下两边、低不透明度，回放页不放；它挂在页面外层，在有衬底的页面之间切换不重播，出现时用与 `Reveal` 相同的"上浮 + 去模糊"；设置页「徽标」可隐藏（`settings.emblem`）。软件图标 `build/icon.svg` 用同一组几何（透明底、黛蓝鹰、求是蓝 #1F5FBF 指针，viewBox 裁到图形本身），改动后 `npx electron scripts/make-icon.cjs` 与 `scripts/make-android-icons.cjs` 重新生成（安卓自适应图标须有底板，背景层用纸色）。求是鹰图形浙大已申请商标，用户知情后选定此方案。
 - 窗口无边框（`titleBarOverlay` 高 56px，与刊头同高），刊头右侧为系统按钮留出 140px；可拖动区域加 `.drag`。
 
 ### 窗口卡死（AppHang）教训

@@ -7,6 +7,10 @@ import { mergeSessions } from '@renderer/lib/calendar'
 import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isSoon, isUrgent, relativeTo, todayWeekday, weekdayLabel, weekdayOf } from '@renderer/lib/format'
+import { MOBILE } from '@renderer/lib/platform'
+
+// 手机端竖排：每块先只显示前几条，「展开」看全部，免得一块很长把下面几块挤到看不见
+const LIMIT: Record<string, number> = { today: 4, todo: 4, exams: 3, replays: 3 }
 
 /** 主页即全部：今日课程、截止、回放、考试汇在一屏；每块内部滚动，窗口再小也不必整页下滑。手机端四块竖排整页滚动，考试排在回放前 */
 export function Home() {
@@ -19,6 +23,15 @@ export function Home() {
   // 显示已忽略的待办（淡显，可右键恢复）
   const [showIgnored, setShowIgnored] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; a: Assignment } | null>(null)
+  const [unfolded, setUnfolded] = useState<Record<string, boolean>>({})
+  const cap = <T,>(name: string, list: T[]): T[] => (MOBILE && !unfolded[name] ? list.slice(0, LIMIT[name]) : list)
+  const more = (name: string, list: unknown[]) =>
+    MOBILE &&
+    list.length > LIMIT[name] && (
+      <button className="pane-more" onClick={() => setUnfolded((u) => ({ ...u, [name]: !u[name] }))}>
+        {unfolded[name] ? '收起' : '展开'}
+      </button>
+    )
 
   useEffect(() => {
     if (!menu) return
@@ -78,7 +91,7 @@ export function Home() {
             <Quiet loading={schedule.loading} error={schedule.error} empty="无课" />
           ) : (
             <ul className="rows">
-              {dayList.map((c) => {
+              {cap('today', dayList).map((c) => {
                 const state = showTomorrow ? 'later' : classState(c.startPeriod, c.endPeriod)
                 return (
                   <li key={c.id} className="row" data-past={state === 'past' || undefined} data-now={state === 'now' || undefined}>
@@ -95,6 +108,7 @@ export function Home() {
               })}
             </ul>
           )}
+          {more('today', dayList)}
         </Pane>
 
         <Pane
@@ -113,7 +127,7 @@ export function Home() {
             <Quiet loading={assignments.loading} error={assignments.error} empty="无" />
           ) : (
             <ul className="rows">
-              {listed.map((a) => (
+              {cap('todo', listed).map((a) => (
                 <li key={a.id}>
                   {/* 不用 button：尾注格里还要放「忽略」按钮 */}
                   <div
@@ -170,6 +184,7 @@ export function Home() {
               ))}
             </ul>
           )}
+          {more('todo', listed)}
         </Pane>
 
         {menu && (
@@ -192,7 +207,7 @@ export function Home() {
             <Quiet loading={replays.loading} error={replays.error} empty="无" />
           ) : (
             <ul className="rows">
-              {recent.map((r) => (
+              {cap('replays', recent).map((r) => (
                 <li key={r.id}>
                   <button className="row" onClick={() => openReplay(r)}>
                     <span className="row-time">{r.status === 'live' ? <span className="live-mark">直播</span> : dotDate(r.recordedAt)}</span>
@@ -206,6 +221,7 @@ export function Home() {
               ))}
             </ul>
           )}
+          {more('replays', recent)}
         </Pane>
 
         <Pane i={5} name="exams" title="考试">
@@ -213,7 +229,7 @@ export function Home() {
             <Quiet loading={exams.loading} error={exams.error} empty="无" />
           ) : (
             <ul className="rows">
-              {upcoming.map((e) => (
+              {cap('exams', upcoming).map((e) => (
                 <li key={e.id} className="row">
                   <span className="row-time">
                     {dotDate(e.startTime)} {clock(e.startTime)}
@@ -235,6 +251,7 @@ export function Home() {
               ))}
             </ul>
           )}
+          {more('exams', upcoming)}
         </Pane>
       </div>
     </div>
