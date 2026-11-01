@@ -1,9 +1,8 @@
-import { app, BrowserWindow, net, safeStorage, session, type Session } from 'electron'
-import { existsSync, readFileSync } from 'node:fs'
-import { readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import type { BrowserWindow } from 'electron'
 import type { Assignment, PtaState } from '@shared/types'
 import { logDiagnostic } from '../diagnostics'
+import { clearSecret, loadSecret, readConfig, saveSecret, writeConfig } from '../secure'
+import { clearCookies, request, solveCaptcha, webLogin } from './ptaTransport'
 
 // PTA（pintia.cn）：浙大程序设计类课程的作业平台，账号与统一身份认证无关。
 // 接口逆向自 PTA 网页端（登录页 passport 的 Login 接口）与开源的 vscode-pintia：
@@ -18,64 +17,36 @@ import { logDiagnostic } from '../diagnostics'
 const PASSPORT = 'https://passport.pintia.cn'
 const API = 'https://pintia.cn/api'
 
-export const ptaSession = (): Session => session.fromPartition('persist:pta')
-
-const configPath = (): string => join(app.getPath('userData'), 'pta.json')
-const credentialsPath = (): string => join(app.getPath('userData'), 'pta-credentials.bin')
+const CONFIG = 'pta.json'
+const CREDENTIALS = 'pta-credentials.bin'
 
 interface Credentials {
   username: string
   password: string
 }
 
-interface PtaResponse<T> {
-  status: number
-  body: T
-}
-
 /** 账号或密码被拒（与网络错误、需要验证码区分：只有这种情况才清掉保存的凭据） */
 class RejectedError extends Error {}
-
-function request<T>(url: string, method = 'GET', body?: unknown): Promise<PtaResponse<T>> {
-  return new Promise((resolve, reject) => {
-    const req = net.request({ url, method, session: ptaSession(), useSessionCookies: true })
-    req.setHeader('Accept', 'application/json;charset=UTF-8')
-    if (body !== undefined) req.setHeader('Content-Type', 'application/json;charset=UTF-8')
-    req.on('error', reject)
-    req.on('response', (res) => {
-      const chunks: Buffer[] = []
-      res.on('data', (c: Buffer) => chunks.push(c))
-      res.on('error', reject)
-      res.on('end', () => {
-        const text = Buffer.concat(chunks).toString('utf8')
-        resolve({ status: res.statusCode, body: (text ? JSON.parse(text) : {}) as T })
-      })
-    })
-    if (body !== undefined) req.write(JSON.stringify(body))
-    req.end()
-  })
-}
 
 // ---- 开关 ----
 
 export function isEnabled(): boolean {
-  return existsSync(configPath()) && (JSON.parse(readFileSync(configPath(), 'utf8')) as { enabled?: boolean }).enabled === true
+  return readConfig<{ enabled?: boolean }>(CONFIG)?.enabled === true
 }
 
 export async function setEnabled(enabled: boolean): Promise<void> {
-  await writeFile(configPath(), JSON.stringify({ enabled }))
+  await writeConfig(CONFIG, { enabled })
 }
 
 // ---- 凭据 ----
 
 async function saveCredentials(credentials: Credentials): Promise<void> {
-  if (!safeStorage.isEncryptionAvailable()) return
-  await writeFile(credentialsPath(), safeStorage.encryptString(JSON.stringify(credentials)))
+  await saveSecret(CREDENTIALS, JSON.stringify(credentials))
 }
 
 async function loadCredentials(): Promise<Credentials | null> {
-  if (!existsSync(credentialsPath())) return null
-  return JSON.parse(safeStorage.decryptString(await readFile(credentialsPath()))) as Credentials
+  const saved = await loadSecret(CREDENTIALS)
+  return saved ? (JSON.parse(saved) as Credentials) : null
 }
 
 // ---- 登录 ----
@@ -84,47 +55,6 @@ interface ErrorBody {
   error?: { code?: string; message?: string }
   code?: string
   message?: string
-}
-
-const CAPTCHA_APP_ID = '194593025'
-
-/**
- * 腾讯滑块验证码：在一个 pintia.cn 域下的小窗口里加载 TCaptcha.js 并弹出（验证码校验来源域名），
- * 用户完成后返回 ticket/randStr；关掉窗口或验证码返回 null
- */
-async function solveCaptcha(parent: BrowserWindow | undefined): Promise<{ ticket: string; randStr: string } | null> {
-  const win = new BrowserWindow({
-    parent,
-    modal: !!parent,
-    width: 400,
-    height: 460,
-    resizable: false,
-    title: 'PTA 验证',
-    autoHideMenuBar: true,
-    backgroundColor: '#f3eee4',
-    show: false,
-    webPreferences: { session: ptaSession(), contextIsolation: true, sandbox: true }
-  })
-  try {
-    // 任一 pintia.cn 页面即可，robots.txt 返回的是很小的 JSON
-    await win.loadURL('https://pintia.cn/robots.txt')
-    win.show()
-    const closed = new Promise<null>((resolve) => win.on('closed', () => resolve(null)))
-    const solved = win.webContents.executeJavaScript(`new Promise((resolve) => {
-      document.body.innerHTML = ''
-      document.body.style.background = '#f3eee4'
-      const script = document.createElement('script')
-      script.src = 'https://turing.captcha.qcloud.com/TCaptcha.js'
-      script.onload = () => new window.TencentCaptcha('${CAPTCHA_APP_ID}', (r) => resolve(r)).show()
-      script.onerror = () => resolve({ ret: -1 })
-      document.head.appendChild(script)
-    })`) as Promise<{ ret: number; ticket?: string; randstr?: string; errorCode?: number }>
-    const result = await Promise.race([solved, closed])
-    if (!result || result.ret !== 0 || result.errorCode || !result.ticket) return null
-    return { ticket: result.ticket, randStr: result.randstr ?? '' }
-  } finally {
-    if (!win.isDestroyed()) win.close()
-  }
 }
 
 /** parent 存在表示用户正在应用内登录：遇到验证码就弹出来让用户做；否则（后台重登）遇到验证码直接失败 */
@@ -154,32 +84,12 @@ export async function login(parent: BrowserWindow | undefined, account?: Credent
     await saveCredentials(account)
     return
   }
-  await new Promise<void>((resolve) => {
-    const win = new BrowserWindow({
-      parent,
-      modal: !!parent,
-      width: 480,
-      height: 720,
-      title: 'PTA 登录',
-      autoHideMenuBar: true,
-      webPreferences: { session: ptaSession(), contextIsolation: true, sandbox: true }
-    })
-    const cookies = ptaSession().cookies
-    const onCookie = (_e: unknown, cookie: Electron.Cookie, _cause: string, removed: boolean): void => {
-      if (cookie.name === 'PTASession' && !removed) win.close()
-    }
-    cookies.on('changed', onCookie)
-    win.on('closed', () => {
-      cookies.off('changed', onCookie)
-      resolve()
-    })
-    void win.loadURL('https://pintia.cn/auth/login')
-  })
+  await webLogin(parent)
 }
 
 export async function logout(): Promise<void> {
-  await ptaSession().clearStorageData({ storages: ['cookies'] })
-  await rm(credentialsPath(), { force: true })
+  await clearCookies()
+  await clearSecret(CREDENTIALS)
 }
 
 interface PtaUser {
@@ -205,7 +115,7 @@ function relogin(): Promise<boolean> {
       logDiagnostic('pta-relogin', { result: 'ok' })
       return true
     } catch (error) {
-      if (error instanceof RejectedError) await rm(credentialsPath(), { force: true })
+      if (error instanceof RejectedError) await clearSecret(CREDENTIALS)
       logDiagnostic('pta-relogin', { result: 'failed', message: error instanceof Error ? error.message : String(error) })
       return false
     }

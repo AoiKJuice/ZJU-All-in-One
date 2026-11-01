@@ -152,6 +152,12 @@ export function SlideViewer({ slides, error, video, ready, live, courseName, onS
                 <button className="act" data-on={(follow && index === current) || undefined} onClick={() => setFollow(true)}>
                   回到当前
                 </button>
+                <button className="act" onClick={() => setFull(index)}>
+                  全窗口
+                </button>
+                <button className="act" onClick={() => download(index)}>
+                  下载
+                </button>
               </div>
             </>
           )

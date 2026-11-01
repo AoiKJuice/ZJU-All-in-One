@@ -3,6 +3,7 @@ import type { McpState, McpToolGroup, PtaState } from '@shared/types'
 import { useApp } from '@renderer/store'
 import { OutlineWord, Reveal, SectionHead } from '@renderer/components/Type'
 import { ACCENT_OPTIONS, FONT_OPTIONS, SIZE_OPTIONS, type FontStyle } from '@renderer/lib/settings'
+import { MOBILE } from '@renderer/lib/platform'
 
 // 与 styles.css 中 html[data-font] 的字体栈一致，用来让每个选项以自身字体预览
 const FAMILY: Record<FontStyle, string> = {
@@ -89,11 +90,13 @@ export function Settings() {
           </Section>
         </Reveal>
 
-        <Reveal i={3}>
-          <Section title="本地 Agent">
-            <Mcp />
-          </Section>
-        </Reveal>
+        {!MOBILE && (
+          <Reveal i={3}>
+            <Section title="本地 Agent">
+              <Mcp />
+            </Section>
+          </Reveal>
+        )}
       </div>
     </div>
   )
@@ -217,9 +220,11 @@ function Pta() {
                 <button type="submit" className="act" disabled={busy || !username.trim() || !password}>
                   {busy ? '登录中' : '登录'}
                 </button>
-                <button type="button" className="act" disabled={busy} onClick={() => void run(() => window.zju['pta:login']())}>
-                  网页登录
-                </button>
+                {!MOBILE && (
+                  <button type="button" className="act" disabled={busy} onClick={() => void run(() => window.zju['pta:login']())}>
+                    网页登录
+                  </button>
+                )}
               </div>
             </form>
           )}
@@ -306,7 +311,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /** 一行设置：左侧名称，右侧选项 */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <li className="row !grid-cols-[8.5em_minmax(0,1fr)] !items-start !py-5">
+    <li className="row settings-row">
       <span className="text-base tracking-[0.1em] text-[var(--ink-2)]">{label}</span>
       <span className="flex flex-wrap items-center gap-x-8 gap-y-2">{children}</span>
     </li>

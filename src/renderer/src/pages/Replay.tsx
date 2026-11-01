@@ -8,6 +8,7 @@ import { TranscribeProgress } from '@renderer/components/TranscribeProgress'
 import { LectureList } from '@renderer/components/LectureList'
 import { SlideViewer } from '@renderer/components/SlideViewer'
 import { useCurrentSlide } from '@renderer/hooks/useCurrentSlide'
+import { MOBILE } from '@renderer/lib/platform'
 
 const hms = (sec: number): string =>
   [Math.floor(sec / 3600), Math.floor((sec % 3600) / 60), Math.floor(sec % 60)].map((n) => String(n).padStart(2, '0')).join(':')
@@ -29,6 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
 /**
  * 回放 / 直播页：左侧整列给视频（16:9 按列宽与可用高度取较小者），右侧侧栏在 课件 / 文字稿 / 选集 之间切换。
  * 三个面板都保持挂载、只是隐藏：字幕依赖文字稿行定位当前句，课件要保留跟随状态。
+ * 手机端视频在上、侧栏在下，只有智云文字稿（没有本地转写与导出），全屏为横屏铺满。
  */
 export function Replay() {
   const replay = useApp((s) => s.replay)!
@@ -66,6 +68,14 @@ export function Replay() {
   const subtitle = useRef<HTMLParagraphElement>(null)
   const title = `${replay.courseName} ${replay.title}`.trim()
   const currentSlide = useCurrentSlide(slides, video, live, src)
+  const back = useApp((s) => s.back)
+
+  // 手机端的全屏就是铺满 + 横屏、隐藏系统栏
+  useEffect(() => {
+    if (!MOBILE) return
+    window.zju.immersive?.(expanded)
+    return () => window.zju.immersive?.(false)
+  }, [expanded])
 
   useEffect(() => {
     let active = true
@@ -228,13 +238,18 @@ export function Replay() {
     <div className="page page-fit page-wide replay-page">
       <OutlineWord text={live ? 'Live' : 'Replay'} />
       <Reveal className="replay-head">
+        {MOBILE && (
+          <button className="replay-back" aria-label="返回" onClick={back}>
+            ←
+          </button>
+        )}
         <h1 className="replay-title">
           {replay.courseName}
           {live && <span className="live-mark ml-4 text-[0.55em]">直播</span>}
         </h1>
         <p className="replay-meta">
           <Joined parts={[replay.title, replay.teacher, dotDate(replay.recordedAt)]} />
-          {replay.url && (
+          {replay.url && !MOBILE && (
             <a className="act ml-6" href={replay.url} target="_blank" rel="noreferrer">
               原页面 ↗
             </a>
@@ -284,16 +299,18 @@ export function Replay() {
               courseName={replay.courseName}
               onSeek={seek}
               extra={
-                <button className="act" disabled={!slides?.length || busy} onClick={exportSlides}>
-                  {busy ? '导出中' : '导出 PDF'}
-                </button>
+                !MOBILE && (
+                  <button className="act" disabled={!slides?.length || busy} onClick={exportSlides}>
+                    {busy ? '导出中' : '导出 PDF'}
+                  </button>
+                )
               }
             />
           </section>
 
           <section className="tab-panel" hidden={tab !== 'transcript'}>
             <div className="acts tab-tools">
-              {SOURCES.map((o) => (
+              {!MOBILE && SOURCES.map((o) => (
                 <button key={o.id} className="act" data-on={source === o.id || undefined} onClick={() => setSource(o.id)}>
                   {o.label}
                 </button>
@@ -304,7 +321,7 @@ export function Replay() {
                   字幕
                 </button>
               )}
-              {source === 'local' && !live && (
+              {source === 'local' && !live && !MOBILE && (
                 segments ? (
                   <button className="act" data-on={stale || undefined} title={stale ? '视频已更新' : undefined} onClick={() => void transcribe(true)}>
                     重新转写
@@ -316,6 +333,7 @@ export function Replay() {
                 )
               )}
               {segments &&
+                !MOBILE &&
                 (['txt', 'srt', 'md'] as const).map((f) => (
                   <button key={f} className="act" onClick={() => void exportText(f)}>
                     {f.toUpperCase()}

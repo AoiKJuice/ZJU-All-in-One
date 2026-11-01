@@ -1,8 +1,5 @@
-import { app, safeStorage } from 'electron'
-import { existsSync } from 'node:fs'
-import { readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { zjuFetch } from '../http'
+import { clearSecret, loadSecret, saveSecret } from '../secure'
 import { logDiagnostic } from '../diagnostics'
 import { CAS_BASE, casCookieValue } from './zjuam'
 
@@ -17,11 +14,12 @@ interface Credentials {
 /** 账号或密码被拒（区别于网络错误：只有这种情况才清掉保存的凭据） */
 class RejectedError extends Error {}
 
-const credentialsPath = (): string => join(app.getPath('userData'), 'credentials.bin')
+const CREDENTIALS = 'credentials.bin'
 
 /** RSA 无填充：密码 UTF-8 字节作大整数 m，c = m^e mod n，十六进制左补 0 到 128 位 */
 function encrypt(password: string, exponent: string, modulus: string): string {
-  let base = BigInt(`0x${Buffer.from(password, 'utf8').toString('hex')}`)
+  const hex = [...new TextEncoder().encode(password)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  let base = BigInt(`0x${hex}`)
   let e = BigInt(`0x${exponent}`)
   const n = BigInt(`0x${modulus}`)
   let result = 1n
@@ -82,17 +80,16 @@ export function passwordLogin(username: string, password: string): Promise<void>
 }
 
 export async function saveCredentials(username: string, password: string): Promise<void> {
-  if (!safeStorage.isEncryptionAvailable()) return
-  await writeFile(credentialsPath(), safeStorage.encryptString(JSON.stringify({ username, password })))
+  await saveSecret(CREDENTIALS, JSON.stringify({ username, password }))
 }
 
 export async function loadCredentials(): Promise<Credentials | null> {
-  if (!existsSync(credentialsPath())) return null
-  return JSON.parse(safeStorage.decryptString(await readFile(credentialsPath()))) as Credentials
+  const saved = await loadSecret(CREDENTIALS)
+  return saved ? (JSON.parse(saved) as Credentials) : null
 }
 
 export async function clearCredentials(): Promise<void> {
-  await rm(credentialsPath(), { force: true })
+  await clearSecret(CREDENTIALS)
 }
 
 /** ok 重登成功；none 没有保存的账号；rejected 密码被拒（已清掉凭据）；failed 其他失败（多半是网络），凭据保留 */

@@ -8,7 +8,7 @@ import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isSoon, isUrgent, relativeTo, todayWeekday, weekdayLabel, weekdayOf } from '@renderer/lib/format'
 
-/** 主页即全部：今日课程、截止、回放、考试汇在一屏；每块内部滚动，窗口再小也不必整页下滑 */
+/** 主页即全部：今日课程、截止、回放、考试汇在一屏；每块内部滚动，窗口再小也不必整页下滑。手机端四块竖排整页滚动，考试排在回放前 */
 export function Home() {
   const schedule = useZju('data:schedule')
   const assignments = useZju('data:assignments')
@@ -58,7 +58,7 @@ export function Home() {
   const recent = replays.data ?? []
 
   return (
-    <div className="page page-fit">
+    <div className="page page-fit home-page">
       <OutlineWord text="Today" />
       <span className="pull-line" data-done={pull === 1 || undefined} style={{ ['--p' as string]: pull }} />
       <Reveal>
@@ -73,7 +73,7 @@ export function Home() {
       </Reveal>
 
       <div className="panes grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Pane i={2} title={showTomorrow ? '明日' : '今日'}>
+        <Pane i={2} name="today" title={showTomorrow ? '明日' : '今日'}>
           {dayList.length === 0 ? (
             <Quiet loading={schedule.loading} error={schedule.error} empty="无课" />
           ) : (
@@ -99,6 +99,7 @@ export function Home() {
 
         <Pane
           i={3}
+          name="todo"
           title="截止"
           note={
             hasIgnored && (
@@ -186,7 +187,7 @@ export function Home() {
           </ul>
         )}
 
-        <Pane i={4} title="回放">
+        <Pane i={4} name="replays" title="回放">
           {recent.length === 0 ? (
             <Quiet loading={replays.loading} error={replays.error} empty="无" />
           ) : (
@@ -207,7 +208,7 @@ export function Home() {
           )}
         </Pane>
 
-        <Pane i={5} title="考试">
+        <Pane i={5} name="exams" title="考试">
           {upcoming.length === 0 ? (
             <Quiet loading={exams.loading} error={exams.error} empty="无" />
           ) : (
@@ -240,9 +241,9 @@ export function Home() {
   )
 }
 
-function Pane({ i, title, note, children }: { i: number; title: string; note?: ReactNode; children: ReactNode }) {
+function Pane({ i, name, title, note, children }: { i: number; name: string; title: string; note?: ReactNode; children: ReactNode }) {
   return (
-    <Reveal i={i} className="pane">
+    <Reveal i={i} className={`pane pane-${name}`}>
       <SectionHead title={title} note={note} />
       <div className="pane-scroll">{children}</div>
     </Reveal>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mobile-demo",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "-c", "vite.mobile.config.ts", "--mode", "demo", "--port", "5179", "--strictPort"],
+      "port": 5179
+    }
+  ]
+}

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 
 // 约三格滚轮
 const THRESHOLD = 300
+// 触屏下拉的距离（px）
+const TOUCH_THRESHOLD = 110
 
-/** 滚到顶后继续向上滚轮（即"下拉"）累积到阈值时刷新；返回 0–1 的拉动进度，1 表示已触发 */
+/** 滚到顶后继续向上滚轮（即"下拉"）累积到阈值时刷新，触屏则是在顶部往下拉；返回 0–1 的拉动进度，1 表示已触发 */
 export function usePullRefresh(onRefresh: () => void): number {
   const [pull, setPull] = useState(0)
 
@@ -48,9 +50,43 @@ export function usePullRefresh(onRefresh: () => void): number {
       }, 400)
     }
 
+    const trigger = (): void => {
+      cooling = true
+      setPull(1)
+      onRefresh()
+      timer = setTimeout(() => {
+        cooling = false
+        setPull(0)
+      }, 900)
+    }
+
+    let startY: number | null = null
+    let progress = 0
+    const onTouchStart = (e: TouchEvent): void => {
+      startY = !cooling && atTop(e.target as Element) ? e.touches[0].clientY : null
+      progress = 0
+    }
+    const onTouchMove = (e: TouchEvent): void => {
+      if (startY === null) return
+      progress = Math.max(0, Math.min(1, (e.touches[0].clientY - startY) / TOUCH_THRESHOLD))
+      setPull(progress)
+    }
+    const onTouchEnd = (): void => {
+      if (startY === null) return
+      startY = null
+      if (progress >= 1) trigger()
+      else setPull(0)
+    }
+
     window.addEventListener('wheel', onWheel, { passive: true })
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove', onTouchMove, { passive: true })
+    window.addEventListener('touchend', onTouchEnd)
     return () => {
       window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
       clearTimeout(timer)
     }
   }, [onRefresh])

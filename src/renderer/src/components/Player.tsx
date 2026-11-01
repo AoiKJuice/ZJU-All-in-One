@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import type { PlaybackSource } from '@shared/types'
+import { MOBILE } from '@renderer/lib/platform'
 
 const SPEEDS = [1, 1.25, 1.5, 2]
 
@@ -159,6 +160,7 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
       data-idle={(idle && !paused) || undefined}
       tabIndex={-1}
       onMouseMove={wake}
+      onTouchStart={wake}
       onMouseLeave={() => setIdle(true)}
     >
       {/* 单击播放/暂停，双击全屏，右键铺满 / 还原 */}
@@ -167,7 +169,7 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
         preload="metadata"
         playsInline
         onClick={toggle}
-        onDoubleClick={fullscreenToggle}
+        onDoubleClick={MOBILE ? onToggleExpand : fullscreenToggle}
         onContextMenu={(e) => {
           e.preventDefault()
           onToggleExpand()
@@ -199,17 +201,22 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
           </>
         )}
         <span className="player-spacer" />
-        <button onClick={() => setVol(muted || volume === 0 ? 1 : 0)}>{muted || volume === 0 ? '静音' : '声音'}</button>
-        <input
-          className="player-volume"
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={muted ? 0 : volume}
-          style={{ ['--p' as string]: `${(muted ? 0 : volume) * 100}%` }}
-          onChange={(e) => setVol(Number(e.target.value))}
-        />
+        {/* 手机用音量键，不放音量条 */}
+        {!MOBILE && (
+          <>
+            <button onClick={() => setVol(muted || volume === 0 ? 1 : 0)}>{muted || volume === 0 ? '静音' : '声音'}</button>
+            <input
+              className="player-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={muted ? 0 : volume}
+              style={{ ['--p' as string]: `${(muted ? 0 : volume) * 100}%` }}
+              onChange={(e) => setVol(Number(e.target.value))}
+            />
+          </>
+        )}
         {!live && (
           <button
             onClick={() => {
@@ -222,8 +229,15 @@ export const Player = forwardRef<HTMLVideoElement | null, Props>(function Player
           </button>
         )}
         {slide && <button onClick={() => setShowSlide((x) => !x)}>{slideOn ? '画面' : '课件'}</button>}
-        <button onClick={onToggleExpand}>{expanded ? '还原' : '铺满'}</button>
-        <button onClick={fullscreenToggle}>{fullscreen ? '退出全屏' : '全屏'}</button>
+        {/* 手机端 WebView 不支持网页全屏：全屏即铺满 + 横屏（Replay 里调原生） */}
+        {MOBILE ? (
+          <button onClick={onToggleExpand}>{expanded ? '退出全屏' : '全屏'}</button>
+        ) : (
+          <>
+            <button onClick={onToggleExpand}>{expanded ? '还原' : '铺满'}</button>
+            <button onClick={fullscreenToggle}>{fullscreen ? '退出全屏' : '全屏'}</button>
+          </>
+        )}
       </div>
     </div>
   )

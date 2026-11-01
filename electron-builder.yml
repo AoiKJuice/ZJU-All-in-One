@@ -6,9 +6,10 @@ directories:
   output: release
   buildResources: build
 
-# 渲染端依赖已由 Vite 打进 out/，运行时只需 out/ 与生产依赖（ffmpeg-static）
+# 渲染端依赖已由 Vite 打进 out/，运行时只需 out/ 与生产依赖（ffmpeg-static）；out/mobile 是安卓端的网页资源，不进桌面包
 files:
   - out/**
+  - '!out/mobile/**'
   - package.json
 
 # ffmpeg 可执行文件不能放在 asar 里运行，whisper.ts 会把路径中的 app.asar 换成 app.asar.unpacked

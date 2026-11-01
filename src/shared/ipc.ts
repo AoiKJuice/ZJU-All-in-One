@@ -150,6 +150,10 @@ export const CONFIRM_EVENT = 'app:confirm'
 export const AUTH_EVENT = 'app:auth'
 
 export type ZjuBridge = ZjuApi & {
+  /** 安卓端（src/mobile/bridge.ts）才有；桌面端缺省 */
+  platform?: 'android'
+  /** 安卓端播放器全屏：横屏并隐藏系统栏 */
+  immersive?: (on: boolean) => void
   /** 订阅长任务进度，返回取消订阅函数 */
   onProgress: (listener: (progress: TaskProgress) => void) => () => void
   onRefresh: (listener: () => void) => () => void

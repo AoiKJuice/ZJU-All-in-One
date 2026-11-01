@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useApp } from '@renderer/store'
+import { MOBILE } from '@renderer/lib/platform'
+
+// 手机端下到系统"下载"目录，没有"所在位置"，直接用其他应用打开
+const REVEAL = MOBILE ? '打开' : '打开位置'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
@@ -36,7 +40,7 @@ export function DownloadRow({ url, name }: { url: string; name: string }) {
         {state.kind === 'error' && <span className="text-[var(--shu)]">{state.message}</span>}
         {state.kind === 'done' && (
           <button className="act" onClick={reveal}>
-            打开位置
+            {REVEAL}
           </button>
         )}
       </span>
@@ -49,7 +53,7 @@ export async function downloadFile(url: string, name: string): Promise<void> {
   const { notify } = useApp.getState()
   try {
     const path = await window.zju['file:download'](url, name)
-    if (path) notify('已保存', { label: '打开位置', run: () => void window.zju['file:reveal'](path) })
+    if (path) notify('已保存', { label: REVEAL, run: () => void window.zju['file:reveal'](path) })
   } catch (e) {
     notify(errorText(e))
   }

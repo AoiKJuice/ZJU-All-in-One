@@ -18,8 +18,12 @@ npm run dist                 # 打包 Windows 安装包 + 便携版到 release/�
 ZJU_DEMO=1 ZJU_DEMO_VIDEO=<本地 mp4> npm run dev # 演示模式下用本地视频调播放器
 ZJU_DEBUG=1 npm run dev      # 主进程打印每个 zjuFetch 请求的最终落点、状态码与响应开头，用于对照真实接口
 npm run build                # 构建到 out/
-npm run typecheck            # node（main/preload/shared）与 web（renderer）两套 tsconfig
+npm run typecheck            # node（main/preload/shared）、web（renderer）、mobile（src/mobile）三套 tsconfig
+npm run mobile:dev -- --mode demo  # 浏览器里调手机界面（演示数据；内置浏览器 preview 名 mobile-demo，切到手机尺寸）
+npm run mobile:build         # 安卓网页资源到 out/mobile 并 cap sync 到 android/
 ```
+
+安卓 APK：`npm run mobile:build` 后在 `android/` 执行 `gradlew assembleRelease`（JAVA_HOME 用 JDK 21；本机 SDK 在 `C:/Android/Sdk`，写在被忽略的 `android/local.properties`；Gradle 下载走代理时设 `GRADLE_OPTS=-Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7897 …`）。发布签名的密钥库与口令在仓库外 `~/.zju-android/keystore.properties`（可用 `ZJU_ANDROID_SIGNING` 指定），丢了就无法覆盖升级已装的版本；缺省时出未签名包。版本号由 `android/app/build.gradle` 读 package.json（0.10.1 → versionCode 1001）。图标与启动图标由 `npx electron scripts/make-android-icons.cjs` 从 `build/icon.svg` 生成。
 
 没有测试与 lint 配置。Electron 二进制在国内网络下需镜像：`ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`（重装依赖或执行 `node node_modules/electron/install.js` 时设置）。
 
@@ -66,7 +70,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 
 ### 待办忽略与截止提醒
 
-`src/main/todos.ts`：userData/todos.json 存忽略的待办 id、提醒开关与已提醒记录（`<id>@<截止时间>`，截止时间变了会再提醒）。主页截止条目是 `div[role=button]`（尾注格里要放按钮）：悬停时剩余时间与「忽略」在同一格里同时交叉淡变（`.swap` 叠放，0.2 秒、不加延迟，不能先消失再出现，用户要求），3 天内的截止时刻显示为「周六 20:53」、悬停换成日期；右键菜单与作业侧页也有忽略；忽略后弹「撤销」轻提示防误触；区块标题旁「已忽略」切换显示被忽略项（淡显，可恢复）。设置「待办 / 截止前 3 小时提醒」开启后，主进程每 30 分钟经 `call('data:assignments')` 取待办，未完成且未忽略的在截止前 3 小时弹 Windows 通知（已进入 3 小时内的立即弹），点通知经 `app:open` 打开作业侧页。`initTodos` 设置 AppUserModelId 为 electron-builder 的 appId。MCP：`get_assignments` 带 `ignored`，`ignore_assignment` 在界面组。
+`src/main/todos.ts`：userData/todos.json 存忽略的待办 id、提醒开关与已提醒记录（`<id>@<截止时间>`，截止时间变了会再提醒）。主页截止条目是 `div[role=button]`（尾注格里要放按钮）：悬停时剩余时间与「忽略」在同一格里同时交叉淡变（`.swap` 叠放，两者各 0.3 秒同时进行、过程中有重叠；不加延迟，不能先消失再出现，也不能即时切换，用户要求），3 天内的截止时刻显示为「周六 20:53」、悬停换成日期；右键菜单与作业侧页也有忽略；忽略后弹「撤销」轻提示防误触；区块标题旁「已忽略」切换显示被忽略项（淡显，可恢复）。设置「待办 / 截止前 3 小时提醒」开启后，主进程每 30 分钟经 `call('data:assignments')` 取待办，未完成且未忽略的在截止前 3 小时弹 Windows 通知（已进入 3 小时内的立即弹），点通知经 `app:open` 打开作业侧页。`initTodos` 设置 AppUserModelId 为 electron-builder 的 appId。MCP：`get_assignments` 带 `ignored`，`ignore_assignment` 在界面组。
 
 ### 本地 MCP 服务
 
@@ -78,7 +82,7 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 转写：`src/main/asr/whisper.ts`，首次使用下载 whisper.cpp CUDA 12.4 构建（b5454，约 684MB）与 `ggml-large-v3-turbo-q5_0`（hf-mirror，约 574MB）到 userData/whisper；ffmpeg 来自 `ffmpeg-static`（安装时设 `FFMPEG_BINARIES_URL=https://registry.npmmirror.com/-/binary/ffmpeg-static`）。`gpuPlan` 按显存决定用不用显卡：预算 = 总显存 30%（且至少给别的程序留 1GB 空闲），放得下模型（实测峰值约 1.1GB，束搜索与贪心相差无几）就上显卡，否则 `-ng` 走 CPU。上显卡时由 `asr/throttle.ts` 限制显卡占用：常驻 PowerShell 用 NtSuspendProcess / NtResumeProcess 按 200ms 周期、60% 占空比挂起与恢复 whisper-cli（实测 10 分钟音频平均占用 64% → 49%，耗时约 1.5 倍）；它的 stdin 关闭时会先恢复再退出。结果缓存在 userData/transcripts，旁边的 `<subId>.json.meta.json` 记下转写所用视频的路径。**智云会在课后重新生成回放并替换同一课次的视频**（实测：课后先给出较短的版本，次日 0 点左右换成完整的 1080p 文件，路径里多一层生成日期 `…/<录制日>/<生成日>/<hash>_1920_1080.mp4`），所以 `isTranscriptStale` 比对来源路径（旧缓存无记录时看文字稿是否覆盖不到视频时长的 85%），回放页文字稿栏的「重新转写」在过期时以主题色提示，`replay:transcribe` 的 `force` 忽略缓存重转，失败时保留原文字稿。文字稿栏有 本地 / 智云 两个来源（`replay:platformTranscript`，直播中随课件每 30 秒重取）：没有本地稿时默认显示智云的；导出与 MCP 的 `get_transcript` / `export_transcript` 都带 `source`。
 - 导出：`src/main/export.ts`，课件用隐藏窗口 `printToPDF`，文字稿 txt/srt/md。
 - 播放器（`components/Player.tsx`）为自绘控制条：回放有播放/进度/倍速，直播（hls）不允许暂停与拖动、被暂停会立即恢复；铺满窗口与全屏按钮相邻，全屏作用于整个播放器容器（字幕、控制条一起进全屏）。
-- 课件区（`components/SlideViewer.tsx`）：缩略图 / 大图切换，大图可翻页、默认跟随当前讲解页（直播取最新一页，回放取 `created_sec` ≤ 播放时间的最后一页）；点击课件不影响播放，右键菜单"全窗口查看 / 下载"。
+- 课件区（`components/SlideViewer.tsx`）：缩略图 / 大图切换，大图可翻页、默认跟随当前讲解页（直播取最新一页，回放取 `created_sec` ≤ 播放时间的最后一页）；点击课件不影响播放；大图模式的翻页行里直接有「全窗口」「下载」（右键菜单保留）。**不要把功能只藏在右键或小字里**（用户要求按钮要显眼）。
 - 回放页布局：左列视频（`.player-wrap` 用容器查询取 min(列宽, 可用高 × 16/9)），右侧栏在 课件 / 文字稿 / 选集 间切换，三个面板始终挂载只隐藏（字幕依赖文字稿 DOM）。播放器控制条的「课件」按钮把视频位置切成当前讲解页（`useCurrentSlide`，声音照常），再点「画面」切回；不在视频下方另放课件区（用户明确不要）。右键视频切换铺满。
 - **主进程请求校内 `http://` 地址会挂起不返回**（智云课件图 `pptimgurl` 就是 http）：渲染端靠 CSP `upgrade-insecure-requests` 才正常；主进程下载 / 导出前用 `download.ts` 的 `upgrade()` 升成 https。
 - **下载一律在应用内完成**：`file:download`（保存框 + `main/download.ts` 用登录会话流式写盘，cmc 域补 Referer）与 `file:reveal`；不要用 `<a target=_blank>` 指向文件（会被 `setWindowOpenHandler` 交给浏览器）。作业说明里的文件链接也被拦截走应用内下载。
@@ -87,6 +91,19 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 本机文件预览（`file:preview` / `components/FilePreview.tsx`）：图片、PDF、常见文本在应用内显示（blob 地址，CSP 放行 `img-src blob:` 与 `frame-src blob:`，PDF 依赖 `webPreferences.plugins: true` 的内置查看器），其余或超过 50MB 交给 `file:open`（系统默认程序）。
 - 直播：`sub_status` 1 直播中 / 2 未开始 / 3 回放生成中 / 5 无回放 / 6 回放；直播流为 `search-live-course-list` 的 `sub_content.output.m3u8` + `clientUUID`，渲染端用 hls.js 播放（CSP 需 `connect-src`，主进程对 cmc 域补 CORS 头）。
 - 课表按周翻页依赖 Celechron 公开校历 `calendar.celechron.top/<学年-学期>.json`；`exchange` 键前 8 位为放假日、后 8 位为调休上课日（上课日按放假日课表排）。
+
+### 安卓端（Capacitor）
+
+`android/` 为 Capacitor 8 工程，`capacitor.config.ts` 指定网页资源 `out/mobile`。思路：渲染端原样复用，主进程的 services 搬进 WebView 运行。
+- `vite.mobile.config.ts`（vite 根 `src/mobile`）用插件把 `src/main` 下依赖 Electron / Node 的底层模块换成 `src/mobile` 里接口相同的实现：`http.ts`、`auth/zjuam.ts`、`secure.ts`、`diagnostics.ts`、`services/ptaTransport.ts`，以及 `node:crypto`（md5、randomUUID）/ `node:fs/promises`（只读刚选的文件）/ `node:path` 的替身。**services 不能直接 import electron 或 node 模块**，需要时照此拆出可替换的一层（凭据与配置读写已收进 `src/main/secure.ts`，PTA 的网络与窗口在 `ptaTransport.ts`）。
+- `src/mobile/bridge.ts` 是安卓端的 `window.zju`：通道与 `ipc.ts` 相同，另有 `platform: 'android'` 与 `immersive`（播放器全屏：横屏并隐藏系统栏）。本地转写、导出、MCP、网页登录不提供；渲染端以 `lib/platform.ts` 的 `MOBILE` 隐藏入口。`--mode demo` 构建换成演示数据（校历为编出来的秋学期第 8 周）。
+- 原生插件 `ZjuNativePlugin.java`：请求不自动跟随跳转（`native.ts` 的 `nativeFetch` 逐跳处理、记落点、`upgradeHttp`），cookie 读写系统 CookieManager（与 WebView 共用，`<video>` / `<img>` 带登录态），桌面 UA；凭据 Android Keystore AES-GCM 加密存 SharedPreferences；下载经 MediaStore 写到"下载/ZJU All in One"，`file:reveal` / `file:open` 用其他应用打开。
+- 页面源设为 `https://classroom.zju.edu.cn`（`server.hostname`，本地提供、不访问该站）：智云回放与课件图校验 Referer，直接加载时据此通过。允许明文（校历是 http）。
+- 截止提醒用 `@capacitor/local-notifications` 预约系统闹钟（`src/mobile/todos.ts`），应用不在前台也会到点弹出，每次取到待办重排；点通知打开作业侧页。
+- 返回键（`src/mobile/main.tsx`）：先收起全屏播放 / 课件大图 / 文件预览（派发 Esc），再关登录面板、作业侧页、按历史返回，到头退到后台。系统栏图标随应用深浅色。
+- 手机布局全在 `styles.css` 末尾 `html[data-platform='android']` 一节：导航为底部标签栏（工具页为空暂不放），回放页收起刊头与标签栏；主页四块竖排整页滚动，考试排在回放前；课表这周周末没课只画五天、左侧只写节次、左右滑动翻周、格子浅底；回放页视频通栏在上、侧栏在下；侧页与登录面板占满宽度；触屏没有悬停，待办「忽略」只在作业侧页。安全区取 Capacitor 注入的 `--safe-area-inset-*`。桌面样式不要写成影响安卓的无前缀规则，反之亦然。
+- Tailwind 在安卓构建里靠 `styles.css` 的 `@source '..'` 扫描渲染端源码。`electron-builder.yml` 排除 `out/mobile`。
+- **未在真机上验证**登录、各数据源与下载；改动后至少在演示模式下按手机尺寸看一遍。
 
 ### 渲染进程与设计语言
 
@@ -99,9 +116,9 @@ npm run typecheck            # node（main/preload/shared）与 web（renderer�
 - 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。 字号四档（小 / 标准 / 大 / 特大）写成 `--scale`，乘在根字号上，不提供自定义数值。
 - 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
 - `Reveal` 动画结束会清掉 filter/transform：带 filter 的祖先会让 `position: fixed` 的后代（如铺满的播放器）只相对它定位。
-- 导航为主页、课表、工具、设置（工具页 `pages/Tools.tsx` 目前为空，留给课堂 / 学业工具；设置是刊头里的独立标签，右上角只留登录与昼夜）；设置页分 外观 / 账号（统一身份认证、PTA）/ 本地 Agent 三组，不加说明小字；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态，`go`/`openReplay` 记入 `past`/`future`，鼠标侧键（button 3/4）返回 / 前进，作业侧页开着时返回先关侧页；主页滚到顶后继续上滚约三格触发刷新（`usePullRefresh`，刊头下一道细线示意）；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
+- 导航为主页、课表、工具、设置（安卓端见上文；工具页 `pages/Tools.tsx` 目前为空，留给课堂 / 学业工具；设置是刊头里的独立标签，右上角只留登录与深浅色切换，后者用细线日 / 月图标而非单字「昼 / 夜」）；设置页分 外观 / 账号（统一身份认证、PTA）/ 本地 Agent 三组，不加说明小字；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态，`go`/`openReplay` 记入 `past`/`future`，鼠标侧键（button 3/4）返回 / 前进，作业侧页开着时返回先关侧页；主页滚到顶后继续上滚约三格触发刷新（`usePullRefresh`，刊头下一道细线示意）；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
 - **数据缓存**（`lib/cache.ts`）：`useZju` 与课表页的校历、各周课次先显示缓存，只有过期（5 分钟）或 `epoch` 变化（登录变化、下拉刷新）才在后台静默重取，切页面不重新加载；`useZju` 的结果同时存 localStorage，冷启动先显示上次数据；确认未登录时整体清空。
-- 课表页（`pages/Schedule.tsx`）：一屏布局，网格行高 `minmax(2.2rem, 1fr)` 占满可用高度；滚轮翻周（累计 60px 翻一周、冷却 380ms），鼠标中键回本周；翻页动效用 variants + `AnimatePresence custom` 让退场方向跟随当前方向（下一周从右进、向左出），回本周按来向决定方向；预取前后一周课次。教务会把连上的课拆成几条，`lib/calendar.mergeSessions` 把同一天、同名、同教室、节次相接且只隔普通课间（≤10 分钟，不跨大课间 / 午休 / 晚饭）的合成一节，主页今日课程同样合并。
+- 课表页（`pages/Schedule.tsx`）：一屏布局，网格行高 `minmax(2.2rem, 1fr)` 占满可用高度；滚轮翻周（累计 60px 翻一周、冷却 380ms），鼠标中键回本周；右上角 `.week-nav` 为大号圆形箭头（悬停浅底），「本周」只在离开本周时出现；翻页动效用 variants + `AnimatePresence custom` 让退场方向跟随当前方向（下一周从右进、向左出），回本周按来向决定方向；预取前后一周课次。教务会把连上的课拆成几条，`lib/calendar.mergeSessions` 把同一天、同名、同教室、节次相接且只隔普通课间（≤10 分钟，不跨大课间 / 午休 / 晚饭）的合成一节，主页今日课程同样合并。
 - 节次作息表在 `lib/periods.ts`。
 - **徽标「钟鹰」**：粗外环 + 主题色浅底表盘，右半边是几何化的求是鹰（倒三角、四层羽、朝右的鹰头，照校标特征抽象，不照搬原图），左半边两根主题色指针。几何在 `components/Logo.tsx`（颜色全取主题变量，随昼夜与主题色变化）。界面上不放在刊头，而是 `App.tsx` 里的衬底 `.page-emblem`：`bare`（无外环与表盘底色）放大压在左下角、越出左下两边、低不透明度，回放页不放；它挂在页面外层，在有衬底的页面之间切换不重播，出现时用与 `Reveal` 相同的"上浮 + 去模糊"；设置页「徽标」可隐藏（`settings.emblem`）。软件图标 `build/icon.svg` 用同一组几何、固定昼间求是蓝，改动后 `npx electron scripts/make-icon.cjs` 重新生成 `build/icon.png`。求是鹰图形浙大已申请商标，用户知情后选定此方案。
 - 窗口无边框（`titleBarOverlay` 高 56px，与刊头同高），刊头右侧为系统按钮留出 140px；可拖动区域加 `.drag`。

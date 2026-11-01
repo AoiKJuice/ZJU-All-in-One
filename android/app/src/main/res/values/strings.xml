@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ZJU All in One</string>
+    <string name="title_activity_main">ZJU All in One</string>
+    <string name="package_name">top.aoikjuice.zjuallinone</string>
+    <string name="custom_url_scheme">top.aoikjuice.zjuallinone</string>
+</resources>

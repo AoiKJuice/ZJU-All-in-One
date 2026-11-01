@@ -1,6 +1,6 @@
 {
   "name": "zju-all-in-one",
-  "version": "0.9.1",
+  "version": "0.10.1",
   "private": true,
   "description": "聚合浙江大学学业信息与实用工具的桌面应用",
   "main": "./out/main/index.js",
@@ -9,19 +9,28 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "electron-vite build && electron-builder --win"
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.mobile.json",
+    "dist": "electron-vite build && electron-builder --win",
+    "mobile:dev": "vite -c vite.mobile.config.ts",
+    "mobile:build": "vite build -c vite.mobile.config.ts && cap sync android",
+    "mobile:apk": "npm run mobile:build && cd android && gradlew assembleRelease"
   },
   "dependencies": {
     "ffmpeg-static": "^5.3.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/local-notifications": "^8.3.1",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "buffer": "^6.0.3",
     "electron": "^45.0.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0",

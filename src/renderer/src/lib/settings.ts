@@ -1,4 +1,5 @@
 import { initialTheme, applyTheme, type Theme } from './theme'
+import { MOBILE } from './platform'
 
 export type FontStyle = 'song' | 'hei' | 'kai'
 export type Accent = 'shu' | 'blue' | 'red'
@@ -13,10 +14,10 @@ export interface Settings {
   emblem: boolean
 }
 
-// name 为字体本身的名字，设置页以该字体显示它
+// name 为字体本身的名字，设置页以该字体显示它；安卓上的黑体是系统自带的思源黑体
 export const FONT_OPTIONS: { id: FontStyle; name: string }[] = [
   { id: 'song', name: '方正书宋' },
-  { id: 'hei', name: '微软雅黑' },
+  { id: 'hei', name: MOBILE ? '思源黑体' : '微软雅黑' },
   { id: 'kai', name: '霞鹜文楷' }
 ]
 

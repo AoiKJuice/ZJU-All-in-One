@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* 安卓端构建的 vite 根目录是 src/mobile，显式指明扫描渲染端源码 */
+@source '..';
 
 /* ------------------------------------------------------------------
    字体：EB Garamond + 方正书宋，与 AoiKJuice 主站一致
@@ -451,7 +453,7 @@ button.row {
   text-align: left;
 }
 
-/* 待办：悬停时时刻换成日期、剩余时间换成「忽略」，两者叠在同一格里同时交叉淡变、不加延迟（点错有撤销） */
+/* 待办：悬停时时刻换成日期、剩余时间换成「忽略」，两者叠在同一格里同时以 0.3 秒交叉淡变、有一段重叠（用户最认可的那版；点错有撤销） */
 .todo {
   cursor: pointer;
 }
@@ -463,7 +465,7 @@ button.row {
 }
 .swap > * {
   grid-area: 1 / 1;
-  transition: opacity 0.2s var(--ease);
+  transition: opacity 0.3s var(--ease);
 }
 .swap > :last-child,
 .todo:hover .swap > :first-child,
@@ -1351,4 +1353,317 @@ button.row {
 }
 html[data-theme='dark'] .page-emblem svg {
   opacity: 0.09;
+}
+
+/* 课表翻周：大号圆形箭头，悬停浅底；「本周」只在离开本周时出现 */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+.week-nav button {
+  display: grid;
+  place-items: center;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  font-size: 1.375rem;
+  color: var(--ink-2);
+  transition: color 0.3s var(--ease), background-color 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+.week-nav button:hover {
+  color: var(--shu);
+  background: var(--tint);
+}
+.week-nav .week-today {
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--shu);
+}
+.week-nav .week-today[data-hidden] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 刊头深浅色切换图标 */
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+.theme-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* 设置页条目：左标签右选项 */
+.settings-row {
+  grid-template-columns: 8.5em minmax(0, 1fr);
+  align-items: start;
+  padding: 1.25rem 0;
+}
+
+/* ------------------------------------------------------------------
+   安卓端（html[data-platform=android]，入口见 src/mobile）：竖屏手机布局。
+   导航在底部标签栏；主页四块竖排整页滚动；课表周末没课只画五天、左右滑动翻周；
+   回放页视频在上、侧栏在下；侧页与登录面板占满宽度。系统栏留白取 Capacitor 注入的安全区
+   ------------------------------------------------------------------ */
+html[data-platform='android'] {
+  --mast-h: 3rem;
+  --tab-h: 3.5rem;
+  --gutter: 1.125rem;
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  font-size: calc(14px * var(--scale, 1));
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-platform='android'] body {
+  font-size: 1rem;
+}
+html[data-platform='android'] .masthead {
+  height: calc(var(--mast-h) + var(--sat));
+  padding: var(--sat) var(--gutter) 0;
+  gap: 1rem;
+}
+html[data-platform='android'] .mast-meta {
+  gap: 1.125rem;
+}
+.tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  display: flex;
+  height: calc(var(--tab-h) + var(--sab));
+  padding-bottom: var(--sab);
+  background: var(--veil);
+  backdrop-filter: blur(1rem) saturate(1.15);
+  border-top: 1px solid var(--rule);
+}
+.tabbar .mast-link {
+  flex: 1;
+  font-size: 1.0625rem;
+}
+.tabbar .mark-dot {
+  bottom: 0.55rem;
+}
+html[data-platform='android'] .page {
+  padding: calc(var(--mast-h) + var(--sat) + 1.25rem) var(--gutter) calc(var(--tab-h) + var(--sab) + 2.5rem);
+}
+html[data-platform='android'] .page-fit {
+  height: 100dvh;
+  min-height: 0;
+  padding-top: calc(var(--mast-h) + var(--sat) + 1rem);
+  padding-bottom: calc(var(--tab-h) + var(--sab) + 0.75rem);
+}
+html[data-platform='android'] .page-title,
+html[data-platform='android'] .page-fit .page-title {
+  font-size: 2.125rem;
+}
+html[data-platform='android'] .page-lede {
+  margin-top: 0.625rem;
+  font-size: 1rem;
+}
+html[data-platform='android'] .outline-word {
+  top: calc(var(--mast-h) + var(--sat));
+  height: 4.25rem;
+}
+html[data-platform='android'] .pull-line {
+  top: calc(var(--mast-h) + var(--sat));
+  width: 60vw;
+}
+html[data-platform='android'] .page-emblem {
+  width: 110vw;
+  translate: -30% 28%;
+}
+html[data-platform='android'] .page-emblem svg {
+  opacity: 0.04;
+}
+
+/* 条目：标题与副标题分两行，三栏收窄 */
+html[data-platform='android'] .row {
+  grid-template-columns: 5.5em minmax(0, 1fr) auto;
+  gap: 0.875rem;
+  padding: 0.75rem 0;
+}
+html[data-platform='android'] .row-title {
+  font-size: 1.0625rem;
+}
+html[data-platform='android'] .row-sub {
+  display: block;
+  margin-left: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+html[data-platform='android'] .row-time,
+html[data-platform='android'] .row-end {
+  font-size: 0.875rem;
+}
+/* 触屏没有悬停：只显示剩余时间与星期时刻，「忽略」在作业侧页里 */
+html[data-platform='android'] .swap > :first-child {
+  opacity: 1 !important;
+}
+html[data-platform='android'] .swap > :last-child {
+  display: none;
+}
+
+/* 主页：竖排、整页滚动，考试排在回放前 */
+html[data-platform='android'] .home-page {
+  height: auto;
+}
+html[data-platform='android'] .home-page .panes {
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+  margin-top: 1.75rem;
+}
+html[data-platform='android'] .home-page .pane-scroll {
+  overflow: visible;
+  mask-image: none;
+}
+html[data-platform='android'] .home-page .pane-today {
+  order: 1;
+}
+html[data-platform='android'] .home-page .pane-todo {
+  order: 2;
+}
+html[data-platform='android'] .home-page .pane-exams {
+  order: 3;
+}
+html[data-platform='android'] .home-page .pane-replays {
+  order: 4;
+}
+
+/* 课表：网格按节次撑高、整页滚动；格子浅底，字小一号 */
+html[data-platform='android'] .schedule-page {
+  height: auto;
+  min-height: 100dvh;
+}
+html[data-platform='android'] .schedule-page .page-title {
+  font-size: 1.625rem;
+}
+html[data-platform='android'] .schedule-page .page-title > span:last-child {
+  display: block;
+  margin: 0.375rem 0 0;
+  font-size: 0.5em;
+}
+html[data-platform='android'] .week-nav {
+  gap: 0.25rem;
+}
+html[data-platform='android'] .week-nav button {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+html[data-platform='android'] .week-nav .week-today {
+  width: auto;
+}
+html[data-platform='android'] .day-head {
+  align-items: center;
+  padding: 0;
+  text-align: center;
+}
+html[data-platform='android'] .day-head > span:first-child {
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
+}
+html[data-platform='android'] .day-head > span:last-child {
+  font-size: 0.6875rem;
+}
+html[data-platform='android'] .period-head {
+  padding-left: 0.375rem;
+  font-size: 0.75rem;
+}
+html[data-platform='android'] .course-cell {
+  margin: 1.5px;
+  padding: 0.25rem 0.25rem 0.25rem 0.375rem;
+  line-height: 1.3;
+  background: rgba(var(--shu-rgb), 0.07);
+}
+html[data-platform='android'] .course-name {
+  font-size: 0.8125rem;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+html[data-platform='android'] .course-cell > span:last-child {
+  font-size: 0.6875rem;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 回放：返回 + 标题，视频通栏，侧栏占下方剩余高度 */
+html[data-platform='android'] .replay-page {
+  height: 100dvh;
+  padding: calc(var(--sat) + 0.375rem) 0 var(--sab);
+}
+html[data-platform='android'] .replay-page .outline-word {
+  display: none;
+}
+html[data-platform='android'] .replay-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 0.5rem;
+  padding: 0 var(--gutter) 0 0.375rem;
+}
+.replay-back {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.375rem;
+  line-height: 1;
+  color: var(--ink-2);
+}
+html[data-platform='android'] .replay-title {
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
+}
+html[data-platform='android'] .replay-meta {
+  grid-column: 2;
+  font-size: 0.8125rem;
+}
+html[data-platform='android'] .replay-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0.5rem;
+}
+html[data-platform='android'] .replay-main,
+html[data-platform='android'] .player-wrap {
+  flex: none;
+}
+html[data-platform='android'] .player-wrap {
+  container-type: normal;
+}
+html[data-platform='android'] .player-wrap > .player {
+  width: 100%;
+}
+html[data-platform='android'] .replay-side {
+  flex: 1;
+  padding: 0.75rem var(--gutter) 0;
+}
+html[data-platform='android'] .player-bar {
+  gap: 0.875rem;
+}
+
+/* 侧页、登录面板占满宽度；轻提示在标签栏之上 */
+html[data-platform='android'] .sheet {
+  width: 100vw;
+  padding: calc(var(--sat) + 1rem) var(--gutter) calc(var(--sab) + 1rem);
+  border-left: 0;
+}
+html[data-platform='android'] .login-panel {
+  top: calc(var(--mast-h) + var(--sat));
+  left: var(--gutter);
+  right: var(--gutter);
+  width: auto;
+}
+html[data-platform='android'] .toast {
+  bottom: calc(var(--tab-h) + var(--sab) + 0.75rem);
+  max-width: calc(100vw - 2 * var(--gutter));
+  white-space: normal;
+}
+html[data-platform='android'] .settings-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
 }

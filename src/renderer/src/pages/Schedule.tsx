@@ -8,6 +8,7 @@ import { PERIOD_COUNT, periodStart } from '@renderer/lib/periods'
 import { weekdayLabel } from '@renderer/lib/format'
 import { addDays, findLecture, mergeSessions, mondayOf, sessionsOn, teachingWeek, ymd } from '@renderer/lib/calendar'
 import { cached, peek } from '@renderer/lib/cache'
+import { MOBILE } from '@renderer/lib/platform'
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7]
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -15,6 +16,8 @@ const EASE = [0.22, 1, 0.36, 1] as const
 // 滚轮累计到这么多像素翻一周；翻页后冷却一段时间，一次快速滑动只翻一周
 const WHEEL_STEP = 60
 const WHEEL_COOLDOWN = 380
+// 触屏横向滑动这么多像素翻一周
+const SWIPE_STEP = 56
 
 const lecturesKey = (monday: string): string => `lectures:${monday}`
 
@@ -27,7 +30,8 @@ const weekSlide = {
   exit: (dir: number) => ({ opacity: 0, x: dir * -SLIDE, filter: 'blur(4px)' })
 }
 
-/** 周视图：按周翻页（按钮、滚轮，中键回本周）；细线网格占满可用高度；有智云课次的课可点进视频。校历与各周课次走缓存 */
+/** 周视图：按周翻页（按钮、滚轮，中键回本周；手机端左右滑动）；细线网格占满可用高度；有智云课次的课可点进视频。校历与各周课次走缓存。
+ *  手机端这一周周末没课就只画周一到周五，左侧只写节次 */
 export function Schedule() {
   const { data, loading, error } = useZju('data:schedule')
   // 演示模式不登录也取数，与 useZju 一致
@@ -79,12 +83,30 @@ export function Schedule() {
     w.until = Date.now() + WHEEL_COOLDOWN
   }
 
+  // 触屏左右滑动翻周：横向位移超过阈值且明显大于纵向
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const onTouchStart = (e: React.TouchEvent): void => {
+    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+  const onTouchEnd = (e: React.TouchEvent): void => {
+    const start = touch.current
+    touch.current = null
+    if (!start) return
+    const dx = e.changedTouches[0].clientX - start.x
+    const dy = e.changedTouches[0].clientY - start.y
+    if (Math.abs(dx) >= SWIPE_STEP && Math.abs(dx) > Math.abs(dy) * 1.5) page(dx < 0 ? 1 : -1)
+  }
+
   const tw = cal && dates.map((d) => teachingWeek(cal, d)).find(Boolean)
+  const weekend = !!cal && !!data && dates.slice(5).some((d) => sessionsOn(cal, data, d).length > 0)
+  const shown = MOBILE && !weekend ? dates.slice(0, 5) : dates
 
   return (
     <div
       className="page page-wide page-fit schedule-page"
       onWheel={onWheel}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       // 中键回本周；按下时就拦住，免得出现自动滚动
       onMouseDown={(e) => {
         if (e.button !== 1) return
@@ -93,7 +115,7 @@ export function Schedule() {
       }}
     >
       <Reveal className="mt-2 flex items-end justify-between">
-        <h1 className="page-title !text-[clamp(1.75rem,2.5vw+1.5vh,2.75rem)]">
+        <h1 className={MOBILE ? 'page-title' : 'page-title !text-[clamp(1.75rem,2.5vw+1.5vh,2.75rem)]'}>
           {tw ? (
             <>
               {tw.half}
@@ -106,14 +128,15 @@ export function Schedule() {
             {dates[0].slice(5).replace('-', '.')} – {dates[6].slice(5).replace('-', '.')}
           </span>
         </h1>
-        <div className="acts pb-2">
-          <button className="act" onClick={() => page(-1)}>
+        {/* 翻周：大号箭头；不在本周时中间才出现「本周」 */}
+        <div className="week-nav">
+          <button aria-label="上一周" onClick={() => page(-1)}>
             ←
           </button>
-          <button className="act" disabled={offset === 0} onClick={() => page(0)}>
+          <button className="week-today" data-hidden={offset === 0 || undefined} onClick={() => page(0)}>
             本周
           </button>
-          <button className="act" onClick={() => page(1)}>
+          <button aria-label="下一周" onClick={() => page(1)}>
             →
           </button>
         </div>
@@ -133,15 +156,19 @@ export function Schedule() {
               exit="exit"
               transition={{ duration: 0.4, ease: EASE }}
               className="grid flex-1 border-t border-[var(--rule)]"
-              style={{ gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))', gridTemplateRows: `3.25rem repeat(${PERIOD_COUNT}, minmax(2.2rem, 1fr))` }}
+              style={
+                MOBILE
+                  ? { gridTemplateColumns: `1.75rem repeat(${shown.length}, minmax(0, 1fr))`, gridTemplateRows: `2.75rem repeat(${PERIOD_COUNT}, minmax(3.25rem, 1fr))` }
+                  : { gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))', gridTemplateRows: `3.25rem repeat(${PERIOD_COUNT}, minmax(2.2rem, 1fr))` }
+              }
             >
-              {dates.map((date, i) =>
+              {shown.map((date, i) =>
                 date === today ? <div key="today" className="bg-[var(--tint)]" style={{ gridColumn: i + 2, gridRow: `1 / ${PERIOD_COUNT + 2}` }} /> : null
               )}
-              {dates.map((date, i) => (
+              {shown.map((date, i) => (
                 <div
                   key={date}
-                  className="flex flex-col justify-center px-3 leading-tight"
+                  className="day-head flex flex-col justify-center px-3 leading-tight"
                   style={{ gridColumn: i + 2, gridRow: 1, color: date === today ? 'var(--shu)' : 'var(--ink-3)' }}
                 >
                   <span className="text-[0.9375rem] tracking-[0.14em]">{weekdayLabel(i + 1)}</span>
@@ -152,11 +179,11 @@ export function Schedule() {
                 </div>
               ))}
               {Array.from({ length: PERIOD_COUNT }, (_, i) => (
-                <div key={i} className="border-t border-[var(--rule)] pt-1 text-xs tabular-nums text-[var(--ink-3)]" style={{ gridColumn: '1 / -1', gridRow: i + 2 }}>
-                  {periodStart(i + 1)}
+                <div key={i} className="period-head border-t border-[var(--rule)] pt-1 text-xs tabular-nums text-[var(--ink-3)]" style={{ gridColumn: '1 / -1', gridRow: i + 2 }}>
+                  {MOBILE ? i + 1 : periodStart(i + 1)}
                 </div>
               ))}
-              {dates.flatMap((date, i) =>
+              {shown.flatMap((date, i) =>
                 mergeSessions(sessionsOn(cal, data, date)).map((c) => {
                   const lecture = findLecture(lectures, c, date)
                   const playable = lecture && (lecture.status === 'replay' || lecture.status === 'live')

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '@renderer/store'
+import { MOBILE } from '@renderer/lib/platform'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
@@ -83,9 +84,11 @@ function Form({ onClose }: { onClose: () => void }) {
           {busy ? '登录中' : '登录'}
         </button>
         <span className="flex-1" />
-        <button type="button" className="act" disabled={busy} onClick={() => void run()}>
-          网页登录
-        </button>
+        {!MOBILE && (
+          <button type="button" className="act" disabled={busy} onClick={() => void run()}>
+            网页登录
+          </button>
+        )}
       </div>
     </motion.form>
   )
