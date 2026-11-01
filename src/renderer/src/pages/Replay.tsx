@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlaybackSource, Slide, TranscriptFormat, TranscriptSegment, TranscriptSource } from '@shared/types'
 import { useApp } from '@renderer/store'
-import { Joined, OutlineWord, Reveal } from '@renderer/components/Type'
+import { Choice, Joined, OutlineWord, Reveal } from '@renderer/components/Type'
 import { dotDate } from '@renderer/lib/format'
 import { Player } from '@renderer/components/Player'
 import { TranscribeProgress } from '@renderer/components/TranscribeProgress'
 import { LectureList } from '@renderer/components/LectureList'
 import { SlideViewer } from '@renderer/components/SlideViewer'
+import { FormatMenu } from '@renderer/components/FormatMenu'
 import { useCurrentSlide } from '@renderer/hooks/useCurrentSlide'
 import { MOBILE } from '@renderer/lib/platform'
 
@@ -250,7 +251,8 @@ export function Replay() {
         <p className="replay-meta">
           <Joined parts={[replay.title, replay.teacher, dotDate(replay.recordedAt)]} />
           {replay.url && !MOBILE && (
-            <a className="act ml-6" href={replay.url} target="_blank" rel="noreferrer">
+            // 与前面的标签同样是一枚小标签，随标签一起换行
+            <a className="part meta-link" href={replay.url} target="_blank" rel="noreferrer">
               原页面 ↗
             </a>
           )}
@@ -258,7 +260,7 @@ export function Replay() {
       </Reveal>
 
       <div className="replay-layout">
-        <Reveal i={1} className="replay-main">
+        <Reveal i={1} flat className="replay-main">
           <div className="player-wrap">
             {src ? (
               <Player
@@ -280,12 +282,12 @@ export function Replay() {
           {src && srcError && <p className="quiet !py-1">{srcError}</p>}
         </Reveal>
 
-        <Reveal i={2} className="replay-side">
+        <Reveal i={2} flat className="replay-side">
           <nav className="tabs">
             {TABS.map((t) => (
-              <button key={t.id} data-active={tab === t.id || undefined} onClick={() => setTab(t.id)}>
+              <Choice key={t.id} group="replay-tab" active={tab === t.id} onClick={() => setTab(t.id)}>
                 {t.label}
-              </button>
+              </Choice>
             ))}
           </nav>
 
@@ -311,34 +313,23 @@ export function Replay() {
           <section className="tab-panel" hidden={tab !== 'transcript'}>
             <div className="acts tab-tools">
               {!MOBILE && SOURCES.map((o) => (
-                <button key={o.id} className="act" data-on={source === o.id || undefined} onClick={() => setSource(o.id)}>
+                <Choice key={o.id} group="transcript-source" className="small" active={source === o.id} onClick={() => setSource(o.id)}>
                   {o.label}
-                </button>
+                </Choice>
               ))}
-              <span className="flex-1" />
-              {segments && (
-                <button className="act" data-on={captions || undefined} onClick={() => setCaptions((x) => !x)}>
-                  字幕
-                </button>
-              )}
-              {source === 'local' && !live && !MOBILE && (
-                segments ? (
+              <span className="tools-end">
+                {segments && (
+                  <button className="act" data-on={captions || undefined} onClick={() => setCaptions((x) => !x)}>
+                    字幕
+                  </button>
+                )}
+                {source === 'local' && !live && !MOBILE && segments && (
                   <button className="act" data-on={stale || undefined} title={stale ? '视频已更新' : undefined} onClick={() => void transcribe(true)}>
                     重新转写
                   </button>
-                ) : (
-                  <button className="act" disabled={running} onClick={() => void transcribe()}>
-                    转写
-                  </button>
-                )
-              )}
-              {segments &&
-                !MOBILE &&
-                (['txt', 'srt', 'md'] as const).map((f) => (
-                  <button key={f} className="act" onClick={() => void exportText(f)}>
-                    {f.toUpperCase()}
-                  </button>
-                ))}
+                )}
+                {segments && !MOBILE && <FormatMenu label="下载" formats={['txt', 'srt', 'md'] as const} onPick={(f) => void exportText(f)} />}
+              </span>
             </div>
             {running && source === 'local' && <TranscribeProgress task={task} />}
             <div
@@ -371,7 +362,15 @@ export function Replay() {
                 </div>
               ) : (
                 !(source === 'local' && running) && (
-                  <p className="quiet">{(source === 'local' ? error : platformError) ?? (source === 'platform' && platform === null ? '…' : '无')}</p>
+                  <div className="transcript-empty">
+                    <p className="quiet">{(source === 'local' ? error : platformError) ?? (source === 'platform' && platform === null ? '…' : '无')}</p>
+                    {/* 还没有本地文字稿时，转写是这里唯一的操作，放在空状态里而不是工具行上孤零零一个 */}
+                    {source === 'local' && !live && !MOBILE && (
+                      <button className="btn btn-solid" onClick={() => void transcribe()}>
+                        转写
+                      </button>
+                    )}
+                  </div>
                 )
               )}
             </div>

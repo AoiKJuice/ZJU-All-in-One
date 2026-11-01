@@ -1,9 +1,18 @@
 import { create } from 'zustand'
-import type { Assignment, AuthState, ConfirmRequest, LectureReplay, TaskProgress, TodoState, TranscriptSegment } from '@shared/types'
+import type { Assignment, AuthState, ConfirmRequest, CourseSession, LectureReplay, TaskProgress, TodoState, TranscriptSegment } from '@shared/types'
 import type { Theme } from './lib/theme'
 import { applySettings, initialSettings, type Settings } from './lib/settings'
 
 export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
+
+/** 课表上点开的一节课：课程详情上拉面板 */
+export interface CourseOpen {
+  session: CourseSession
+  /** 这节课的日期 YYYY-MM-DD */
+  date: string
+  /** 这节课对应的智云课次（有的话） */
+  lecture?: LectureReplay
+}
 
 /** 一条浏览记录：页面 + 回放页所开的课次 */
 interface Visit {
@@ -17,6 +26,9 @@ interface AppStore {
   replay: LectureReplay | null
   /** 侧页中打开的作业 */
   assignment: Assignment | null
+  /** 课程详情面板中的课 */
+  course: CourseOpen | null
+  openCourse: (course: CourseOpen | null) => void
   /** 主进程推送的长任务进度，按 key 存最新一条 */
   tasks: Record<string, TaskProgress>
   /** 转写中实时识别出的段落，按任务 key 累积 */
@@ -90,6 +102,8 @@ export const useApp = create<AppStore>((set, get) => {
     page: 'home',
     replay: null,
     assignment: null,
+    course: null,
+    openCourse: (course) => set({ course }),
     tasks: {},
     partials: {},
     clearPartials: (key) => set((s) => ({ partials: { ...s.partials, [key]: [] } })),
@@ -107,9 +121,10 @@ export const useApp = create<AppStore>((set, get) => {
     past: [],
     future: [],
     back: () => {
-      const { past, future, page, replay, assignment } = get()
-      // 作业侧页开着时，返回先关侧页
+      const { past, future, page, replay, assignment, course } = get()
+      // 作业侧页、课程详情开着时，返回先关它们
       if (assignment) return set({ assignment: null })
+      if (course) return set({ course: null })
       const prev = past.at(-1)
       if (prev) set({ ...prev, past: past.slice(0, -1), future: [{ page, replay }, ...future] })
     },
@@ -118,8 +133,14 @@ export const useApp = create<AppStore>((set, get) => {
       const next = future[0]
       if (next) set({ ...next, past: [...past, { page, replay }], future: future.slice(1) })
     },
-    go: (page) => visit({ page, replay: get().replay }),
-    openReplay: (replay) => visit({ page: 'replay', replay }),
+    go: (page) => {
+      set({ course: null })
+      visit({ page, replay: get().replay })
+    },
+    openReplay: (replay) => {
+      set({ course: null })
+      visit({ page: 'replay', replay })
+    },
     openAssignment: (assignment) => set({ assignment }),
     refresh: () => set((s) => ({ epoch: s.epoch + 1 })),
     toast: null,

@@ -8,12 +8,15 @@ import { Replay } from './pages/Replay'
 import { Settings } from './pages/Settings'
 import { Tools } from './pages/Tools'
 import { AssignmentSheet } from './components/AssignmentSheet'
+import { CourseSheet } from './components/CourseSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Toast } from './components/Toast'
 import { LoginPanel } from './components/LoginPanel'
 import { AgentConfirm } from './components/AgentConfirm'
 import { FilePreview } from './components/FilePreview'
 import { Logo } from './components/Logo'
+import { LiquidGlass } from './components/LiquidGlass'
+import { dur } from '@renderer/lib/motion'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
@@ -26,6 +29,7 @@ const PAGES: Record<PageId, ComponentType> = {
 export function App() {
   const page = useApp((s) => s.page)
   const emblem = useApp((s) => s.settings.emblem)
+  const style = useApp((s) => s.settings.style)
   const refreshAuth = useApp((s) => s.refreshAuth)
   const back = useApp((s) => s.back)
   const forward = useApp((s) => s.forward)
@@ -61,22 +65,24 @@ export function App() {
           <motion.div
             key="emblem"
             className="page-emblem"
-            initial={{ opacity: 0, y: 14, filter: 'blur(5px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none', transform: 'none' } }}
-            exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
-            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
+            // 衬底很大，只上浮淡入不模糊（大面积 filter 动画在部分显卡上会闪烁）
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0, transitionEnd: { transform: 'none' } }}
+            exit={{ opacity: 0, transition: { duration: dur(0.22), ease: [0.22, 1, 0.36, 1] } }}
+            transition={{ duration: dur(0.75), ease: [0.22, 1, 0.36, 1], delay: dur(0.08) }}
           >
             <Logo />
           </motion.div>
         )}
       </AnimatePresence>
       <Masthead scroller={scroller} />
-      <main ref={setScroller} className="relative z-0 h-full overflow-y-auto">
+      <main ref={setScroller} className="app-scroller relative z-0 h-full overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div
             key={page}
-            exit={{ opacity: 0, filter: 'blur(6px)' }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            // 整页退场只淡出：全窗口的 filter 动画要把整页离屏渲染再模糊，切页时卡片闪烁、显卡负担重
+            exit={{ opacity: 0 }}
+            transition={{ duration: dur(0.22), ease: [0.22, 1, 0.36, 1] }}
           >
             <ErrorBoundary>
               <Page />
@@ -85,12 +91,16 @@ export function App() {
         </AnimatePresence>
       </main>
       <ErrorBoundary>
+        <CourseSheet />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <AssignmentSheet />
       </ErrorBoundary>
       <LoginPanel />
       <AgentConfirm />
       <FilePreview />
       <Toast />
+      {style === 'glass' && <LiquidGlass />}
     </>
   )
 }

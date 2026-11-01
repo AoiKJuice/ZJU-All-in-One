@@ -9,11 +9,12 @@ import { getTodoState, onReminderTap, setIgnored, setRemind, updateAssignments }
 import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from '../main/auth/password'
 import * as eta from '../main/services/eta'
 import { fetchSchedule as fetchZdbkSchedule, fetchExams, fetchProfile, reset as resetZdbk } from '../main/services/zdbk'
-import { fetchAssignments, getAssignmentDetail, submitHomework, retractSubmission, reset as resetCourses } from '../main/services/courses'
+import { fetchAssignments, fetchCourseHomework, getAssignmentDetail, submitHomework, retractSubmission, reset as resetCourses } from '../main/services/courses'
 import { fetchReplays, fetchLectures, listSlides, getPlaybackSource, getPlatformTranscript, reset as resetClassroom } from '../main/services/classroom'
 import { fetchCalendar } from '../main/services/calendar'
+import * as graduation from '../main/services/graduation'
 import * as pta from '../main/services/pta'
-import { demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
+import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
 
 // 安卓端的 window.zju：与桌面端 src/main/ipc.ts 同一套通道，services 原样复用（网络、cookie、凭据换成原生插件）。
 // 桌面专属的本地转写、导出、MCP 在这里不提供，界面按 platform 隐藏入口
@@ -27,6 +28,7 @@ function resetServices(): void {
   resetCourses()
   resetClassroom()
   eta.reset()
+  graduation.reset()
 }
 
 const authListeners = new Set<() => void>()
@@ -139,7 +141,9 @@ const handlers: Handlers = {
   },
   'data:replays': () => fetchReplays(),
   'data:calendar': () => fetchCalendar(),
+  'data:courseHomework': (courseName) => fetchCourseHomework(courseName),
   'data:lectures': (from, to) => fetchLectures(from, to),
+  'data:graduation': () => graduation.fetchGraduation(),
   'system:stats': async () => ({ cpu: 0, memory: { used: 0, total: 0 }, appMemory: 0 }),
 
   // 下到系统"下载/ZJU All in One"；返回的 content:// 地址交给 file:reveal / file:open 用其他应用打开
@@ -198,7 +202,9 @@ if (import.meta.env.VITE_ZJU_DEMO === '1') {
     'data:assignments': async () => mock(mockAssignments),
     'data:replays': async () => mock(mockReplays),
     'data:lectures': async () => mockReplays,
+    'data:graduation': async () => mock(mockGraduation),
     'data:calendar': async () => demoCalendar(),
+    'data:courseHomework': async (courseName: string) => demoCourseHomework(courseName),
     'replay:slides': async () => mockSlides,
     'replay:platformTranscript': async () => mockPlatformTranscript,
     'replay:playback': async () => {

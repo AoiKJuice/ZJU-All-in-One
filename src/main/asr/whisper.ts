@@ -126,7 +126,25 @@ export function cleanSegments(
   while (end > start && normalizeText(filtered[end - 1].text).length === 0) {
     end--
   }
-  return filtered.slice(start, end)
+  return dropRepeats(filtered.slice(start, end))
+}
+
+// Whisper 在静音、杂音里会编句子：课末录像常比讲课长出很久，它在每个 30 秒窗口里都编一句「我们下期再见」「谢谢大家」，
+// 或把前面几句整段再说一遍。两条规则（只看 4 字以上的句子，正常讲课很少原样重复整句）：
+// 同一句在 150 秒内再次出现就丢掉；整份稿子里出现 6 次以上的句子只留第一次
+function dropRepeats(segments: TranscriptSegment[]): TranscriptSegment[] {
+  const keys = segments.map(segment => normalizeText(segment.text))
+  const counts = new Map<string, number>()
+  for (const key of keys) if (key.length >= 4) counts.set(key, (counts.get(key) ?? 0) + 1)
+  const lastSeen = new Map<string, number>()
+  return segments.filter((segment, i) => {
+    const key = keys[i]
+    if (key.length < 4) return true
+    const seen = lastSeen.get(key)
+    if (seen !== undefined && (counts.get(key)! >= 6 || segment.start - seen < 150)) return false
+    lastSeen.set(key, segment.start)
+    return true
+  })
 }
 
 export function activeChildPids(): number[] {
@@ -558,6 +576,8 @@ async function recognize(
     '-oj',
     '-of', output,
     '-pp',
+    // 只拿前文最近的 64 个 token 作上下文：全量上下文容易在课末静音处复读同一句
+    '-mc', '64',
     '--prompt', PROMPT
   ], onStderr, onStdout, true, plan.duty).finally(flush)
 

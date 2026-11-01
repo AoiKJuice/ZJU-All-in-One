@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { SystemStats, TaskProgress } from '@shared/types'
 import { Joined } from './Type'
+import { dur } from '@renderer/lib/motion'
 
 const STEPS = [
   ['engine', '引擎'],
@@ -83,7 +84,7 @@ function Stats() {
       initial={{ opacity: 0, y: -4, filter: 'blur(4px)' }}
       animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       exit={{ opacity: 0, y: -4, filter: 'blur(4px)' }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: dur(0.35), ease: [0.22, 1, 0.36, 1] }}
     >
       {stats ? rows.map(([k, v]) => [<dt key={`${k}t`}>{k}</dt>, <dd key={`${k}d`}>{v}</dd>]) : <dd>…</dd>}
     </motion.dl>

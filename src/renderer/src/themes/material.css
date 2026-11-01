@@ -1,0 +1,161 @@
+/* ------------------------------------------------------------------
+   风格：Material（Material 3）。由主题色派生的色调表面，几乎不用投影，大圆角，
+   选中为 secondary container 色的胶囊，手机底部为贴边的导航栏。字体随设置，不打包主题字体。
+   规则一律以 html[data-style='material'] 开头，自包含
+   ------------------------------------------------------------------ */
+html[data-style='material'][data-theme] {
+  --paper: color-mix(in srgb, var(--shu) 4%, #fcfcff);
+  --paper-2: color-mix(in srgb, var(--shu) 10%, #f3f3f7);
+  --veil: color-mix(in srgb, var(--paper) 88%, transparent);
+  --ink: #1b1c20;
+  --ink-2: #45464f;
+  --ink-3: #74757f;
+  --rule: rgba(27, 28, 32, 0.12);
+  --tint: color-mix(in srgb, var(--shu) 8%, transparent);
+  --surface: color-mix(in srgb, var(--shu) 7%, #f7f7fb);
+  --surface-2: color-mix(in srgb, var(--shu) 9%, transparent);
+  --shadow: none;
+  --shadow-pop: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 12px 2px rgba(0, 0, 0, 0.08);
+  /* secondary container：选中滑块、次按钮 */
+  --m3-secondary: color-mix(in srgb, var(--shu) 18%, #eeeef4);
+  --m3-high: color-mix(in srgb, var(--shu) 12%, #ececf2);
+  /* 导航栏：比卡片深一档的 surface container，选中指示器再深一档，与卡片区分开 */
+  --m3-nav: color-mix(in srgb, var(--shu) 16%, #e0e0e8);
+  --m3-indicator: color-mix(in srgb, var(--shu) 32%, #e4e4ee);
+  --grain: none;
+  --r-lg: 1.75rem;
+  --r-md: 1rem;
+  --r-sm: 0.75rem;
+}
+html[data-style='material'][data-theme='dark'] {
+  --paper: color-mix(in srgb, var(--shu) 5%, #111318);
+  --paper-2: color-mix(in srgb, var(--shu) 8%, #1d2026);
+  --ink: #e3e2e9;
+  --ink-2: #c5c6d0;
+  --ink-3: #8f909a;
+  --rule: rgba(227, 226, 233, 0.12);
+  --surface: color-mix(in srgb, var(--shu) 7%, #1a1c21);
+  --surface-2: color-mix(in srgb, var(--shu) 12%, transparent);
+  --shadow-pop: 0 1px 3px rgba(0, 0, 0, 0.4), 0 6px 16px 3px rgba(0, 0, 0, 0.3);
+  --m3-secondary: color-mix(in srgb, var(--shu) 26%, #23252b);
+  --m3-high: color-mix(in srgb, var(--shu) 12%, #25272d);
+  --m3-nav: color-mix(in srgb, var(--shu) 12%, #2a2d34);
+  --m3-indicator: color-mix(in srgb, var(--shu) 36%, #2c2f37);
+}
+
+html[data-style='material'] body {
+  line-height: 1.6;
+}
+/* Display / Headline 用常规字重，Title 用 500 */
+html[data-style='material'] .page-title,
+html[data-style='material'] .replay-title {
+  font-weight: 400;
+}
+html[data-style='material'] :is(.section-title, .sheet-title, .course-sheet-title) {
+  font-weight: 500;
+}
+
+/* 面板：surface container，无投影 */
+html[data-style='material'] :is(.pane, .panel, .replay-side, .period-block) {
+  box-shadow: none;
+}
+html[data-style='material'] .row {
+  border-radius: var(--r-md);
+}
+
+/* 选中：secondary container 胶囊，文字为 on-secondary-container（墨色） */
+html[data-style='material'] .choice-pill {
+  background: var(--m3-secondary);
+}
+html[data-style='material'] :is(.choice[data-active], .mast-link[data-active]) {
+  color: var(--ink);
+}
+html[data-style='material'] .act[data-on] {
+  color: var(--ink);
+  background: var(--m3-secondary);
+}
+
+/* 按钮：filled 与 tonal */
+html[data-style='material'] .btn {
+  font-weight: 500;
+  background: var(--m3-secondary);
+}
+html[data-style='material'] .btn:hover:not(:disabled) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--m3-secondary) 88%, var(--ink));
+}
+html[data-style='material'] .btn-solid,
+html[data-style='material'] .btn-solid:hover:not(:disabled) {
+  color: #fff;
+  background: var(--shu);
+}
+html[data-style='material'][data-theme='dark'] :is(.btn-solid, .btn-solid:hover:not(:disabled)) {
+  color: color-mix(in srgb, var(--shu) 22%, #000);
+}
+
+/* 课程格子：色调块 */
+html[data-style='material'] .course-cell {
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--cc) 20%, var(--surface));
+}
+html[data-style='material'] .course-cell:hover {
+  background: color-mix(in srgb, var(--cc) 28%, var(--surface));
+}
+html[data-style='material'] .today-col {
+  background: color-mix(in srgb, var(--shu) 7%, transparent);
+}
+
+/* 浮层：surface container high；翻周为 FAB 样式的圆角矩形 */
+html[data-style='material'] :is(.toast, .login-panel, .context-menu, .confirm, .sheet, .course-sheet) {
+  background: var(--m3-high);
+}
+html[data-style='material'] .toast {
+  border-radius: var(--r-sm);
+}
+html[data-style='material'] .week-float {
+  padding: 0.375rem;
+  border-radius: 1.25rem;
+  background: var(--m3-high);
+  backdrop-filter: none;
+}
+html[data-style='material'] .week-float button {
+  border-radius: 0.875rem;
+}
+html[data-style='material'] .week-float .week-today[data-away] {
+  color: var(--ink);
+  background: var(--m3-secondary);
+}
+html[data-style='material'] .course-sheet {
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+html[data-style='material'] .field {
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--ink-3);
+}
+html[data-style='material'] .field:focus {
+  border-bottom: 2px solid var(--shu);
+}
+
+/* 刊头：滚动后为不透明的 surface container */
+html[data-style='material'] .masthead[data-solid='true'] {
+  background: var(--m3-nav);
+  backdrop-filter: none;
+}
+
+/* 手机：底部贴边导航栏，选中项为胶囊指示器 */
+html[data-style='material'] .tabbar {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--tab-h) + 1rem + var(--sab));
+  padding: 0.75rem 1rem calc(0.75rem + var(--sab));
+  gap: 0.5rem;
+  border-radius: 0;
+  background: var(--m3-nav);
+  backdrop-filter: none;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.06);
+}
+html[data-style='material'] .tabbar .choice-pill {
+  background: var(--m3-indicator);
+}

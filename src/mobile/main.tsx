@@ -25,7 +25,7 @@ if (Capacitor.isNativePlatform()) {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     } else if (state.loginOpen) {
       state.setLoginOpen(false)
-    } else if (state.assignment || state.past.length) {
+    } else if (state.assignment || state.course || state.past.length) {
       state.back()
     } else {
       void NativeApp.minimizeApp()

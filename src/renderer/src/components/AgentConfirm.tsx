@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { ConfirmRequest } from '@shared/types'
 import { useApp } from '@renderer/store'
 import { Joined, OutlineWord } from './Type'
+import { dur } from '@renderer/lib/motion'
 
 const ACTION: Record<ConfirmRequest['action'], { title: string; ok: string }> = {
   submit: { title: '提交作业', ok: '提交' },
@@ -25,7 +26,7 @@ export function AgentConfirm() {
             initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none', transform: 'none' } }}
             exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: dur(0.5), ease: [0.22, 1, 0.36, 1] }}
           >
             <OutlineWord text="Agent" />
             <h2 className="section-title">{ACTION[request.action].title}</h2>

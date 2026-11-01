@@ -42,3 +42,17 @@ export const isUrgent = (iso: string): boolean => {
   const diff = new Date(iso).getTime() - Date.now()
   return diff > 0 && diff < 48 * 3_600_000
 }
+
+const DIGITS = '零一二三四五六七八九'
+/** 教学周等小整数写成汉字：7 → 七，12 → 十二，20 → 二十 */
+export function cnNumber(n: number): string {
+  if (n < 10) return DIGITS[n]
+  const tens = Math.floor(n / 10)
+  return `${tens > 1 ? DIGITS[tens] : ''}十${n % 10 ? DIGITS[n % 10] : ''}`
+}
+
+/** 学号等账号脱敏：留前三后三，中间打码；较短的只留首字 */
+export function maskAccount(account: string): string {
+  if (account.length >= 8) return `${account.slice(0, 3)}${'*'.repeat(account.length - 6)}${account.slice(-3)}`
+  return account ? `${account.slice(0, 1)}${'*'.repeat(Math.max(account.length - 1, 2))}` : account
+}

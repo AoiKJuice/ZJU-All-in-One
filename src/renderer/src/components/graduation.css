@@ -1,0 +1,217 @@
+/* 工具页「毕业自审」（components/Graduation.tsx）。只用主题变量，三种风格经 .panel 与变量自动适配 */
+/* 本文件随组件引入，注入顺序可能早于 styles.css：覆盖 .row 等通用类时选择器要多一级 */
+
+.grad-top,
+.grad-bottom {
+  display: grid;
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+  margin-top: clamp(1.5rem, 4vh, 2.5rem);
+}
+.grad-top {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+.grad-bottom {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+}
+
+/* 数字块：课堂三块、美育劳育两块，浅底圆角 */
+.grad-tiles {
+  display: grid;
+  gap: 0.625rem;
+  padding: 0.25rem 0.375rem 0.625rem;
+}
+.grad-tiles-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.grad-tiles-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.grad-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0.875rem 1rem 0.75rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.grad-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.grad-figure {
+  font-size: 2rem;
+  line-height: 1.2;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.02em;
+}
+.grad-figure small {
+  margin-left: 0.375em;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.grad-tile-sub {
+  min-height: 1.4em;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.grad-tile-sub .part + .part {
+  margin-left: 0.875em;
+}
+
+/* 状态：通过 / 已替代 / 达标 淡显，未通过 / 未达标 主题色，在修 主题色浅底，未修 只有字 */
+.grad-chip {
+  padding: 0.1rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+.grad-chip[data-s='failed'],
+.grad-chip[data-s='short'] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.grad-chip[data-s='studying'] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.06);
+}
+.grad-chip[data-s='none'] {
+  background: transparent;
+}
+.grad-tile .grad-chip[data-s='ok'] {
+  background: var(--surface);
+}
+
+.grad-filter {
+  display: inline-flex;
+  gap: 0.125rem;
+}
+
+/* 必修：按模块分组，组标题旁是学分与门数 */
+.grad-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+}
+.group-title.grad-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.25rem 0 0.125rem;
+}
+.grad-group-meta {
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.grad-group-meta .part + .part {
+  margin-left: 0.875em;
+}
+.rows > .grad-course {
+  grid-template-columns: minmax(0, 1fr) auto 3.75rem;
+  align-items: center;
+}
+.rows > .grad-course .row-sub {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.875em;
+  margin-left: 0;
+}
+.grad-course .grad-chip {
+  justify-self: end;
+}
+
+/* 模块：名称与学分一行，下面一条通栏的细圆角进度条 */
+.rows > .grad-module {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  row-gap: 0.375rem;
+}
+.rows > .grad-module .row-title {
+  font-size: 1.0625rem;
+}
+.grad-meter {
+  grid-column: 1 / -1;
+  display: block;
+  height: 0.25rem;
+  margin-top: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.grad-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(var(--shu-rgb), 0.55);
+  transition: width calc(0.6s * var(--speed, 1)) var(--ease);
+}
+.grad-meter[data-full] > span {
+  background: var(--ink-3);
+  opacity: 0.5;
+}
+
+@media (max-width: 960px) {
+  .grad-top,
+  .grad-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 手机：单列，数字块缩小 */
+html[data-platform='android'] .grad-top,
+html[data-platform='android'] .grad-bottom {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+html[data-platform='android'] .grad-tiles {
+  gap: 0.5rem;
+  padding: 0.125rem 0.25rem 0.5rem;
+}
+html[data-platform='android'] .grad-tile {
+  padding: 0.625rem 0.75rem 0.5rem;
+}
+html[data-platform='android'] .grad-tile-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+html[data-platform='android'] .grad-figure {
+  font-size: 1.5rem;
+}
+html[data-platform='android'] .grad-figure small {
+  margin-left: 0.25em;
+  font-size: 0.75rem;
+}
+html[data-platform='android'] .grad-tile-sub .part {
+  display: block;
+  margin-left: 0;
+}
+html[data-platform='android'] .rows > .grad-course {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+html[data-platform='android'] .rows > .grad-module {
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 0.375rem;
+}
+html[data-platform='android'] .group-title.grad-group-title {
+  flex-direction: column;
+  gap: 0.125rem;
+}

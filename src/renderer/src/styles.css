@@ -1,9 +1,12 @@
 @import 'tailwindcss';
+/* 经典以外的风格（设置「风格」→ html[data-style]），各自一个自包含文件；本文件末尾有它们共用的几条 */
+@import './themes/material.css';
+@import './themes/glass.css';
 /* 安卓端构建的 vite 根目录是 src/mobile，显式指明扫描渲染端源码 */
 @source '..';
 
 /* ------------------------------------------------------------------
-   字体：EB Garamond + 思源宋体（Noto Serif SC，Medium 字重，由 @fontsource 按字符分片打包，见 main.tsx）
+   字体：EB Garamond + 思源宋体（Noto Serif SC 可变字重，由 @fontsource-variable 按字符分片打包，见 main.tsx）
    ------------------------------------------------------------------ */
 @font-face {
   font-family: 'AJ Latin';
@@ -127,7 +130,7 @@ html[data-theme='dark'][data-accent='red'] {
 /* 字体风格：书宋（默认）/ 黑体 / 文楷，由 html[data-font] 决定，见 lib/settings.ts */
 :root,
 html[data-font='song'] {
-  --f-text: 'AJ Digits', 'AJ Latin', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --f-text: 'AJ Digits', 'AJ Latin', 'Noto Serif SC Variable', 'Songti SC', 'SimSun', serif;
 }
 html[data-font='hei'] {
   --f-text: 'AJ Sans', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
@@ -163,7 +166,7 @@ html[data-font='kai'] {
     font-variant-numeric: lining-nums;
     -webkit-font-smoothing: antialiased;
     user-select: none;
-    transition: background-color 0.6s var(--ease), color 0.6s var(--ease);
+    transition: background-color calc(0.6s * var(--speed, 1)) var(--ease), color calc(0.6s * var(--speed, 1)) var(--ease);
   }
   ::selection {
     background: rgba(var(--shu-rgb), 0.22);
@@ -220,7 +223,7 @@ body {
   gap: 2.25rem;
   /* 右侧给系统窗口按钮留位 */
   padding: 0 calc(140px + 1rem) 0 var(--gutter);
-  transition: background-color 0.5s var(--ease);
+  transition: background-color calc(0.5s * var(--speed, 1)) var(--ease);
 }
 .masthead[data-solid='true'] {
   background: var(--veil);
@@ -244,20 +247,11 @@ body {
   padding: 0.375rem 0;
   letter-spacing: 0.14em;
   color: var(--ink-3);
-  transition: color 0.4s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .mast-link:hover,
 .mast-link[data-active='true'] {
   color: var(--ink);
-}
-.mark-dot {
-  position: absolute;
-  left: calc(50% - 0.2rem - 0.07em);
-  bottom: -2px;
-  width: 0.3125rem;
-  height: 0.3125rem;
-  border-radius: 50%;
-  background: var(--shu);
 }
 .mast-meta {
   display: flex;
@@ -268,7 +262,7 @@ body {
   color: var(--ink-3);
 }
 .mast-meta button {
-  transition: color 0.4s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .mast-meta button:hover {
   color: var(--shu);
@@ -336,7 +330,7 @@ body {
   stroke: var(--outline);
   stroke-width: 1.5;
   stroke-dasharray: 12000;
-  animation: draw-outline 3.6s cubic-bezier(0.65, 0, 0.35, 1) both;
+  animation: draw-outline calc(3.6s * var(--speed, 1)) cubic-bezier(0.65, 0, 0.35, 1) both;
 }
 @keyframes draw-outline {
   from {
@@ -396,7 +390,7 @@ body {
   gap: 1.25rem;
   padding: 0.8125rem 0;
   border-bottom: 1px solid var(--rule);
-  transition: opacity 0.5s var(--ease);
+  transition: opacity calc(0.5s * var(--speed, 1)) var(--ease);
 }
 .row[data-past='true'] {
   opacity: 0.42;
@@ -446,7 +440,7 @@ button.row .row-title,
   background-size: 0% 1px;
   background-position: 0 100%;
   background-repeat: no-repeat;
-  transition: color 0.45s var(--ease), background-size 0.7s var(--ease);
+  transition: color calc(0.45s * var(--speed, 1)) var(--ease), background-size calc(0.7s * var(--speed, 1)) var(--ease);
 }
 a.row:hover .row-title,
 button.row:hover .row-title,
@@ -471,7 +465,7 @@ button.row {
 }
 .swap > * {
   grid-area: 1 / 1;
-  transition: opacity 0.3s var(--ease);
+  transition: opacity calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .swap > :last-child,
 .todo:hover .swap > :first-child,
@@ -506,7 +500,7 @@ button.row {
   background-size: 0% 1px;
   background-position: 0 100%;
   background-repeat: no-repeat;
-  transition: color 0.4s var(--ease), background-size 0.6s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease), background-size calc(0.6s * var(--speed, 1)) var(--ease);
 }
 .act:hover:not(:disabled) {
   color: var(--shu);
@@ -533,7 +527,7 @@ button.row {
   position: absolute;
   inset: 0 auto 0 0;
   background: var(--shu);
-  transition: width 0.6s var(--ease);
+  transition: width calc(0.6s * var(--speed, 1)) var(--ease);
 }
 
 /* 课件：无框缩略图，悬停轻抬 */
@@ -554,7 +548,7 @@ button.row {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transition: transform 0.8s var(--ease);
+  transition: transform calc(0.8s * var(--speed, 1)) var(--ease);
 }
 .slide:hover img {
   transform: scale(1.03);
@@ -625,7 +619,7 @@ button.row {
 .lecture-strip button {
   position: relative;
   color: var(--ink-3);
-  transition: color 0.4s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .lecture-strip button:hover {
   color: var(--ink);
@@ -668,7 +662,7 @@ button.row {
 }
 .transcript p {
   color: var(--ink-2);
-  transition: color 0.4s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .transcript p[data-now] {
   color: var(--ink);
@@ -739,7 +733,7 @@ button.row {
   border: 0;
   border-bottom: 1px solid var(--rule);
   outline: none;
-  transition: border-color 0.4s var(--ease);
+  transition: border-color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .field:focus {
   border-color: var(--shu);
@@ -794,7 +788,7 @@ button.row {
 .steps li {
   position: relative;
   color: var(--rule);
-  transition: color 0.5s var(--ease);
+  transition: color calc(0.5s * var(--speed, 1)) var(--ease);
 }
 .steps li[data-state='done'] {
   color: var(--ink-3);
@@ -880,7 +874,7 @@ button.row {
   background-size: 0% 1px;
   background-position: 0 100%;
   background-repeat: no-repeat;
-  transition: color 0.45s var(--ease), background-size 0.7s var(--ease);
+  transition: color calc(0.45s * var(--speed, 1)) var(--ease), background-size calc(0.7s * var(--speed, 1)) var(--ease);
 }
 .course-cell[data-playable] {
   cursor: pointer;
@@ -899,7 +893,7 @@ button.row {
   font-size: 1.0625rem;
   letter-spacing: 0.06em;
   color: var(--ink-2);
-  transition: color 0.4s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .opt:hover {
   color: var(--ink);
@@ -922,16 +916,6 @@ button.row {
   border-radius: 50%;
 }
 
-/* 分隔：短细竖线 */
-.sep {
-  display: inline-block;
-  width: 1px;
-  height: 0.8em;
-  margin: 0 0.85em;
-  vertical-align: -0.08em;
-  background: currentColor;
-  opacity: 0.35;
-}
 /* 开关类文字按钮：打开时主题色下划线常驻 */
 .act[data-on] {
   color: var(--shu);
@@ -959,7 +943,7 @@ button.row {
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.86);
   background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent);
-  transition: opacity 0.4s var(--ease);
+  transition: opacity calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .player[data-idle] .player-bar {
   opacity: 0;
@@ -969,7 +953,7 @@ button.row {
 }
 .player-bar button {
   white-space: nowrap;
-  transition: color 0.3s var(--ease);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .player-bar button:hover {
   color: var(--shu-bright);
@@ -1036,6 +1020,7 @@ button.row {
   min-height: 0;
   overflow: hidden;
   background: var(--paper-2);
+  touch-action: pan-y;
 }
 .slide-stage img {
   position: absolute;
@@ -1043,16 +1028,32 @@ button.row {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
+/* 页面滚动区始终给滚动条留位：否则长页（设置）与一屏页（课表）切换、新旧两页短暂重叠时滚动条一闪，
+   整页宽度跳动、所有内容重新排版，看起来像某个组件忽大忽小、页面卡一下 */
+.app-scroller {
+  scrollbar-gutter: stable;
+}
+/* 翻页区固定两行：第一行翻页，第二行其他动作；不随宽度在一行与两行之间跳 */
 .slide-nav {
   flex: none;
-  flex-wrap: wrap;
-  row-gap: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
   padding-top: 0.5rem;
   font-size: 0.875rem;
   color: var(--ink-3);
-  border-top: 1px solid var(--rule);
 }
+.slide-pager,
+.slide-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 1.25rem;
+}
+
 /* 右键菜单：细线框，无阴影卡片 */
 .context-menu {
   position: fixed;
@@ -1071,7 +1072,7 @@ button.row {
   padding: 0.35rem 1.25rem;
   text-align: left;
   color: var(--ink-2);
-  transition: color 0.3s var(--ease), background-color 0.3s var(--ease);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .context-menu button:hover {
   color: var(--shu);
@@ -1169,7 +1170,7 @@ button.row {
   font-size: 1.125rem;
   letter-spacing: 0.14em;
   color: var(--ink-3);
-  transition: color 0.4s var(--ease);
+  transition: color calc(0.4s * var(--speed, 1)) var(--ease);
 }
 .tabs button:hover {
   color: var(--ink);
@@ -1197,8 +1198,39 @@ button.row {
 }
 .tab-tools {
   flex: none;
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
   padding: 0.625rem 0 0.5rem;
   font-size: 0.875rem;
+}
+/* 文字稿为空：一行「无」，下面是转写按钮 */
+.transcript-empty .quiet {
+  padding-bottom: 0;
+}
+.transcript-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+/* 回放页元信息末尾的「原页面」：与前面的标签同样是一枚小标签 */
+.meta-link {
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.meta-link:hover {
+  color: var(--shu);
+}
+/* 工具行的动作固定在第二行，不随宽度跳行 */
+.tools-end {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.25rem;
+}
+/* 第一个按钮的胶囊左缘与上一行的来源选项对齐 */
+.tools-end > .act:first-child {
+  margin-left: 0;
 }
 .lecture-row {
   grid-template-columns: 5em minmax(0, 1fr) auto;
@@ -1240,10 +1272,10 @@ button.row {
   pointer-events: none;
   opacity: min(1, calc(var(--p) * 3));
   transform: translateX(-50%) scaleX(var(--p));
-  transition: transform 0.25s var(--ease), opacity 0.3s var(--ease);
+  transition: transform calc(0.25s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .pull-line[data-done] {
-  animation: pull-done 0.9s var(--ease) forwards;
+  animation: pull-done calc(0.9s * var(--speed, 1)) var(--ease) forwards;
 }
 @keyframes pull-done {
   0% { transform: translateX(-50%) scaleX(1); opacity: 1; }
@@ -1377,7 +1409,7 @@ html[data-theme='dark'] .page-emblem svg {
   border-radius: 999px;
   font-size: 1.375rem;
   color: var(--ink-2);
-  transition: color 0.3s var(--ease), background-color 0.3s var(--ease), opacity 0.3s var(--ease);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .week-nav button:hover {
   color: var(--shu);
@@ -1439,7 +1471,7 @@ html[data-theme='dark'] .page-emblem svg {
   padding: 0.6875rem 0.75rem;
   border-bottom: 0;
   border-radius: var(--r-md);
-  transition: opacity 0.5s var(--ease), background-color 0.3s var(--ease);
+  transition: opacity calc(0.5s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
 button.row:hover,
 .row[role='button']:hover {
@@ -1560,6 +1592,550 @@ button.row:hover,
 }
 
 /* ------------------------------------------------------------------
+   选中态：不用下划线。选中文字转主题色，背后一块主题色浅底的圆角滑块，同组切换时滑块移动过去（Choice）
+   ------------------------------------------------------------------ */
+.choice,
+.mast-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.3rem 0.875rem;
+  border-radius: 999px;
+  color: var(--ink-2);
+  transition: color calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.choice:hover,
+.mast-link:hover {
+  color: var(--ink);
+}
+.choice[data-active],
+.mast-link[data-active] {
+  color: var(--shu);
+}
+.choice-pill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.choice-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.choice.small {
+  padding: 0.2rem 0.75rem;
+  font-size: 0.9375rem;
+  letter-spacing: 0.08em;
+}
+/* 选项行与刊头导航：选项之间的距离由按钮内边距给出 */
+.opt {
+  font-size: 1.0625rem;
+  letter-spacing: 0.06em;
+}
+.opt[data-active]::after,
+.tabs button[data-active]::after {
+  content: none;
+}
+.mast-nav {
+  gap: 0.25rem;
+}
+.mast-link {
+  padding: 0.3rem 0.875rem;
+  letter-spacing: 0.14em;
+}
+.tabs {
+  gap: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.tabs .choice {
+  font-size: 1.0625rem;
+  letter-spacing: 0.14em;
+}
+.settings-label {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  padding-top: 0.3rem;
+}
+
+/* 文字按钮：悬停只变主题色；开关打开时同样是主题色浅底圆角（内边距用负外边距抵消，不挤动排版） */
+.act {
+  margin: -0.2rem -0.55rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: transparent;
+  transition: color calc(0.35s * var(--speed, 1)) var(--ease), background-color calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.act:hover:not(:disabled) {
+  color: var(--shu);
+}
+.act[data-on] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+a.row .row-title,
+button.row .row-title,
+.row[role='button'] .row-title {
+  background: none;
+  transition: color calc(0.35s * var(--speed, 1)) var(--ease);
+}
+
+/* ------------------------------------------------------------------
+   字重：标题 600，条目标题 500，正文与副文字 400（思源宋体可变字重）
+   ------------------------------------------------------------------ */
+.page-title,
+.replay-title {
+  font-weight: 600;
+}
+.section-title,
+.sheet-title,
+.course-sheet-title {
+  font-weight: 600;
+}
+.row-title,
+.course-name,
+.wordmark,
+.mast-link,
+.choice,
+.btn {
+  font-weight: 500;
+}
+.page-title > span,
+.row-sub,
+.row-time,
+.row-end,
+.page-lede {
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------------------
+   按钮：主操作实心主题色胶囊，次操作浅底胶囊
+   ------------------------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: var(--surface-2);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.btn:hover:not(:disabled) {
+  background: rgba(var(--shu-rgb), 0.12);
+  color: var(--shu);
+}
+.btn-solid {
+  color: #fff;
+  background: var(--shu);
+}
+.btn-solid:hover:not(:disabled) {
+  color: #fff;
+  background: var(--shu);
+  opacity: 0.88;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------
+   课表：标题「秋七周」；课程按课名配色、无左侧衬线；有录播的右上角带播放标志；底部悬浮翻周
+   ------------------------------------------------------------------ */
+html[data-theme='light'] {
+  --course-0: #3f6db3;
+  --course-1: #b2593d;
+  --course-2: #3a8a6b;
+  --course-3: #8558ad;
+  --course-4: #b3832b;
+  --course-5: #2d879a;
+  --course-6: #b04870;
+  --course-7: #6c7c35;
+}
+html[data-theme='dark'] {
+  --course-0: #86a8e0;
+  --course-1: #e29b80;
+  --course-2: #7cc3a5;
+  --course-3: #b99ae0;
+  --course-4: #e0bd70;
+  --course-5: #74c1cf;
+  --course-6: #e08aab;
+  --course-7: #b3c47c;
+}
+.schedule-title {
+  font-size: clamp(1.75rem, 2.5vw + 1.5vh, 2.75rem);
+}
+/* 密码锁式滚动文字（components/Roll.tsx）：每一位一个裁切框，变了的字在框里上下滚动 */
+.roll {
+  display: inline-flex;
+}
+.roll-slot {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.roll-char {
+  display: inline-block;
+  white-space: pre;
+}
+.today-col {
+  border-radius: var(--r-md);
+  background: rgba(var(--shu-rgb), 0.06);
+}
+.day-head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 0.75rem;
+  line-height: 1.25;
+  color: var(--ink-3);
+}
+.day-head[data-today] {
+  color: var(--shu);
+}
+.day-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+.day-date {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.period-head {
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem 0 0 0.25rem;
+  line-height: 1.2;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.period-no {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.period-time {
+  font-size: 0.6875rem;
+}
+.course-cell {
+  position: relative;
+  margin: 2px;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--r-sm);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--cc) 16%, var(--surface));
+  cursor: pointer;
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), transform calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.course-cell:hover {
+  background: color-mix(in srgb, var(--cc) 24%, var(--surface));
+}
+.course-cell:active {
+  transform: scale(0.98);
+}
+.course-name {
+  padding-right: 0.875rem;
+  color: color-mix(in srgb, var(--cc) 45%, var(--ink));
+  background: none;
+}
+.course-place {
+  margin-top: auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+.cell-replay {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--cc);
+}
+.cell-replay svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+.cell-live {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: #fff;
+  background: var(--shu);
+}
+.week-float {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  translate: -50% 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(1rem) saturate(1.2);
+  box-shadow: var(--shadow-pop);
+}
+.week-float button {
+  display: grid;
+  place-items: center;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  border-radius: 999px;
+  color: var(--ink-2);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.week-float button:hover {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.week-float svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.week-float .week-today {
+  display: grid;
+  width: 6.5rem;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  cursor: default;
+}
+/* 「本周」与「回到本周」叠在同一格里交叉淡变，按钮长度不变 */
+.week-float .week-today span {
+  grid-area: 1 / 1;
+  transition: opacity calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.week-float .week-today span:last-child,
+.week-float .week-today[data-away] span:first-child {
+  opacity: 0;
+}
+.week-float .week-today[data-away] span:last-child {
+  opacity: 1;
+}
+.week-float .week-today[data-away] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+  cursor: pointer;
+}
+.week-float .week-today:disabled:hover {
+  color: var(--ink-3);
+  background: none;
+}
+.page.schedule-page {
+  padding-bottom: 5.5rem;
+}
+
+/* ------------------------------------------------------------------
+   课程详情：底部上拉面板，顶部把手可下拉关闭
+   ------------------------------------------------------------------ */
+.course-veil {
+  z-index: 43;
+}
+.course-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 44;
+  display: flex;
+  flex-direction: column;
+  width: min(44rem, 100vw);
+  max-height: 82vh;
+  margin-left: calc(min(44rem, 100vw) / -2);
+  background: var(--surface);
+  border-radius: 1.5rem 1.5rem 0 0;
+  box-shadow: var(--shadow-pop);
+}
+.sheet-handle {
+  flex: none;
+  align-self: center;
+  width: 2.75rem;
+  height: 0.3125rem;
+  margin: 0.625rem 0 0.25rem;
+  border-radius: 999px;
+  background: var(--rule);
+  cursor: grab;
+  touch-action: none;
+  box-sizing: content-box;
+  border: 0.5rem solid transparent;
+  background-clip: padding-box;
+}
+.course-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.25rem 1.5rem 1.5rem;
+}
+.course-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+}
+.course-dot {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: 0.7rem;
+  border-radius: 50%;
+  background: var(--cc);
+}
+.course-sheet-title {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+.course-sheet-meta {
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.course-replay {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--cc) 12%, transparent);
+}
+.course-replay-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+.course-time-row {
+  grid-template-columns: 4em minmax(0, 1fr);
+}
+.homework-row {
+  grid-template-columns: 7.5em minmax(0, 1fr) auto;
+  align-items: center;
+}
+.row-inline {
+  margin-left: 0.75em;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.status-chip {
+  padding: 0.1rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+.status-chip[data-state='open'] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.status-chip[data-state='missed'] {
+  color: var(--ink-3);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+/* ------------------------------------------------------------------
+   侧页与详情里的分组：组标题 + 浅底圆角块；说明文字放在内嵌块里
+   ------------------------------------------------------------------ */
+.sheet-title {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+.sheet-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.sheet-body {
+  margin-top: 1.25rem;
+}
+.sheet-group {
+  margin-top: 1.5rem;
+}
+.group-title {
+  margin: 0 0 0.375rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--ink-3);
+}
+.sheet-group .rows {
+  padding: 0.25rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.sheet-block {
+  padding: 1rem 1.125rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.sheet-compose {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+.sheet-compose .acts {
+  gap: 0.75rem;
+}
+
+/* 手机主页「展开 / 收起」：浅底胶囊、主题色字、箭头 */
+.pane-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: auto;
+  margin: 0.5rem auto 0.625rem;
+  padding: 0.375rem 1.125rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.pane-more svg {
+  width: 1rem;
+  height: 1rem;
+  transition: rotate calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.pane-more[data-open] svg {
+  rotate: 180deg;
+}
+
+/* ------------------------------------------------------------------
    安卓端（html[data-platform=android]，入口见 src/mobile）：竖屏手机布局。
    导航在底部标签栏；主页四块竖排整页滚动；课表周末没课只画五天、左右滑动翻周；
    回放页视频在上、侧栏在下；侧页与登录面板占满宽度。系统栏留白取 Capacitor 注入的安全区
@@ -1584,26 +2160,29 @@ html[data-platform='android'] .masthead {
 html[data-platform='android'] .mast-meta {
   gap: 1.125rem;
 }
+/* 底部导航：半透明悬浮胶囊，选中项为滑动的主题色浅底 */
 .tabbar {
   position: fixed;
-  inset: auto 0 0 0;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(var(--sab) + 0.75rem);
   z-index: 40;
   display: flex;
-  height: calc(var(--tab-h) + var(--sab));
-  padding-bottom: var(--sab);
-  background: var(--veil);
-  backdrop-filter: blur(1rem) saturate(1.15);
-  box-shadow: 0 -10px 28px -22px rgba(0, 0, 0, 0.35);
+  gap: 0.25rem;
+  height: var(--tab-h);
+  padding: 0.375rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  backdrop-filter: blur(1.25rem) saturate(1.3);
+  box-shadow: var(--shadow-pop);
 }
 .tabbar .mast-link {
   flex: 1;
+  justify-content: center;
   font-size: 1.0625rem;
 }
-.tabbar .mark-dot {
-  bottom: 0.55rem;
-}
 html[data-platform='android'] .page {
-  padding: calc(var(--mast-h) + var(--sat) + 1.25rem) var(--gutter) calc(var(--tab-h) + var(--sab) + 2.5rem);
+  padding: calc(var(--mast-h) + var(--sat) + 1.25rem) var(--gutter) calc(var(--tab-h) + var(--sab) + 3.5rem);
 }
 html[data-platform='android'] .page-fit {
   height: 100dvh;
@@ -1694,43 +2273,41 @@ html[data-platform='android'] .schedule-page {
   height: auto;
   min-height: 100dvh;
 }
-html[data-platform='android'] .schedule-page .page-title {
-  font-size: 1.625rem;
+html[data-platform='android'] .schedule-title {
+  font-size: 1.75rem;
 }
-html[data-platform='android'] .schedule-page .page-title > span:last-child {
-  display: block;
-  margin: 0.375rem 0 0;
-  font-size: 0.5em;
+html[data-platform='android'] .schedule-page {
+  padding-bottom: calc(var(--tab-h) + var(--sab) + 5rem);
 }
-html[data-platform='android'] .week-nav {
-  gap: 0.25rem;
-}
-html[data-platform='android'] .week-nav button {
-  width: 2.5rem;
-  height: 2.5rem;
-}
-html[data-platform='android'] .week-nav .week-today {
-  width: auto;
+html[data-platform='android'] .week-float {
+  bottom: calc(var(--tab-h) + var(--sab) + 1.375rem);
 }
 html[data-platform='android'] .day-head {
   align-items: center;
   padding: 0;
   text-align: center;
 }
-html[data-platform='android'] .day-head > span:first-child {
+html[data-platform='android'] .day-name {
   font-size: 0.875rem;
   letter-spacing: 0.06em;
 }
-html[data-platform='android'] .day-head > span:last-child {
+html[data-platform='android'] .day-date {
   font-size: 0.6875rem;
 }
 html[data-platform='android'] .period-head {
-  padding-left: 0.375rem;
-  font-size: 0.75rem;
+  padding: 0.3rem 0 0;
+}
+html[data-platform='android'] .period-head > span {
+  width: 2.375rem;
+  text-align: center;
+}
+html[data-platform='android'] .period-time {
+  font-size: 0.5625rem;
+  letter-spacing: -0.02em;
 }
 html[data-platform='android'] .course-cell {
   margin: 1.5px;
-  padding: 0.25rem 0.25rem 0.25rem 0.4375rem;
+  padding: 0.3rem 0.25rem 0.25rem 0.375rem;
   line-height: 1.3;
 }
 html[data-platform='android'] .schedule-board {
@@ -1738,14 +2315,37 @@ html[data-platform='android'] .schedule-board {
   padding: 0.25rem 0.25rem 0.5rem;
 }
 html[data-platform='android'] .course-name {
+  padding-right: 0.5rem;
   font-size: 0.8125rem;
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
-html[data-platform='android'] .course-cell > span:last-child {
+html[data-platform='android'] .course-place {
   font-size: 0.6875rem;
   letter-spacing: 0;
   overflow-wrap: anywhere;
+}
+html[data-platform='android'] .cell-replay {
+  top: 0.2rem;
+  right: 0.2rem;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+html[data-platform='android'] .cell-replay svg {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+html[data-platform='android'] .course-sheet {
+  max-height: 86vh;
+}
+html[data-platform='android'] .course-sheet-body {
+  padding: 0.25rem var(--gutter) calc(var(--sab) + 1.25rem);
+}
+html[data-platform='android'] .homework-row {
+  grid-template-columns: 5.5em minmax(0, 1fr) auto;
+}
+html[data-platform='android'] .course-replay {
+  flex-wrap: wrap;
 }
 
 /* 回放：返回 + 标题，视频通栏，侧栏占下方剩余高度 */
@@ -1827,4 +2427,93 @@ html[data-platform='android'] .settings-row {
   grid-template-columns: minmax(0, 1fr);
   gap: 0.375rem;
   padding: 0.875rem 0.75rem;
+}
+
+/* ------------------------------------------------------------------
+   分行：正文避免最后几个字单独落到下一行，标题各行长度均衡；
+   Joined 串起来的字段整段换行；设置选项在手机上按等宽列排，不会剩一两个孤零零地换到下一行
+   ------------------------------------------------------------------ */
+body {
+  text-wrap: pretty;
+}
+.page-title,
+.section-title,
+.sheet-title,
+.course-sheet-title,
+.replay-title,
+.row-title {
+  text-wrap: balance;
+}
+.part {
+  display: inline-block;
+  max-width: 100%;
+}
+/* 设置的选中滑块为圆角矩形（其余选项保持胶囊形） */
+.opt {
+  border-radius: var(--r-sm);
+}
+html[data-platform='android'] .settings-row > span:last-child {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.75rem, 1fr));
+  gap: 0.375rem;
+}
+html[data-platform='android'] .settings-row .opt {
+  justify-content: center;
+}
+.opt,
+.choice,
+.btn,
+.act,
+.status-chip {
+  white-space: nowrap;
+}
+/* 元信息行末的「原页面 ↗」等链接整体换行，不留一两个字到下一行 */
+a.act {
+  display: inline-block;
+}
+
+/* 并列信息（Joined）：段间留白代替分隔线；侧页、课程详情、回放页顶部的元信息为浅底小标签 */
+.part:not(:last-child) {
+  margin-right: 1.1em;
+}
+.sheet-meta .part,
+.course-sheet-meta .part,
+.replay-meta .part {
+  margin: 0.25rem 0.375rem 0 0;
+  padding: 0.0625rem 0.625rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+/* 课表：上午、下午、晚上三块卡片，块之间空一行；表头星期直接在纸面上 */
+.schedule-board {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.period-block {
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.today-col {
+  border-radius: 0;
+}
+.today-col[data-last] {
+  border-top-right-radius: var(--r-lg);
+  border-bottom-right-radius: var(--r-lg);
+}
+
+/* ------------------------------------------------------------------
+   风格共用：经典以外的风格收窄字距，不画空心描边水印
+   ------------------------------------------------------------------ */
+html[data-style]:not([data-style='paper']) .outline-word {
+  display: none;
+}
+html[data-style]:not([data-style='paper']) :is(.page-title, .section-title, .group-title, .settings-label, .mast-link, .mast-meta, .tabs .choice, .opt, .choice.small, .btn, .pane-more, .week-float .week-today) {
+  letter-spacing: 0.02em;
+}
+/* 这些风格的课表块有亮边或更明显的底色，节次不贴着左边 */
+html[data-style]:not([data-style='paper']) .period-head {
+  padding-left: 0.625rem;
 }

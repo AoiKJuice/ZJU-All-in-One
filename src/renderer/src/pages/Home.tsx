@@ -3,8 +3,9 @@ import type { Assignment, CourseSession } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
 import { useApp } from '@renderer/store'
 import { usePullRefresh } from '@renderer/hooks/usePullRefresh'
-import { mergeSessions } from '@renderer/lib/calendar'
-import { Joined, OutlineWord, Quiet, Reveal, SectionHead, Sep } from '@renderer/components/Type'
+import { addDays, mergeSessions, sessionsOn, ymd } from '@renderer/lib/calendar'
+import { useCalendar } from '@renderer/hooks/useCalendar'
+import { AutoHeight, Joined, OutlineWord, Quiet, Reveal, SectionHead } from '@renderer/components/Type'
 import { classState, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, isSoon, isUrgent, relativeTo, todayWeekday, weekdayLabel, weekdayOf } from '@renderer/lib/format'
 import { MOBILE } from '@renderer/lib/platform'
@@ -28,8 +29,11 @@ export function Home() {
   const more = (name: string, list: unknown[]) =>
     MOBILE &&
     list.length > LIMIT[name] && (
-      <button className="pane-more" onClick={() => setUnfolded((u) => ({ ...u, [name]: !u[name] }))}>
+      <button className="pane-more" data-open={unfolded[name] || undefined} onClick={() => setUnfolded((u) => ({ ...u, [name]: !u[name] }))}>
         {unfolded[name] ? '收起' : '展开'}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M6 9.5l6 6 6-6" />
+        </svg>
       </button>
     )
 
@@ -46,13 +50,18 @@ export function Home() {
 
   const now = new Date()
   const wd = todayWeekday()
-  const byDay = (d: number): CourseSession[] =>
-    mergeSessions((schedule.data ?? []).filter((c) => c.weekday === d))
-  const today = byDay(wd)
+  // 按日期取课：有校历时与课表页一样区分半学期、教学周范围、单双周与放假调休；校历还没到时先按星期
+  const cal = useCalendar()
+  const byDay = (offset: number): CourseSession[] => {
+    const list = schedule.data ?? []
+    const date = addDays(new Date(), offset)
+    return mergeSessions(cal ? sessionsOn(cal, list, ymd(date)) : list.filter((c) => c.weekday === ((date.getDay() + 6) % 7) + 1))
+  }
+  const today = byDay(0)
   const remaining = today.filter((c) => classState(c.startPeriod, c.endPeriod) !== 'past')
   // 今天的课上完了就看明天
   const showTomorrow = today.length > 0 ? remaining.length === 0 : true
-  const dayList = showTomorrow ? byDay((wd % 7) + 1) : today
+  const dayList = showTomorrow ? byDay(1) : today
 
   const ignored = new Set(todos.ignored)
   const open = (assignments.data ?? [])
@@ -237,13 +246,7 @@ export function Home() {
                   <span>
                     <span className="row-title">{e.courseName}</span>
                     <span className="row-sub">
-                      {e.location}
-                      {e.seat && (
-                        <>
-                          <Sep />
-                          {e.seat} 座
-                        </>
-                      )}
+                      <Joined parts={[e.location, e.seat && `${e.seat} 座`]} />
                     </span>
                   </span>
                   <span className="row-end">{relativeTo(e.startTime)}</span>
@@ -260,9 +263,10 @@ export function Home() {
 
 function Pane({ i, name, title, note, children }: { i: number; name: string; title: string; note?: ReactNode; children: ReactNode }) {
   return (
-    <Reveal i={i} className={`pane pane-${name}`}>
+    <Reveal i={i} flat className={`pane pane-${name}`}>
       <SectionHead title={title} note={note} />
-      <div className="pane-scroll">{children}</div>
+      {/* 手机端整页滚动：展开 / 收起时高度平滑过渡 */}
+      <div className="pane-scroll">{MOBILE ? <AutoHeight>{children}</AutoHeight> : children}</div>
     </Reveal>
   )
 }

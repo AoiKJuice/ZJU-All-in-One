@@ -15,6 +15,23 @@ const BASE = 'https://courses.zju.edu.cn'
 
 let loginPromise: Promise<void> | undefined
 let studentId: string | undefined
+let myCourses: Promise<Course[]> | undefined
+
+interface Course {
+  id: string | number
+  name: string
+}
+
+// 课程作业列表（照 zju-learning-assistant 的 get_homework_uploads）。
+// 推测：提交状态字段名未经实测，以下几个任一为真即视为已交。
+interface HomeworkActivity {
+  id: string | number
+  title: string
+  end_time: string | null
+  submitted?: boolean
+  is_submitted?: boolean
+  submission_status?: string
+}
 
 interface Todo {
   id: string | number
@@ -191,6 +208,7 @@ export async function ensureLogin(): Promise<void> {
 export function reset(): void {
   loginPromise = undefined
   studentId = undefined
+  myCourses = undefined
 }
 
 async function getStudentId(): Promise<string> {
@@ -244,6 +262,71 @@ export async function fetchAssignments(): Promise<DataResult<Assignment[]>> {
     source: 'live',
     fetchedAt: Date.now()
   }
+}
+
+// 我的课程（进行中），POST /api/my-courses 分页；同一会话里只取一次
+function listCourses(): Promise<Course[]> {
+  myCourses ??= (async () => {
+    const courses: Course[] = []
+    for (let page = 1; ; page++) {
+      const response = await postJson('/api/my-courses', {
+        fields: 'id,name',
+        page,
+        page_size: 100,
+        conditions: { status: ['ongoing'], keyword: '', classify_type: 'recently_started', display_studio_list: false },
+        showScorePassedStatus: false
+      })
+      const json = await response.json<{ courses: Course[]; pages: number }>()
+      courses.push(...json.courses)
+      if (page >= json.pages) return courses
+    }
+  })().catch((error: unknown) => {
+    myCourses = undefined
+    throw error
+  })
+  return myCourses
+}
+
+// 课表与学在浙大的课名写法略有出入（全角 / 半角括号、罗马数字、空格）
+const normalize = (name: string): string =>
+  name
+    .replace(/\s/g, '')
+    .replace(/[（(]/g, '(')
+    .replace(/[）)]/g, ')')
+    .replace(/Ⅰ/g, 'I')
+    .replace(/Ⅱ/g, 'II')
+    .replace(/Ⅲ/g, 'III')
+
+/** 按课表上的课名找到学在浙大课程，返回它的全部作业（含已交、已截止）；找不到课程时为空 */
+export async function fetchCourseHomework(courseName: string): Promise<Assignment[]> {
+  await ensureLogin()
+
+  const target = normalize(courseName)
+  const courses = await listCourses()
+  const course =
+    courses.find((c) => normalize(c.name) === target) ??
+    courses.find((c) => normalize(c.name).includes(target) || target.includes(normalize(c.name)))
+  if (!course) return []
+
+  const items: HomeworkActivity[] = []
+  for (let page = 1; ; page++) {
+    const json = await getJson<{ homework_activities: HomeworkActivity[]; pages: number }>(
+      `/api/courses/${course.id}/homework-activities?page=${page}&page_size=100`
+    )
+    items.push(...json.homework_activities)
+    if (page >= json.pages) break
+  }
+
+  return items.map((item) => ({
+    id: String(item.id),
+    courseId: String(course.id),
+    type: 'homework',
+    courseName: course.name,
+    title: item.title,
+    deadline: item.end_time ? new Date(item.end_time).toISOString() : '',
+    submitted: !!(item.submitted || item.is_submitted || item.submission_status === 'submitted'),
+    url: activityUrl(course.id, item.id)
+  }))
 }
 
 export async function getAssignmentDetail(

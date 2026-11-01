@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '@renderer/store'
+import { dur } from '@renderer/lib/motion'
 
 /** 底部居中一行小字，5 秒后消失 */
 export function Toast() {
@@ -13,7 +14,7 @@ export function Toast() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: dur(0.35), ease: [0.22, 1, 0.36, 1] }}
         >
           {toast.text}
           {toast.action && (

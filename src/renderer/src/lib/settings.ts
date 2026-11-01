@@ -1,20 +1,33 @@
 import { initialTheme, applyTheme, type Theme } from './theme'
 import { MOBILE } from './platform'
+import { setMotionSpeed } from './motion'
 
 export type FontStyle = 'song' | 'hei' | 'kai'
 export type Accent = 'shu' | 'blue' | 'red'
 export type FontSize = 's' | 'm' | 'l' | 'xl'
+export type Speed = 'off' | 'fast' | 'normal' | 'slow'
+export type Style = 'paper' | 'material' | 'glass'
 
 export interface Settings {
   theme: Theme
+  /** 整体风格：经典（纸与墨，默认）以外的各在 themes/*.css */
+  style: Style
   font: FontStyle
   accent: Accent
   size: FontSize
   /** 主页左侧的钟鹰衬底 */
   emblem: boolean
+  /** 动效速度：所有动画时长乘以系数，关闭为 0 */
+  speed: Speed
 }
 
 // name 为字体本身的名字，设置页以该字体显示它；安卓上的黑体是系统自带的思源黑体
+export const STYLE_OPTIONS: { id: Style; label: string }[] = [
+  { id: 'paper', label: '经典' },
+  { id: 'material', label: 'Material' },
+  { id: 'glass', label: '液态玻璃' }
+]
+
 export const FONT_OPTIONS: { id: FontStyle; name: string }[] = [
   { id: 'song', name: '思源宋体' },
   { id: 'hei', name: MOBILE ? '思源黑体' : '微软雅黑' },
@@ -35,18 +48,27 @@ export const SIZE_OPTIONS: { id: FontSize; label: string; scale: number }[] = [
   { id: 'xl', label: '特大', scale: 1.22 }
 ]
 
+export const SPEED_OPTIONS: { id: Speed; label: string; factor: number }[] = [
+  { id: 'off', label: '关闭', factor: 0 },
+  { id: 'fast', label: '快', factor: 0.6 },
+  { id: 'normal', label: '标准', factor: 1 },
+  { id: 'slow', label: '慢', factor: 1.6 }
+]
+
 const KEY = 'zju-settings'
 
 export function initialSettings(): Settings {
-  const defaults: Settings = { theme: initialTheme(), font: 'song', accent: 'blue', size: 'm', emblem: true }
+  const defaults: Settings = { theme: initialTheme(), style: 'paper', font: 'song', accent: 'blue', size: 'm', emblem: true, speed: 'normal' }
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
     return {
       theme: defaults.theme,
+      style: STYLE_OPTIONS.some((o) => o.id === stored.style) ? stored.style! : defaults.style,
       font: FONT_OPTIONS.some((o) => o.id === stored.font) ? stored.font! : defaults.font,
       accent: ACCENT_OPTIONS.some((o) => o.id === stored.accent) ? stored.accent! : defaults.accent,
       size: SIZE_OPTIONS.some((o) => o.id === stored.size) ? stored.size! : defaults.size,
-      emblem: stored.emblem ?? defaults.emblem
+      emblem: stored.emblem ?? defaults.emblem,
+      speed: SPEED_OPTIONS.some((o) => o.id === stored.speed) ? stored.speed! : defaults.speed
     }
   } catch {
     return defaults
@@ -55,10 +77,12 @@ export function initialSettings(): Settings {
 
 export function applySettings(s: Settings): void {
   applyTheme(s.theme)
+  document.documentElement.dataset.style = s.style
   document.documentElement.dataset.font = s.font
   document.documentElement.dataset.accent = s.accent
   document.documentElement.style.setProperty('--scale', String(SIZE_OPTIONS.find((o) => o.id === s.size)!.scale))
+  setMotionSpeed(SPEED_OPTIONS.find((o) => o.id === s.speed)!.factor)
   try {
-    localStorage.setItem(KEY, JSON.stringify({ font: s.font, accent: s.accent, size: s.size, emblem: s.emblem }))
+    localStorage.setItem(KEY, JSON.stringify({ style: s.style, font: s.font, accent: s.accent, size: s.size, emblem: s.emblem, speed: s.speed }))
   } catch {}
 }

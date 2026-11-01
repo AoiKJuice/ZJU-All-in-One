@@ -2,35 +2,19 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp, type PageId } from '@renderer/store'
 import { MOBILE } from '@renderer/lib/platform'
+import { dur } from '@renderer/lib/motion'
 
-// 工具页目前为空，手机端先不放
 const NAV: { id: PageId; label: string }[] = [
   { id: 'home', label: '主页' },
   { id: 'schedule', label: '课表' },
-  ...(MOBILE ? [] : [{ id: 'tools' as const, label: '工具' }]),
+  { id: 'tools', label: '工具' },
   { id: 'settings', label: '设置' }
 ]
 
-/** 刊头：字标、三项导航（朱点随切换滑动）、登录与昼夜切换；手机端导航移到底部标签栏，回放页整条收起让位给视频 */
+/** 刊头：字标、三项导航（主题色圆角滑块随切换移动）、未登录时的「登录」与昼夜切换（登录后这里不显示账号，退出在设置页）；手机端导航移到底部标签栏，回放页整条收起让位给视频 */
 export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
-  const { page, go, auth, authBusy, loginOpen, setLoginOpen, logout, theme, toggleTheme } = useApp()
+  const { page, go, auth, authBusy, loginOpen, setLoginOpen, theme, toggleTheme } = useApp()
   const [solid, setSolid] = useState(false)
-  // 退出需两次点击：第一次把名字换成"退出"，3 秒内再点才生效
-  const [armed, setArmed] = useState(false)
-
-  useEffect(() => {
-    if (!armed) return
-    const timer = setTimeout(() => setArmed(false), 3000)
-    return () => clearTimeout(timer)
-  }, [armed])
-
-  const onAuth = (): void => {
-    if (!auth.loggedIn) setLoginOpen(!loginOpen)
-    else if (armed) {
-      setArmed(false)
-      void logout()
-    } else setArmed(true)
-  }
 
   useEffect(() => {
     if (!scroller) return
@@ -41,8 +25,8 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
 
   const nav = NAV.map(({ id, label }) => (
     <button key={id} className="mast-link" data-active={page === id || undefined} onClick={() => go(id)}>
-      {label}
-      {page === id && <motion.span layoutId="mark-dot" className="mark-dot" transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} />}
+      {page === id && <motion.span layoutId="nav-pill" className="choice-pill" transition={{ duration: dur(0.55), ease: [0.22, 1, 0.36, 1] }} />}
+      <span className="choice-label">{label}</span>
     </button>
   ))
 
@@ -57,15 +41,17 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
       </span>
       {MOBILE ? <span className="mr-auto" /> : <nav className="mast-nav">{nav}</nav>}
       <div className="mast-meta">
-        <button
-          data-login-toggle
-          disabled={authBusy}
-          onClick={onAuth}
-          data-armed={armed || loginOpen || undefined}
-          className="data-[armed]:text-[var(--shu)]"
-        >
-          {!auth.loggedIn ? '登录' : armed ? '退出' : (auth.account ?? '已登录')}
-        </button>
+        {!auth.loggedIn && (
+          <button
+            data-login-toggle
+            disabled={authBusy}
+            onClick={() => setLoginOpen(!loginOpen)}
+            data-armed={loginOpen || undefined}
+            className="data-[armed]:text-[var(--shu)]"
+          >
+            登录
+          </button>
+        )}
         <button onClick={toggleTheme} aria-label="切换深浅色" title="切换深浅色" className="theme-toggle">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.span
@@ -73,7 +59,7 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
               initial={{ opacity: 0, y: 6, filter: 'blur(4px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: -6, filter: 'blur(4px)' }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: dur(0.5), ease: [0.22, 1, 0.36, 1] }}
             >
               {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
             </motion.span>

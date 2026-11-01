@@ -2,7 +2,10 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type RefO
 import { AnimatePresence, motion } from 'motion/react'
 import type { Slide } from '@shared/types'
 import { downloadFile } from './Download'
+import { Choice } from './Type'
+import { ZoomStage } from './ZoomStage'
 import { useCurrentSlide } from '@renderer/hooks/useCurrentSlide'
+import { dur } from '@renderer/lib/motion'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -23,7 +26,7 @@ interface Props {
 /**
  * 课件区：缩略图 / 大图两种视图。
  * 大图可翻页，默认跟随当前讲解页，手动翻页后停止跟随，"回到当前"恢复。
- * 点击课件不影响播放（直播尤其不能暂停）；右键：全窗口查看、下载。
+ * 点击课件不影响播放（直播尤其不能暂停）；右键：全窗口查看、下载。触屏上大图可双指缩放、左右滑动翻页（ZoomStage）。
  */
 export function SlideViewer({ slides, error, video, ready, live, courseName, onSeek, extra }: Props) {
   const [mode, setMode] = useState<'grid' | 'single'>('grid')
@@ -91,12 +94,12 @@ export function SlideViewer({ slides, error, video, ready, live, courseName, onS
       <div className="acts tab-tools">
         {count > 0 && (
           <>
-            <button className="act" data-on={mode === 'grid' || undefined} onClick={() => setMode('grid')}>
+            <Choice group="slide-mode" className="small" active={mode === 'grid'} onClick={() => setMode('grid')}>
               缩略图
-            </button>
-            <button className="act" data-on={mode === 'single' || undefined} onClick={() => setMode('single')}>
+            </Choice>
+            <Choice group="slide-mode" className="small" active={mode === 'single'} onClick={() => setMode('single')}>
               大图
-            </button>
+            </Choice>
           </>
         )}
         <span className="flex-1" />
@@ -129,35 +132,43 @@ export function SlideViewer({ slides, error, video, ready, live, courseName, onS
         ) : (
           slide && (
             <>
-              <div className="slide-stage" onContextMenu={(e) => openMenu(e, index)}>
-                <img src={slide.imageUrl} alt="" />
-              </div>
+              <ZoomStage
+                src={slide.imageUrl}
+                canPrev={index > 0}
+                canNext={index < count - 1}
+                onPrev={() => go(index - 1)}
+                onNext={() => go(index + 1)}
+                onContextMenu={(e) => openMenu(e, index)}
+              />
               {/* 翻页一行在图片框之外，图片限制在自己的框内，不会盖住按钮 */}
-              <div className="acts slide-nav">
-                <button className="act" disabled={index === 0} onClick={() => go(index - 1)}>
-                  上一页
-                </button>
-                <span className="tabular-nums">
-                  {index + 1} / {count}
-                </span>
-                <button className="act" disabled={index === count - 1} onClick={() => go(index + 1)}>
-                  下一页
-                </button>
-                <span className="flex-1" />
-                {!live && slide.time !== undefined && (
-                  <button className="act" onClick={() => onSeek(slide.time!)}>
-                    从此页播放
+              <div className="slide-nav">
+                <span className="slide-pager">
+                  <button className="act" disabled={index === 0} onClick={() => go(index - 1)}>
+                    上一页
                   </button>
-                )}
-                <button className="act" data-on={(follow && index === current) || undefined} onClick={() => setFollow(true)}>
-                  回到当前
-                </button>
-                <button className="act" onClick={() => setFull(index)}>
-                  全窗口
-                </button>
-                <button className="act" onClick={() => download(index)}>
-                  下载
-                </button>
+                  <span className="tabular-nums">
+                    {index + 1} / {count}
+                  </span>
+                  <button className="act" disabled={index === count - 1} onClick={() => go(index + 1)}>
+                    下一页
+                  </button>
+                </span>
+                <span className="slide-acts">
+                  {!live && slide.time !== undefined && (
+                    <button className="act" onClick={() => onSeek(slide.time!)}>
+                      从此页播放
+                    </button>
+                  )}
+                  <button className="act" data-on={(follow && index === current) || undefined} onClick={() => setFollow(true)}>
+                    回到当前
+                  </button>
+                  <button className="act" onClick={() => setFull(index)}>
+                    全窗口
+                  </button>
+                  <button className="act" onClick={() => download(index)}>
+                    下载
+                  </button>
+                </span>
               </div>
             </>
           )
@@ -198,7 +209,7 @@ export function SlideViewer({ slides, error, video, ready, live, courseName, onS
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.35 }}
+            transition={{ duration: dur(0.35) }}
           >
             <motion.img
               key={full}
@@ -206,7 +217,7 @@ export function SlideViewer({ slides, error, video, ready, live, courseName, onS
               alt=""
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.45, ease: EASE }}
+              transition={{ duration: dur(0.45), ease: EASE }}
             />
             <span className="lightbox-no">
               {full + 1} / {count}

@@ -95,7 +95,8 @@ async function ensureLogin(): Promise<void> {
   loggedIn = true
 }
 
-async function post<T>(path: string, fields?: Record<string, string>): Promise<T> {
+/** 教务的 POST 查询（毕业自审等也经它，见 graduation.ts） */
+export async function post<T>(path: string, fields?: Record<string, string>): Promise<T> {
   await ensureLogin()
 
   const request = () => zjuFetch(`${BASE}${path}`, {

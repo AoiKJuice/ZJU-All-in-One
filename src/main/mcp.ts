@@ -132,6 +132,11 @@ function buildServer(tools: Config['tools']): McpServer {
       annotations: read
     }, async () => json((await call('data:exams')).data))
 
+    mcp.registerTool('get_graduation_audit', {
+      description: '毕业自审：nodes 为教务「毕业资格自审」树（平铺，parentId 还原层级；没有 code 的是模块，带要求 / 已获学分与门数，kind 为选必修；有 code 的是课程，status 为 passed 通过 / failed 不通过 / replaced 被替代 / studying 在修 / none 无记录）；classrooms 为第二课堂系统的二、三、四课堂记点、学分、等级与是否达标；aesthetic / labor 为美育、劳育的达标、记点与自审里对应模块的学分。某一部分取不到时为 null，原因在 nodesError / practiceError',
+      annotations: read
+    }, async () => json((await call('data:graduation')).data))
+
     mcp.registerTool('get_assignments', {
       description: '待办：学在浙大的作业与活动，以及（设置里开启并登录后）PTA 未截止的题目集（type 为 pta，progress 为已通过 / 总题数）；含截止时间与是否已完成。ignored 为 true 的是用户在应用里忽略的条目（主页不显示、不提醒）',
       annotations: read
@@ -139,6 +144,12 @@ function buildServer(tools: Config['tools']): McpServer {
       const ignored = new Set(getTodoState().ignored)
       return json((await call('data:assignments')).data.map((a) => ({ ...a, ignored: ignored.has(a.id) })))
     })
+
+    mcp.registerTool('get_course_homework', {
+      description: '某门课的全部作业（含已交、已截止），按课表上的课名匹配学在浙大课程；deadline 为空表示没有截止时间',
+      inputSchema: { course_name: z.string().describe('课名，与 get_schedule 返回的 name 一致') },
+      annotations: read
+    }, async ({ course_name }) => json(await call('data:courseHomework', course_name)))
 
     mcp.registerTool('get_assignment_detail', {
       description: '某项作业的说明、附件与已有提交',

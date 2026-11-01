@@ -1,13 +1,15 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { McpState, McpToolGroup, PtaState } from '@shared/types'
 import { useApp } from '@renderer/store'
-import { OutlineWord, Reveal, SectionHead } from '@renderer/components/Type'
-import { ACCENT_OPTIONS, FONT_OPTIONS, SIZE_OPTIONS, type FontStyle } from '@renderer/lib/settings'
+import { Choice, OutlineWord, Reveal, SectionHead } from '@renderer/components/Type'
+import { ACCENT_OPTIONS, FONT_OPTIONS, SIZE_OPTIONS, SPEED_OPTIONS, STYLE_OPTIONS, type FontStyle } from '@renderer/lib/settings'
 import { MOBILE } from '@renderer/lib/platform'
+import { maskAccount } from '@renderer/lib/format'
+import { peek, put } from '@renderer/lib/cache'
 
 // 与 styles.css 中 html[data-font] 的字体栈一致，用来让每个选项以自身字体预览
 const FAMILY: Record<FontStyle, string> = {
-  song: "'AJ Digits', 'AJ Latin', 'Noto Serif SC', serif",
+  song: "'AJ Digits', 'AJ Latin', 'Noto Serif SC Variable', serif",
   hei: "'AJ Sans', 'Microsoft YaHei UI', sans-serif",
   kai: "'AJ Digits', 'AJ Kai', 'KaiTi', serif"
 }
@@ -32,6 +34,13 @@ export function Settings() {
       <div className="mt-20 flex max-w-3xl flex-col gap-14">
         <Reveal>
           <Section title="外观">
+            <Row label="风格">
+              {STYLE_OPTIONS.map((o) => (
+                <Option key={o.id} active={settings.style === o.id} onClick={() => setSetting('style', o.id)}>
+                  {o.label}
+                </Option>
+              ))}
+            </Row>
             <Row label="模式">
               {(['light', 'dark'] as const).map((t) => (
                 <Option key={t} active={settings.theme === t} onClick={() => setSetting('theme', t)}>
@@ -61,6 +70,13 @@ export function Settings() {
                 </Option>
               ))}
             </Row>
+            <Row label="动效">
+              {SPEED_OPTIONS.map((o) => (
+                <Option key={o.id} active={settings.speed === o.id} onClick={() => setSetting('speed', o.id)}>
+                  {o.label}
+                </Option>
+              ))}
+            </Row>
             <Row label="背景徽标">
               {([true, false] as const).map((on) => (
                 <Option key={String(on)} active={settings.emblem === on} onClick={() => setSetting('emblem', on)}>
@@ -71,7 +87,7 @@ export function Settings() {
           </Section>
         </Reveal>
 
-        <Reveal i={1}>
+        <Reveal i={1} flat>
           <Section title="待办">
             <Row label="截止前 3 小时提醒">
               {([true, false] as const).map((on) => (
@@ -83,7 +99,7 @@ export function Settings() {
           </Section>
         </Reveal>
 
-        <Reveal i={2}>
+        <Reveal i={2} flat>
           <Section title="账号">
             <ZjuAccount />
             <Pta />
@@ -91,7 +107,7 @@ export function Settings() {
         </Reveal>
 
         {!MOBILE && (
-          <Reveal i={3}>
+          <Reveal i={3} flat>
             <Section title="本地 Agent">
               <Mcp />
             </Section>
@@ -117,7 +133,7 @@ function ZjuAccount() {
     <Row label="统一身份认证">
       {auth.loggedIn ? (
         <>
-          <span className="text-[var(--ink)]">{auth.account ?? '已登录'}</span>
+          <span className="text-[var(--ink)]">{auth.account ? maskAccount(auth.account) : '已登录'}</span>
           <button
             className="act"
             data-on={armed || undefined}
@@ -146,7 +162,12 @@ function ZjuAccount() {
 /** PTA：开关；开启后登录（账号密码，验证码时走网页登录）或显示账号与退出。题目集并入主页待办 */
 function Pta() {
   const refresh = useApp((s) => s.refresh)
-  const [pta, setPta] = useState<PtaState | null>(null)
+  // 先显示上次取到的状态，免得每次进设置页这块从无到有、把下面顶下去
+  const [pta, setPtaState] = useState<PtaState | null>(() => peek<PtaState>('pta-state') ?? null)
+  const setPta = (state: PtaState): void => {
+    put('pta-state', state, 0)
+    setPtaState(state)
+  }
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -237,7 +258,11 @@ function Pta() {
 /** 本地 MCP 服务：总开关、接入配置、按组开关工具 */
 function Mcp() {
   const notify = useApp((s) => s.notify)
-  const [mcp, setMcp] = useState<McpState | null>(null)
+  const [mcp, setMcpState] = useState<McpState | null>(() => peek<McpState>('mcp-state') ?? null)
+  const setMcp = (state: McpState): void => {
+    put('mcp-state', state, 0)
+    setMcpState(state)
+  }
 
   useEffect(() => {
     void window.zju['mcp:state']().then(setMcp)
@@ -288,7 +313,7 @@ function Mcp() {
           </Row>
           <Row label="允许">
             {MCP_TOOLS.map((t) => (
-              <Option key={t.id} active={mcp.tools[t.id]} onClick={() => void set({ tools: { [t.id]: !mcp.tools[t.id] } })}>
+              <Option key={t.id} multi active={mcp.tools[t.id]} onClick={() => void set({ tools: { [t.id]: !mcp.tools[t.id] } })}>
                 {t.label}
               </Option>
             ))}
@@ -308,20 +333,26 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+// 一行内的选项同属一组，选中滑块在组内移动
+const RowGroup = createContext('')
+
 /** 一行设置：左侧名称，右侧选项 */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <li className="row settings-row">
-      <span className="text-base tracking-[0.1em] text-[var(--ink-2)]">{label}</span>
-      <span className="flex flex-wrap items-center gap-x-8 gap-y-2">{children}</span>
+      <span className="settings-label">{label}</span>
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <RowGroup.Provider value={label}>{children}</RowGroup.Provider>
+      </span>
     </li>
   )
 }
 
-function Option({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function Option({ active, onClick, multi, children }: { active: boolean; onClick: () => void; multi?: boolean; children: ReactNode }) {
+  const group = useContext(RowGroup)
   return (
-    <button className="opt" data-active={active || undefined} onClick={onClick}>
+    <Choice group={`settings-${group}`} active={active} multi={multi} onClick={onClick} className="opt">
       {children}
-    </button>
+    </Choice>
   )
 }

@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import type { LectureReplay, TermCalendar } from '@shared/types'
+import type { LectureReplay } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
+import { useCalendar } from '@renderer/hooks/useCalendar'
 import { useApp } from '@renderer/store'
-import { Quiet, Reveal, Sep } from '@renderer/components/Type'
+import { Quiet, Reveal } from '@renderer/components/Type'
 import { PERIOD_COUNT, periodStart } from '@renderer/lib/periods'
-import { weekdayLabel } from '@renderer/lib/format'
+import { cnNumber, weekdayLabel } from '@renderer/lib/format'
+import { Roll } from '@renderer/components/Roll'
 import { addDays, findLecture, mergeSessions, mondayOf, sessionsOn, teachingWeek, ymd } from '@renderer/lib/calendar'
+import { colorVar, courseColors } from '@renderer/lib/courseColor'
 import { cached, peek } from '@renderer/lib/cache'
 import { MOBILE } from '@renderer/lib/platform'
+import { dur } from '@renderer/lib/motion'
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7]
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -20,27 +24,34 @@ const WHEEL_COOLDOWN = 380
 const SWIPE_STEP = 56
 
 const lecturesKey = (monday: string): string => `lectures:${monday}`
-// 午间、晚间之后的第一节上方画一道浅线，其余节次之间不画
-const BREAKS = new Set([6, 11])
 
-// 翻页动效：下一周从右进、向左出，上一周反之。用 variants + AnimatePresence 的 custom，
-// 退场的那一周按"当前"方向离开（直接写在 exit 里会用它渲染时的旧方向）
-const SLIDE = 36
-const weekSlide = {
-  enter: (dir: number) => ({ opacity: 0, x: dir * SLIDE, filter: 'blur(4px)' }),
-  center: { opacity: 1, x: 0, filter: 'blur(0px)' },
-  exit: (dir: number) => ({ opacity: 0, x: dir * -SLIDE, filter: 'blur(4px)' })
+// 上午 1–5、下午 6–10、晚上 11–13 节各是一块卡片，块与块之间空一行；节次 → 网格行（第 1 行是星期）
+const BLOCKS: [number, number][] = [
+  [1, 5],
+  [6, 10],
+  [11, 13]
+]
+const rowOf = (period: number): number => period + 1 + (period >= 6 ? 1 : 0) + (period >= 11 ? 1 : 0)
+
+// 翻周时网格不动：周数与日期按位滚动（Roll），两周都有的课原地不动，只有出现、消失的课淡入淡出
+const cellFade = {
+  initial: { opacity: 0, scale: 0.94 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.94 }
 }
 
-/** 周视图：按周翻页（按钮、滚轮，中键回本周；手机端左右滑动）；细线网格占满可用高度；有智云课次的课可点进视频。校历与各周课次走缓存。
- *  手机端这一周周末没课就只画周一到周五，左侧只写节次 */
+/**
+ * 周视图：按周翻页（底部悬浮按钮、滚轮，中键回本周；手机端左右滑动）；上午、下午、晚上三块卡片占满可用高度，左侧节次与开始时刻。
+ * 课程按课名配色，有录播的课右上角带标志；点课程打开课程详情（上课时间地点、作业、智云入口）。校历与各周课次走缓存。
+ * 空间够时七天都画；手机或窄窗口里周六、周日只有这一周确实有课（含调休上课）时才加上那一列
+ */
 export function Schedule() {
   const { data, loading, error } = useZju('data:schedule')
   // 演示模式不登录也取数，与 useZju 一致
   const loggedIn = useApp((s) => s.auth.loggedIn) || import.meta.env.VITE_ZJU_DEMO === '1'
   const epoch = useApp((s) => s.epoch)
-  const openReplay = useApp((s) => s.openReplay)
-  const [cal, setCal] = useState<TermCalendar | null>(() => peek<TermCalendar>('calendar', true) ?? null)
+  const openCourse = useApp((s) => s.openCourse)
+  const cal = useCalendar()
   const [offset, setOffset] = useState(0)
   const [dir, setDir] = useState(0)
 
@@ -48,10 +59,7 @@ export function Schedule() {
   const dates = DAYS.map((d) => ymd(addDays(monday, d - 1)))
   const today = ymd(new Date())
   const [lectures, setLectures] = useState<LectureReplay[]>(() => peek<LectureReplay[]>(lecturesKey(dates[0])) ?? [])
-
-  useEffect(() => {
-    if (loggedIn) void cached('calendar', epoch, () => window.zju['data:calendar'](), true).then(setCal, () => {})
-  }, [loggedIn, epoch])
+  const colors = useMemo(() => courseColors(data ?? []), [data])
 
   // 本周课次先用缓存，过期再取；顺带预取前后一周，翻页时不必等
   useEffect(() => {
@@ -100,8 +108,11 @@ export function Schedule() {
   }
 
   const tw = cal && dates.map((d) => teachingWeek(cal, d)).find(Boolean)
-  const weekend = !!cal && !!data && dates.slice(5).some((d) => sessionsOn(cal, data, d).length > 0)
-  const shown = MOBILE && !weekend ? dates.slice(0, 5) : dates
+  // 每列：日期与星期（1–7）；窄屏时周末没课的那天不占列
+  const narrow = useNarrow()
+  const shown = dates
+    .map((date, i) => ({ date, weekday: i + 1 }))
+    .filter(({ date, weekday }) => !narrow || weekday <= 5 || (!!cal && !!data && sessionsOn(cal, data, date).length > 0))
 
   return (
     <div
@@ -116,100 +127,132 @@ export function Schedule() {
         if (offset !== 0) page(0)
       }}
     >
-      <Reveal className="mt-2 flex items-end justify-between">
-        <h1 className={MOBILE ? 'page-title' : 'page-title !text-[clamp(1.75rem,2.5vw+1.5vh,2.75rem)]'}>
-          {tw ? (
-            <>
-              {tw.half}
-              <Sep />第 {tw.week} 周
-            </>
-          ) : (
-            '课表'
-          )}
-          <span className="ml-5 text-[0.45em] tracking-[0.06em] text-[var(--ink-3)]">
-            {dates[0].slice(5).replace('-', '.')} – {dates[6].slice(5).replace('-', '.')}
-          </span>
+      <Reveal className="mt-2">
+        {/* 秋七周：半学期 + 汉字周数 */}
+        <h1 className="page-title schedule-title">
+          <Roll text={tw ? `${tw.half}${cnNumber(tw.week)}周` : '课表'} dir={dir} />
         </h1>
-        {/* 翻周：大号箭头；不在本周时中间才出现「本周」 */}
-        <div className="week-nav">
-          <button aria-label="上一周" onClick={() => page(-1)}>
-            ←
-          </button>
-          <button className="week-today" data-hidden={offset === 0 || undefined} onClick={() => page(0)}>
-            本周
-          </button>
-          <button aria-label="下一周" onClick={() => page(1)}>
-            →
-          </button>
-        </div>
       </Reveal>
 
-      <Reveal i={1} className="panel schedule-board mt-4 flex min-h-0 flex-1 flex-col">
+      <Reveal i={1} flat className="schedule-board mt-4 flex min-h-0 flex-1 flex-col">
         {!data?.length || !cal ? (
           <Quiet loading={loading || (loggedIn && !cal)} error={error} empty="无" />
         ) : (
-          <AnimatePresence mode="wait" custom={dir}>
-            <motion.div
-              key={dates[0]}
-              custom={dir}
-              variants={weekSlide}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.4, ease: EASE }}
+            <div
               className="grid flex-1"
-              style={
-                MOBILE
-                  ? { gridTemplateColumns: `1.75rem repeat(${shown.length}, minmax(0, 1fr))`, gridTemplateRows: `2.75rem repeat(${PERIOD_COUNT}, minmax(3.25rem, 1fr))` }
-                  : { gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))', gridTemplateRows: `3.25rem repeat(${PERIOD_COUNT}, minmax(2.2rem, 1fr))` }
-              }
+              style={{
+                gridTemplateColumns: `${MOBILE ? '2.375rem' : '4rem'} repeat(${shown.length}, minmax(0, 1fr))`,
+                gridTemplateRows: `${MOBILE ? '2.75rem' : '3.25rem'} ${BLOCKS.map(([a, b]) => `repeat(${b - a + 1}, minmax(${MOBILE ? '3.25rem' : '2rem'}, 1fr))`).join(' 0.625rem ')}`
+              }}
             >
-              {shown.map((date, i) =>
-                date === today ? <div key="today" className="rounded-[var(--r-md)] bg-[var(--tint)]" style={{ gridColumn: i + 2, gridRow: `1 / ${PERIOD_COUNT + 2}` }} /> : null
-              )}
-              {shown.map((date, i) => (
-                <div
-                  key={date}
-                  className="day-head flex flex-col justify-center px-3 leading-tight"
-                  style={{ gridColumn: i + 2, gridRow: 1, color: date === today ? 'var(--shu)' : 'var(--ink-3)' }}
-                >
-                  <span className="text-[0.9375rem] tracking-[0.14em]">{weekdayLabel(i + 1)}</span>
-                  <span className="text-xs tabular-nums">
-                    {date.slice(5).replace('-', '.')}
-                    {cal.holidays[date] && <span className="ml-2 text-[var(--shu)]">{cal.holidays[date]}</span>}
+              {BLOCKS.map(([a, b]) => (
+                <div key={a} className="period-block" style={{ gridColumn: '1 / -1', gridRow: `${rowOf(a)} / ${rowOf(b) + 1}` }} />
+              ))}
+              <AnimatePresence initial={false}>
+                {shown.flatMap(({ date }, i) =>
+                  date === today
+                    ? BLOCKS.map(([a, b]) => (
+                        <motion.div
+                          key={`today-${a}`}
+                          className="today-col"
+                          // 最右一列贴着块的圆角，右侧两角跟着圆
+                          data-last={i === shown.length - 1 || undefined}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: dur(0.35) }}
+                          style={{ gridColumn: i + 2, gridRow: `${rowOf(a)} / ${rowOf(b) + 1}` }}
+                        />
+                      ))
+                    : []
+                )}
+              </AnimatePresence>
+              {shown.map(({ date, weekday }, i) => (
+                <div key={weekday} className="day-head" data-today={date === today || undefined} style={{ gridColumn: i + 2, gridRow: 1 }}>
+                  <span className="day-name">{weekdayLabel(weekday)}</span>
+                  <span className="day-date">
+                    <Roll text={date.slice(5).replace('-', '.')} dir={dir} />
+                    {cal.holidays[date] && <span className="ml-1.5 text-[var(--shu)]">{cal.holidays[date]}</span>}
                   </span>
                 </div>
               ))}
               {Array.from({ length: PERIOD_COUNT }, (_, i) => (
-                <div key={i} className={`period-head pt-1 text-xs tabular-nums text-[var(--ink-3)]${BREAKS.has(i + 1) ? ' period-break' : ''}`} style={{ gridColumn: '1 / -1', gridRow: i + 2 }}>
-                  {MOBILE ? i + 1 : periodStart(i + 1)}
+                <div key={i} className="period-head" style={{ gridColumn: 1, gridRow: rowOf(i + 1) }}>
+                  <span className="period-no">{i + 1}</span>
+                  <span className="period-time">{periodStart(i + 1)}</span>
                 </div>
               ))}
-              {shown.flatMap((date, i) =>
-                mergeSessions(sessionsOn(cal, data, date)).map((c) => {
-                  const lecture = findLecture(lectures, c, date)
-                  const playable = lecture && (lecture.status === 'replay' || lecture.status === 'live')
-                  const Tag = playable ? 'button' : 'div'
-                  return (
-                    <Tag
-                      key={`${date}:${c.id}`}
-                      onClick={playable ? () => openReplay(lecture) : undefined}
-                      className="course-cell"
-                      data-playable={playable || undefined}
-                      style={{ gridColumn: i + 2, gridRow: `${c.startPeriod + 1} / ${c.endPeriod + 2}` }}
-                    >
-                      <span className="course-name">{c.name}</span>
-                      <span className="mt-auto text-xs tracking-wide text-[var(--ink-3)]">
-                        {lecture?.status === 'live' ? <span className="live-mark">直播</span> : c.location}
-                      </span>
-                    </Tag>
-                  )
-                })
-              )}
-            </motion.div>
-          </AnimatePresence>
+              <AnimatePresence initial={false}>
+                {shown.flatMap(({ date, weekday }, i) =>
+                  mergeSessions(sessionsOn(cal, data, date)).map((c) => {
+                    const lecture = findLecture(lectures, c, date)
+                    const recorded = lecture?.status === 'replay' || lecture?.status === 'live'
+                    return (
+                      <motion.button
+                        // 按星期、节次、课名与教室认课：两周都有的同一节课不重建，原地不动
+                        key={`${weekday}:${c.startPeriod}-${c.endPeriod}:${c.name}:${c.location}`}
+                        {...cellFade}
+                        transition={{ duration: dur(0.35), ease: EASE }}
+                        onClick={() => openCourse({ session: c, date, lecture })}
+                        className="course-cell"
+                        style={{ gridColumn: i + 2, gridRow: `${rowOf(c.startPeriod)} / ${rowOf(c.endPeriod) + 1}`, ['--cc' as string]: colorVar(colors.get(c.name)) }}
+                      >
+                        {recorded && lecture &&
+                          (lecture.status === 'live' ? (
+                            <span className="cell-live">直播</span>
+                          ) : (
+                            <span className="cell-replay" aria-label="有录播">
+                              <svg viewBox="0 0 12 12" aria-hidden>
+                                <path d="M4.2 2.9v6.2L9.2 6z" fill="currentColor" />
+                              </svg>
+                            </span>
+                          ))}
+                        <span className="course-name">{c.name}</span>
+                        <span className="course-place">{c.location}</span>
+                      </motion.button>
+                    )
+                  })
+                )}
+              </AnimatePresence>
+            </div>
         )}
       </Reveal>
+
+      {/* 翻周：底部居中的半透明悬浮按钮，长度固定；中间在本周时写「本周」（不可点），离开本周时换成「回到本周」 */}
+      <div className="week-float">
+        <button aria-label="上一周" onClick={() => page(-1)}>
+          <Chevron dir={-1} />
+        </button>
+        <button className="week-today" data-away={offset !== 0 || undefined} disabled={offset === 0} onClick={() => page(0)}>
+          <span>本周</span>
+          <span>回到本周</span>
+        </button>
+        <button aria-label="下一周" onClick={() => page(1)}>
+          <Chevron dir={1} />
+        </button>
+      </div>
     </div>
+  )
+}
+
+// 七列放不下（手机，或窗口窄到每列不足一个课名宽）时折叠没课的周末
+const NARROW = '(max-width: 760px)'
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(() => MOBILE || matchMedia(NARROW).matches)
+  useEffect(() => {
+    if (MOBILE) return
+    const query = matchMedia(NARROW)
+    const onChange = (): void => setNarrow(query.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
+
+function Chevron({ dir }: { dir: 1 | -1 }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={dir < 0 ? 'M14.5 6l-6 6 6 6' : 'M9.5 6l6 6-6 6'} />
+    </svg>
   )
 }

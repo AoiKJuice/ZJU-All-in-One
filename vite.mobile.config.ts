@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, normalizePath, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -9,7 +9,9 @@ import tailwindcss from '@tailwindcss/vite'
 const main = resolve('src/main')
 const mobile = resolve('src/mobile')
 
-const REPLACE: Record<string, string> = {
+// 替身的路径要写成正斜杠：与正常 import 解析出的 id 一致，否则 Windows 下同一文件会被当成两个模块各打包一份
+// （曾导致选文件存进一个 Map、提交时读另一个，报"文件已失效"）
+const REPLACE: Record<string, string> = Object.fromEntries(Object.entries({
   [resolve(main, 'http.ts')]: resolve(mobile, 'http.ts'),
   [resolve(main, 'secure.ts')]: resolve(mobile, 'secure.ts'),
   [resolve(main, 'diagnostics.ts')]: resolve(mobile, 'diagnostics.ts'),
@@ -18,7 +20,7 @@ const REPLACE: Record<string, string> = {
   'node:crypto': resolve(mobile, 'shims/crypto.ts'),
   'node:fs/promises': resolve(mobile, 'shims/fs.ts'),
   'node:path': resolve(mobile, 'shims/path.ts')
-}
+}).map(([from, to]) => [from, normalizePath(to)]))
 
 function replaceMainModules(): Plugin {
   return {

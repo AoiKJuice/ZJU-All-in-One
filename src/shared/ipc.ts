@@ -13,6 +13,7 @@ import type {
   CourseSession,
   DataResult,
   Exam,
+  GraduationAudit,
   LectureReplay,
   PlaybackSource,
   SystemStats,
@@ -42,8 +43,12 @@ export interface ZjuApi {
   'data:replays': () => Promise<DataResult<LectureReplay[]>>
   /** 当前学年学期校历 */
   'data:calendar': () => Promise<TermCalendar>
+  /** 某门课（按课表上的课名匹配学在浙大课程）的全部作业，含已交与已截止 */
+  'data:courseHomework': (courseName: string) => Promise<Assignment[]>
   /** 区间内（YYYY-MM-DD，含两端）的全部智云课次，供课表点课跳视频 */
   'data:lectures': (from: string, to: string) => Promise<LectureReplay[]>
+  /** 毕业自审：教务毕业资格自审树（必修课完成情况等）+ 第二课堂系统的二三四课堂、美育、劳育 */
+  'data:graduation': () => Promise<DataResult<GraduationAudit>>
   /** 悬停转写进度时轮询 */
   'system:stats': () => Promise<SystemStats>
 
@@ -108,7 +113,9 @@ export const ZJU_CHANNELS = [
   'data:assignments',
   'data:replays',
   'data:calendar',
+  'data:courseHomework',
   'data:lectures',
+  'data:graduation',
   'system:stats',
   'file:download',
   'file:reveal',

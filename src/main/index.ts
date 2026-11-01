@@ -12,7 +12,12 @@ app.setPath('userData', join(app.getPath('appData'), profile ? `zju-all-in-one-$
 
 // Windows 回放用软件解码，规避 D3D11 解码路径。界面保留 GPU 合成（全软件渲染太卡）；
 // 与 Whisper CUDA 的争用由 asr/throttle.ts 限制 Whisper 的显卡占空比解决。
-if (process.platform === 'win32') app.commandLine.appendSwitch('disable-accelerated-video-decode')
+// 视频也不交给硬件叠加平面（MPO）：NVIDIA 驱动下这条路径在 Chromium 里有闪烁与显卡进程挂起的已知问题，
+// 本机日志里没有视频解码时也出现过 AppHang
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-accelerated-video-decode')
+  app.commandLine.appendSwitch('disable-direct-composition-video-overlays')
+}
 
 let mainWindow: BrowserWindow | null = null
 

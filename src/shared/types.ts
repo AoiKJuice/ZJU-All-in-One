@@ -90,7 +90,7 @@ export interface Assignment {
   type: string
   courseName: string
   title: string
-  /** ISO 8601 */
+  /** ISO 8601；课程作业列表里没有截止时间的为空串 */
   deadline: string
   submitted: boolean
   url?: string
@@ -240,4 +240,55 @@ export interface TaskProgress {
   eta?: number
   /** transcribe 阶段新识别出的段落（增量，渲染端累积） */
   partial?: TranscriptSegment[]
+}
+
+/** 毕业自审里一门课的审核状态：通过 / 不通过 / 被替代 / 在修 / 无记录（多半未修） */
+export type AuditStatus = 'passed' | 'failed' | 'replaced' | 'studying' | 'none'
+
+/** 教务「毕业资格自审」树的一个节点：模块（无课程代码）或课程；平铺给出，按 parentId 还原层级 */
+export interface AuditNode {
+  id: string
+  parentId: string | null
+  name: string
+  /** 课程代码；模块为空 */
+  code?: string
+  /** 选必修，如「必修课程」「选修课程」 */
+  kind?: string
+  /** 课程学分 */
+  credits?: number
+  grade?: string
+  status: AuditStatus
+  /** 替代说明或修读备注 */
+  note?: string
+  /** 模块要求 / 已获学分、要求 / 完成门数，保留原样（可能是「150+8」这样的复合值） */
+  requiredCredits?: string
+  earnedCredits?: string
+  requiredCourses?: string
+  completedCourses?: string
+}
+
+/** 第二课堂系统里的一类课堂（二 / 三 / 四课堂）：记点、折算学分、等级、是否达标 */
+export interface ClassroomCredit {
+  points: number
+  credits: number | null
+  grade: string | null
+  passed: boolean | null
+}
+
+/** 美育 / 劳育：第二课堂的达标判定与该类项目的记点，以及毕业自审里对应模块的学分 */
+export interface EducationCredit {
+  passed: boolean | null
+  points: number | null
+  earnedCredits?: string
+  requiredCredits?: string
+}
+
+/** 毕业自审：教务自审树 + 第二课堂系统，两部分各自可能失败 */
+export interface GraduationAudit {
+  nodes: AuditNode[] | null
+  nodesError?: string
+  classrooms: { second: ClassroomCredit; third: ClassroomCredit; fourth: ClassroomCredit } | null
+  aesthetic: EducationCredit
+  labor: EducationCredit
+  practiceError?: string
 }

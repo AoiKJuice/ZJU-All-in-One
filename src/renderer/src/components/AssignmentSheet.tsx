@@ -5,6 +5,7 @@ import { useApp } from '@renderer/store'
 import { Joined } from './Type'
 import { DownloadRow, downloadFile } from './Download'
 import { clock, dotDate, relativeTo } from '@renderer/lib/format'
+import { dur } from '@renderer/lib/motion'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -48,7 +49,7 @@ export function AssignmentSheet() {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ duration: 0.6, ease: EASE }}
+            transition={{ duration: dur(0.6), ease: EASE }}
           >
             {assignment.type === 'pta' ? (
               <PtaBody key={assignment.id} a={assignment} />
@@ -78,6 +79,12 @@ function SheetActs({ a }: { a: Assignment }) {
       >
         {ignored ? '恢复' : '忽略'}
       </button>
+      {/* 原页面放在标题旁的动作里，不跟在元信息后面（窄时会单独掉到下一行） */}
+      {a.url && a.type !== 'pta' && (
+        <a className="act" href={a.url} target="_blank" rel="noreferrer">
+          原页面 ↗
+        </a>
+      )}
       <button className="act" onClick={() => openAssignment(null)}>
         关闭
       </button>
@@ -90,13 +97,13 @@ function PtaBody({ a }: { a: Assignment }) {
   return (
     <>
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="section-title !tracking-[0.06em]">{a.title}</h2>
+        <h2 className="sheet-title">{a.title}</h2>
         <SheetActs a={a} />
       </div>
-      <p className="quiet !py-2">
-        <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />
+      <p className="sheet-meta">
+        <Joined parts={[a.courseName, a.deadline && `${dotDate(a.deadline)} ${clock(a.deadline)}`, a.deadline && relativeTo(a.deadline)]} />
       </p>
-      <div className="sheet-body mt-4">
+      <div className="sheet-body">
         <ul className="rows">
           <li className="row !grid-cols-[6.5em_minmax(0,1fr)] !py-2">
             <span className="row-time">进度</span>
@@ -193,25 +200,20 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
   return (
     <>
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="section-title !tracking-[0.06em]">{a.title}</h2>
+        <h2 className="sheet-title">{a.title}</h2>
         <SheetActs a={a} />
       </div>
-      <p className="quiet !py-2">
-        <Joined parts={[a.courseName, `${dotDate(a.deadline)} ${clock(a.deadline)}`, relativeTo(a.deadline)]} />
-        {a.url && (
-          <a className="act ml-4" href={a.url} target="_blank" rel="noreferrer">
-            原页面 ↗
-          </a>
-        )}
+      <p className="sheet-meta">
+        <Joined parts={[a.courseName, a.deadline && `${dotDate(a.deadline)} ${clock(a.deadline)}`, a.deadline && relativeTo(a.deadline)]} />
       </p>
 
-      <div className="sheet-body mt-4">
+      <div className="sheet-body">
         {!detail ? (
           <p className="quiet">{error ?? '…'}</p>
         ) : (
           <>
             {detail.descriptionHtml && <div
-                className="rich"
+                className="sheet-block rich"
                 onClick={(e) => {
                   const link = (e.target as HTMLElement).closest('a')
                   if (!link || !FILE_LINK.test(link.href)) return
@@ -222,15 +224,18 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
                 dangerouslySetInnerHTML={{ __html: clean(detail.descriptionHtml) }}
               />}
             {detail.attachments.length > 0 && (
-              <ul className="rows mt-4">
-                {detail.attachments.map((f) => (
-                  <DownloadRow key={f.url} url={f.url} name={f.name} />
-                ))}
-              </ul>
+              <section className="sheet-group">
+                <h3 className="group-title">附件</h3>
+                <ul className="rows">
+                  {detail.attachments.map((f) => (
+                    <DownloadRow key={f.url} url={f.url} name={f.name} />
+                  ))}
+                </ul>
+              </section>
             )}
             {detail.submissions.length > 0 && (
-              <div className="mt-8">
-                <h3 className="section-note">已提交</h3>
+              <div className="sheet-group">
+                <h3 className="group-title">已提交</h3>
                 <ul className="rows">
                   {detail.submissions.map((s) => (
                     <li key={s.id} className="row !grid-cols-[6.5em_minmax(0,1fr)_auto] !py-2">
@@ -251,8 +256,8 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
               </div>
             )}
             {detail.draft && (
-              <div className="mt-8">
-                <h3 className="section-note">草稿</h3>
+              <div className="sheet-group">
+                <h3 className="group-title">草稿</h3>
                 <ul className="rows">
                   <li className="row !grid-cols-[minmax(0,1fr)] !py-2">
                     <span className="text-[0.9375rem] text-[var(--ink-2)]">
@@ -267,7 +272,7 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
       </div>
 
       {canSubmit && (
-        <div className="mt-4">
+        <div className="sheet-compose">
           <textarea className="field" placeholder="留言" value={comment} onChange={(e) => setComment(e.target.value)} />
           {files.length > 0 && (
             <ul className="rows">
@@ -287,10 +292,10 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
           <div className="acts mt-4 justify-end">
             {error && detail && <span className="mr-auto text-sm text-[var(--shu)]">{error}</span>}
             {state === 'sent' && <span className="mr-auto text-sm text-[var(--ink-3)]">已提交</span>}
-            <button className="act" onClick={pick} disabled={state === 'sending'}>
+            <button className="btn" onClick={pick} disabled={state === 'sending'}>
               添加文件
             </button>
-            <button className="act !text-[var(--shu)]" onClick={submit} disabled={empty || state === 'sending'}>
+            <button className="btn btn-solid" onClick={submit} disabled={empty || state === 'sending'}>
               {state === 'sending' ? '提交中' : armed ? '确认提交' : '提交'}
             </button>
           </div>

@@ -60,9 +60,9 @@ interface TranscriptResponse {
   code: number
   list: {
     all_content: {
-      begin_sec: number
-      end_sec: number
-      text: string
+      BeginSec: number
+      EndSec: number
+      Text: string
     }[]
   }[]
 }
@@ -349,11 +349,11 @@ export async function getPlatformTranscript(subId: string): Promise<TranscriptSe
   )
 
   return (result.list[0]?.all_content ?? [])
-    .filter(segment => segment.text.trim())
+    .filter(segment => segment.Text?.trim())
     .map(segment => ({
-      start: segment.begin_sec,
-      end: segment.end_sec,
-      text: segment.text.trim()
+      start: segment.BeginSec,
+      end: segment.EndSec,
+      text: segment.Text.trim()
     }))
 }
 

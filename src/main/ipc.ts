@@ -26,6 +26,7 @@ import {
 } from './services/zdbk'
 import {
   fetchAssignments,
+  fetchCourseHomework,
   getAssignmentDetail,
   submitHomework,
   retractSubmission,
@@ -41,13 +42,14 @@ import {
   reset as resetClassroom
 } from './services/classroom'
 import { fetchCalendar } from './services/calendar'
+import * as graduation from './services/graduation'
 import * as pta from './services/pta'
 import { getSystemStats } from './stats'
 import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { downloadToFile } from './download'
-import { demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockReplays, mockSchedule, mockSlides, mockTranscript, mockPlatformTranscript } from './services/demo'
+import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockTranscript, mockPlatformTranscript } from './services/demo'
 
 type Handlers = {
   [K in ZjuChannel]: (
@@ -61,6 +63,7 @@ function resetServices(): void {
   resetCourses()
   resetClassroom()
   eta.reset()
+  graduation.reset()
 }
 
 // 课表以 ETA 为主（返回干净、少出错），ETA 失败或为空（选课排课期间）时退回教务
@@ -179,7 +182,9 @@ const handlers: Handlers = {
   },
   'data:replays': () => fetchReplays(),
   'data:calendar': () => fetchCalendar(),
+  'data:courseHomework': (_win, courseName) => fetchCourseHomework(courseName),
   'data:lectures': (_win, from, to) => fetchLectures(from, to),
+  'data:graduation': () => graduation.fetchGraduation(),
   'system:stats': async () => getSystemStats(),
 
   'file:download': async (win, url, name) => {
@@ -300,6 +305,8 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:replays': async () => mock(mockReplays),
     'data:calendar': () => fetchCalendar(),
     'data:lectures': async () => mockReplays,
+    'data:graduation': async () => mock(mockGraduation),
+    'data:courseHomework': async (_win, courseName) => demoCourseHomework(courseName),
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,
     'replay:platformTranscript': async () => mockPlatformTranscript,

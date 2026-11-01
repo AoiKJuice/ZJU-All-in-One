@@ -1,0 +1,194 @@
+/* ------------------------------------------------------------------
+   风格：液态玻璃。照 Apple 的用法分两层：
+   - 内容层（主页区块、设置面板、课表块）是压在柔和渐变壁纸上的半透明浅色面板，带亮边，不做实时模糊
+     （壁纸本身就是平滑渐变，模糊看不出区别，却很耗合成，切换风格时会卡）；
+   - 导航与控件层（标签栏、刊头导航与右侧按钮、翻周、轻提示、右键菜单）是真正的玻璃：几乎透明，
+     边缘透镜折射 + 色散 + 沿边高光，滤镜由 components/LiquidGlass.tsx 按尺寸生成并写进 --lg-filter。
+   侧页、登录面板等临时浮层用轻度毛玻璃。字体随设置，不打包主题字体。规则一律以 html[data-style='glass'] 开头，自包含。
+   课程格子、条目不加模糊（见 CLAUDE.md 的 AppHang 教训）
+   ------------------------------------------------------------------ */
+html[data-style='glass'][data-theme] {
+  --paper: #e9eef6;
+  --paper-2: rgba(255, 255, 255, 0.5);
+  --veil: rgba(240, 244, 250, 0.6);
+  --ink: #11141b;
+  --ink-2: #3d4350;
+  --ink-3: #6b7280;
+  --rule: rgba(17, 20, 27, 0.1);
+  --tint: rgba(255, 255, 255, 0.4);
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-2: rgba(255, 255, 255, 0.55);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-shine: rgba(255, 255, 255, 0.95);
+  --glass-tint: rgba(255, 255, 255, 0.12);
+  --shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-shine), 0 8px 28px -14px rgba(30, 45, 90, 0.22);
+  --shadow-pop: inset 0 0 0 1px var(--glass-edge), 0 14px 40px -12px rgba(30, 45, 90, 0.32);
+  /* 壁纸：写在 --grain 里，仍画在 body 背景上（经典风格的纸纹也在这里），不加全窗覆盖层 */
+  --grain: radial-gradient(42rem 32rem at 8% 12%, rgba(var(--shu-rgb), 0.34), transparent 70%),
+    radial-gradient(36rem 30rem at 92% 6%, rgba(255, 160, 130, 0.38), transparent 70%),
+    radial-gradient(40rem 34rem at 78% 96%, rgba(110, 200, 255, 0.36), transparent 70%),
+    radial-gradient(34rem 30rem at 18% 92%, rgba(175, 140, 255, 0.3), transparent 70%);
+  --r-lg: 1.5rem;
+  --r-md: 1rem;
+  --r-sm: 0.75rem;
+}
+html[data-style='glass'][data-theme='dark'] {
+  --paper: #0b0e15;
+  --paper-2: rgba(255, 255, 255, 0.06);
+  --veil: rgba(14, 17, 25, 0.6);
+  --ink: #eef1f7;
+  --ink-2: #b6bdcb;
+  --ink-3: #828a9a;
+  --rule: rgba(255, 255, 255, 0.1);
+  --tint: rgba(255, 255, 255, 0.07);
+  --surface: rgba(30, 34, 46, 0.62);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --glass-edge: rgba(255, 255, 255, 0.12);
+  --glass-shine: rgba(255, 255, 255, 0.2);
+  --glass-tint: rgba(255, 255, 255, 0.05);
+  --shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-shine), 0 10px 32px -14px rgba(0, 0, 0, 0.6);
+  --shadow-pop: inset 0 0 0 1px var(--glass-edge), 0 16px 44px -12px rgba(0, 0, 0, 0.7);
+  --grain: radial-gradient(42rem 32rem at 8% 12%, rgba(var(--shu-rgb), 0.3), transparent 70%),
+    radial-gradient(36rem 30rem at 92% 6%, rgba(200, 90, 120, 0.28), transparent 70%),
+    radial-gradient(40rem 34rem at 78% 96%, rgba(40, 120, 200, 0.3), transparent 70%),
+    radial-gradient(34rem 30rem at 18% 92%, rgba(110, 70, 200, 0.28), transparent 70%);
+}
+html[data-style='glass'] body {
+  background-attachment: fixed;
+}
+html[data-style='glass'] :is(.page-title, .replay-title, .schedule-title) {
+  font-weight: 700;
+}
+html[data-style='glass'] :is(.section-title, .sheet-title, .course-sheet-title) {
+  font-weight: 600;
+}
+
+/* 临时浮层：轻度毛玻璃（只在打开时存在） */
+html[data-style='glass'] :is(.sheet, .course-sheet, .login-panel, .confirm) {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(18px) saturate(1.6);
+}
+html[data-style='glass'] .sheet-veil {
+  background: rgba(10, 20, 40, 0.08);
+}
+
+/* 刊头：不铺底色也不模糊（否则它会挡住导航玻璃取到的背景），滚动后只在顶端加一道渐隐，内容从下面淡出。
+   渐变不能过渡，画在伪元素上淡入淡出，免得滚动时突然出现 */
+html[data-style='glass'] .masthead,
+html[data-style='glass'] .masthead[data-solid='true'] {
+  background: none;
+  backdrop-filter: none;
+}
+html[data-style='glass'] .masthead::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--paper) 92%, transparent), color-mix(in srgb, var(--paper) 55%, transparent) 60%, transparent);
+  opacity: 0;
+  transition: opacity calc(0.5s * var(--speed, 1)) var(--ease);
+}
+html[data-style='glass'] .masthead[data-solid='true']::before {
+  opacity: 1;
+}
+
+/* 导航与控件层的玻璃：几乎不着色，靠折射与高光显形；--lg-filter 未生成时退回普通毛玻璃 */
+html[data-style='glass'] :is(.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu) {
+  background: var(--glass-tint);
+  backdrop-filter: var(--lg-filter, blur(8px)) saturate(1.5);
+  box-shadow: inset 0 0 0 0.5px var(--glass-edge), 0 8px 24px -8px rgba(20, 30, 60, 0.28), 0 1px 3px rgba(20, 30, 60, 0.1);
+}
+html[data-style='glass'][data-theme='dark'] :is(.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu) {
+  backdrop-filter: var(--lg-filter, blur(8px)) saturate(1.4) brightness(0.92);
+  box-shadow: inset 0 0 0 0.5px var(--glass-edge), 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+}
+html[data-style='glass'] :is(.mast-nav, .mast-meta) {
+  padding: 0.3rem;
+  border-radius: 999px;
+}
+html[data-style='glass'] .mast-meta {
+  gap: 0.25rem;
+}
+html[data-style='glass'] .mast-meta > button {
+  display: grid;
+  place-items: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+}
+html[data-style='glass'] .mast-meta > button.theme-toggle {
+  padding: 0;
+}
+
+/* 选中：玻璃里浮起的一颗更亮的"水滴"，文字为主题色 */
+html[data-style='glass'] .choice-pill {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.9), inset 0 1px 1px #fff, 0 2px 8px -2px rgba(30, 45, 90, 0.2);
+}
+html[data-style='glass'][data-theme='dark'] .choice-pill {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+}
+html[data-style='glass'] .act[data-on] {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 1px var(--glass-shine);
+}
+html[data-style='glass'][data-theme='dark'] .act[data-on] {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 翻周的「回到本周」：与选中项一样是玻璃里浮起的水滴，文字为主题色 */
+html[data-style='glass'] .week-float .week-today[data-away] {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.9), inset 0 1px 1px #fff, 0 2px 8px -2px rgba(30, 45, 90, 0.2);
+}
+html[data-style='glass'][data-theme='dark'] .week-float .week-today[data-away] {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+}
+html[data-style='glass'] .week-float button:not([data-away]):hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.35);
+}
+html[data-style='glass'][data-theme='dark'] .week-float button:not([data-away]):hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 按钮：主操作为带光泽的主题色玻璃，次操作为浅玻璃 */
+html[data-style='glass'] .btn {
+  box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-shine);
+}
+html[data-style='glass'] .btn-solid,
+html[data-style='glass'] .btn-solid:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 60%), var(--shu);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 6px 18px -6px rgba(var(--shu-rgb), 0.6);
+}
+html[data-style='glass'][data-theme='dark'] :is(.btn-solid, .btn-solid:hover:not(:disabled)) {
+  color: #0b0e15;
+}
+
+/* 课程格子：半透明色块与亮边 */
+html[data-style='glass'] .course-cell {
+  background: color-mix(in srgb, var(--cc) 20%, rgba(255, 255, 255, 0.55));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+html[data-style='glass'] .course-cell:hover {
+  background: color-mix(in srgb, var(--cc) 28%, rgba(255, 255, 255, 0.6));
+}
+html[data-style='glass'][data-theme='dark'] .course-cell {
+  background: color-mix(in srgb, var(--cc) 22%, rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+html[data-style='glass'][data-theme='dark'] .course-cell:hover {
+  background: color-mix(in srgb, var(--cc) 30%, rgba(255, 255, 255, 0.06));
+}
+html[data-style='glass'] .today-col {
+  background: rgba(255, 255, 255, 0.3);
+}
+html[data-style='glass'][data-theme='dark'] .today-col {
+  background: rgba(255, 255, 255, 0.05);
+}
+html[data-style='glass'] .field {
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+}

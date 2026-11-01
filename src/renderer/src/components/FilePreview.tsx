@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { FilePreview as Preview } from '@shared/types'
 import { useApp } from '@renderer/store'
+import { dur } from '@renderer/lib/motion'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
@@ -49,7 +50,7 @@ function View({ path, onClose }: { path: string; onClose: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: dur(0.3), ease: [0.22, 1, 0.36, 1] }}
     >
       <div className="preview-bar">
         <span className="truncate">{file?.name ?? path.split(/[\\/]/).pop()}</span>

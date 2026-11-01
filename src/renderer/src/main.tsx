@@ -1,8 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-// 思源宋体只打包 Medium 一档：比常规体略重，正文 400 也落到它
-import '@fontsource/noto-serif-sc/500.css'
+// 思源宋体可变字重（200–900），按场景用不同字重区分层次
+import '@fontsource-variable/noto-serif-sc'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
