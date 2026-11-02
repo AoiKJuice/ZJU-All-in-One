@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { FormAnswer, FormOpenOptions, FormProfile, FormQuestion, FormSession, FormStatus } from '@shared/forms'
 import { loadSecret, saveSecret } from '../secure'
 import { logDiagnostic } from '../diagnostics'
+import { zjuSession } from '../auth/zjuam'
 import { formMatcher, formPage, type PageState } from './page.js'
 
 // 问卷填写：订阅后在后台开窗（不显示）加载问卷（问卷星 / 腾讯问卷 / 金数据等），注入 page.js 按题目标题填入本人信息。
@@ -135,7 +136,8 @@ function setStatus(live: Live, status: FormStatus, extra?: Record<string, number
 }
 
 async function install(live: Live): Promise<void> {
-  if (!live.armed) return
+  // 登录页（统一身份认证、扫码）不是问卷，不能往里填学号
+  if (!live.armed || live.onLogin) return
   await run(live, script('install', (await loadProfile()) ?? EMPTY_PROFILE, live.answers))
 }
 
@@ -291,8 +293,32 @@ async function schedule(live: Live, at: number): Promise<void> {
   else later(live, wait, () => arm(live))
 }
 
+/** 登录页：换了主机且地址像登录（zjuam 与问卷同在 zju.edu.cn 下，不能按站点比） */
+function isLogin(target: string, formHost: string): boolean {
+  try {
+    return new URL(target).hostname !== formHost && LOGIN.test(target)
+  } catch {
+    return false
+  }
+}
+
+/** 浙大自己的表单（form.zju.edu.cn 等）走统一身份认证：把应用里已登录的 CAS cookie 带进问卷分区，不用再登一次 */
+async function shareCas(host: string): Promise<void> {
+  if (!/(^|\.)zju\.edu\.cn$/.test(host)) return
+  const target = session.fromPartition(PARTITION).cookies
+  const cookies = await zjuSession().cookies.get({ domain: 'zju.edu.cn' }).catch(() => [])
+  for (const c of cookies) {
+    const domain = (c.domain ?? '').replace(/^\./, '')
+    if (domain !== 'zjuam.zju.edu.cn' && domain !== 'zju.edu.cn') continue
+    await target
+      .set({ url: `https://${domain}${c.path ?? '/'}`, name: c.name, value: c.value, path: c.path, secure: c.secure, httpOnly: c.httpOnly, expirationDate: c.expirationDate, ...(c.hostOnly ? {} : { domain: c.domain }) })
+      .catch(() => {})
+  }
+}
+
 function sameSite(a: string, b: string): boolean {
-  const root = (host: string): string => host.split('.').slice(-2).join('.')
+  // edu.cn、com.cn 这类二级后缀要再往前取一级
+  const root = (host: string): string => host.split('.').slice(/\.(edu|com|net|org|gov|ac)\.cn$/.test(host) ? -3 : -2).join('.')
   try {
     return root(new URL(a).hostname) === root(new URL(b).hostname)
   } catch {
@@ -362,7 +388,7 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     return { action: 'deny' }
   })
   win.webContents.on('did-navigate', (_e, target) => {
-    live.onLogin = !sameSite(target, url) && LOGIN.test(target)
+    live.onLogin = isLogin(target, host)
     if (!live.onLogin) return
     setStatus(live, 'login')
     reveal(live, 'auto')
@@ -389,7 +415,7 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
   const ticker = setInterval(() => (live.win ? void poll(live) : clearInterval(ticker)), 800)
   live.timers.push(ticker)
 
-  win.loadURL(url).catch(() => {})
+  void shareCas(host).then(() => win.loadURL(url).catch(() => {}))
   if (timed) void schedule(live, at)
   logDiagnostic('form-open', { timed, autoSubmit: options.autoSubmit, optional: options.optional })
   return { ...live.session }

@@ -43,6 +43,14 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 1000, height: 900, webPreferences: { partition: 'probe-forms', sandbox: true, contextIsolation: true, backgroundThrottling: false } })
   await win.loadURL(url).catch((e) => console.log('加载：' + e.message))
   await new Promise((r) => setTimeout(r, 3000))
+  // 被弹到登录页（统一身份认证、扫码）：不是问卷，不往里填
+  const landed = win.webContents.getURL()
+  if (new URL(landed).hostname !== new URL(url).hostname && /ptlogin|graph\.qq\.com|weixin\.qq\.com|passport\.|\/(login|signin|oauth|auth)\b/i.test(landed)) {
+    console.log('需要登录：' + new URL(landed).hostname)
+    win.destroy()
+    app.exit(0)
+    return
+  }
   await win.webContents.executeJavaScript(script('install'))
   await new Promise((r) => setTimeout(r, 2500))
   const state = await win.webContents.executeJavaScript(script('state'))
