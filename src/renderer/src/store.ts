@@ -4,6 +4,8 @@ import type { Theme } from './lib/theme'
 import { applySettings, initialSettings, type Settings } from './lib/settings'
 
 export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
+/** 工具页里打开的工具（见 tools/index.ts） */
+export type ToolId = 'graduation'
 
 /** 课表上点开的一节课：课程详情上拉面板 */
 export interface CourseOpen {
@@ -14,16 +16,20 @@ export interface CourseOpen {
   lecture?: LectureReplay
 }
 
-/** 一条浏览记录：页面 + 回放页所开的课次 */
+/** 一条浏览记录：页面 + 回放页所开的课次 + 工具页所开的工具 */
 interface Visit {
   page: PageId
   replay: LectureReplay | null
+  tool: ToolId | null
 }
 
 interface AppStore {
   page: PageId
   /** 回放页当前打开的课次 */
   replay: LectureReplay | null
+  /** 工具页当前打开的工具；null 为工具列表 */
+  tool: ToolId | null
+  openTool: (tool: ToolId | null) => void
   /** 侧页中打开的作业 */
   assignment: Assignment | null
   /** 课程详情面板中的课 */
@@ -90,9 +96,9 @@ export const useApp = create<AppStore>((set, get) => {
 
   // 换页时把当前页记入 past，清空 future；同一页同一课次不记
   const visit = (next: Visit): void => {
-    const { page, replay, past } = get()
-    if (page === next.page && replay?.id === next.replay?.id) return
-    set({ ...next, past: [...past, { page, replay }].slice(-50), future: [] })
+    const { page, replay, tool, past } = get()
+    if (page === next.page && replay?.id === next.replay?.id && tool === next.tool) return
+    set({ ...next, past: [...past, { page, replay, tool }].slice(-50), future: [] })
   }
 
   const settings = initialSettings()
@@ -101,6 +107,11 @@ export const useApp = create<AppStore>((set, get) => {
   return {
     page: 'home',
     replay: null,
+    tool: null,
+    openTool: (tool) => {
+      set({ course: null })
+      visit({ page: 'tools', replay: get().replay, tool })
+    },
     assignment: null,
     course: null,
     openCourse: (course) => set({ course }),
@@ -121,25 +132,25 @@ export const useApp = create<AppStore>((set, get) => {
     past: [],
     future: [],
     back: () => {
-      const { past, future, page, replay, assignment, course } = get()
+      const { past, future, page, replay, tool, assignment, course } = get()
       // 作业侧页、课程详情开着时，返回先关它们
       if (assignment) return set({ assignment: null })
       if (course) return set({ course: null })
       const prev = past.at(-1)
-      if (prev) set({ ...prev, past: past.slice(0, -1), future: [{ page, replay }, ...future] })
+      if (prev) set({ ...prev, past: past.slice(0, -1), future: [{ page, replay, tool }, ...future] })
     },
     forward: () => {
-      const { past, future, page, replay } = get()
+      const { past, future, page, replay, tool } = get()
       const next = future[0]
-      if (next) set({ ...next, past: [...past, { page, replay }], future: future.slice(1) })
+      if (next) set({ ...next, past: [...past, { page, replay, tool }], future: future.slice(1) })
     },
     go: (page) => {
       set({ course: null })
-      visit({ page, replay: get().replay })
+      visit({ page, replay: get().replay, tool: null })
     },
     openReplay: (replay) => {
       set({ course: null })
-      visit({ page: 'replay', replay })
+      visit({ page: 'replay', replay, tool: null })
     },
     openAssignment: (assignment) => set({ assignment }),
     refresh: () => set((s) => ({ epoch: s.epoch + 1 })),

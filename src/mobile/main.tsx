@@ -21,7 +21,7 @@ if (Capacitor.isNativePlatform()) {
   // 返回键：先收起全屏播放 / 课件大图 / 文件预览（它们都认 Esc），再关登录面板、作业侧页，然后按历史返回；到头了退到后台
   void NativeApp.addListener('backButton', () => {
     const state = useApp.getState()
-    if (document.querySelector('.player[data-expanded], .lightbox, .preview')) {
+    if (document.querySelector('.player[data-expanded], .lightbox, .preview, .local-sheet')) {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     } else if (state.loginOpen) {
       state.setLoginOpen(false)

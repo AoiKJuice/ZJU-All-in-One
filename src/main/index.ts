@@ -18,6 +18,10 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-accelerated-video-decode')
   app.commandLine.appendSwitch('disable-direct-composition-video-overlays')
 }
+// 不接入系统媒体控制（媒体键、Windows 的媒体浮窗）：播放视频时 Chromium 在主线程上同步播放状态给系统，
+// 这条路径在 Electron 里有卡住主线程的已知问题；2026-11-01 两次「只是看视频」就卡死，看门狗都记到主线程卡住后不再恢复。
+// 应用用不到媒体键。disable-features 只能写一次，要加别的特性一并写在这里
+app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService')
 
 let mainWindow: BrowserWindow | null = null
 

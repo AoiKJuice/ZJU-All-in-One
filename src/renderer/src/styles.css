@@ -80,7 +80,7 @@ html[data-theme='light'] {
   --shadow-pop: 0 2px 6px rgba(38, 34, 29, 0.06), 0 18px 40px -16px rgba(38, 34, 29, 0.32);
   /* 钟鹰的鹰身：黛蓝 */
   --emblem: #2a3b57;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain: url('/grain-light.png');
 }
 
 html[data-theme='dark'] {
@@ -101,7 +101,7 @@ html[data-theme='dark'] {
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 30px -18px rgba(0, 0, 0, 0.6);
   --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.3), 0 20px 44px -16px rgba(0, 0, 0, 0.7);
   --emblem: #aeb9cb;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.86 0 0 0 0 0.8 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain: url('/grain-dark.png');
 }
 
 /* 主题色：朱砂 / 求是蓝 RGB(0,63,136) / 创新红（浙大 VI 标准色）RGB(176,31,36)；夜间各取提亮版本 */
@@ -141,7 +141,8 @@ html[data-font='kai'] {
 
 :root {
   --f-mono: 'Fira Code', ui-monospace, Consolas, monospace;
-  --mast-h: 3.5rem;
+  /* 刊头与系统窗口按钮（titleBarOverlay，56px）同高，取窗口按钮区的高度，不随根字号缩放，否则小窗口时导航比窗口按钮偏高 */
+  --mast-h: env(titlebar-area-height, 56px);
   --gutter: clamp(1.5rem, 4vw, 3.5rem);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -206,8 +207,11 @@ html[data-font='kai'] {
 }
 
 /* 纸纹：直接画在 body 背景上（不用全窗 mix-blend 覆盖层，避免与视频/GPU 负载叠加时拖垮合成） */
+/* 纸纹是预渲染的 PNG（public/grain-*.png，2 倍尺寸）：原先的 SVG feTurbulence 每次背景重画都要重算滤镜，
+   切页面、动画时背景会轻微闪一下 */
 body {
   background-image: var(--grain);
+  background-size: 180px 180px;
 }
 
 /* ------------------------------------------------------------------
@@ -2133,6 +2137,113 @@ html[data-theme='dark'] {
 }
 .pane-more[data-open] svg {
   rotate: 180deg;
+}
+
+/* ------------------------------------------------------------------
+   工具页（pages/Tools.tsx、tools/）：入口为徽标 + 名称的卡片，悬停时徽标动起来；点开后标题左侧是返回
+   ------------------------------------------------------------------ */
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+  margin-top: clamp(1.75rem, 5vh, 3rem);
+}
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 1.75rem 1rem 1.375rem;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: background-color calc(0.35s * var(--speed, 1)) var(--ease), transform calc(0.45s * var(--speed, 1)) var(--ease);
+}
+.tool-card:hover {
+  background: color-mix(in srgb, var(--surface) 70%, rgba(var(--shu-rgb), 0.12));
+  transform: translateY(-2px);
+}
+.tool-icon svg {
+  display: block;
+  width: 4.25rem;
+  height: 4.25rem;
+  overflow: visible;
+}
+.tool-name {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+/* 徽标部件：墨色主体、主题色点缀；悬停动效 */
+.tool-icon .ti-ink {
+  stroke: var(--ink);
+}
+.tool-icon .ti-accent {
+  stroke: var(--shu);
+}
+.tool-icon .ti-fill {
+  fill: var(--shu);
+}
+.tool-icon :is(.ti-cap, .ti-tassel) {
+  transform-box: fill-box;
+  transition: transform calc(0.55s * var(--speed, 1)) var(--ease);
+}
+.tool-icon .ti-cap {
+  transform-origin: 50% 100%;
+}
+.tool-icon .ti-tassel {
+  transform-origin: 0% 0%;
+}
+.tool-card:hover .ti-cap {
+  transform: translateY(-3px) rotate(-6deg);
+}
+.tool-card:hover .ti-tassel {
+  animation: ti-swing calc(0.9s * var(--speed, 1)) var(--ease);
+}
+@keyframes ti-swing {
+  30% {
+    transform: rotate(9deg);
+  }
+  60% {
+    transform: rotate(-5deg);
+  }
+  85% {
+    transform: rotate(2deg);
+  }
+}
+.tool-icon .ti-check {
+  stroke-dasharray: 18;
+  stroke-dashoffset: 18;
+  transition: stroke-dashoffset calc(0.45s * var(--speed, 1)) var(--ease);
+}
+.tool-card:hover .ti-check {
+  stroke-dashoffset: 0;
+  transition-delay: calc(0.15s * var(--speed, 1));
+}
+.tool-head {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.tool-back {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: -0.75rem;
+  border-radius: 999px;
+  color: var(--ink-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.tool-back:hover {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.tool-back svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 /* ------------------------------------------------------------------

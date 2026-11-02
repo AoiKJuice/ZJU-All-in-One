@@ -283,6 +283,25 @@ export interface EducationCredit {
   requiredCredits?: string
 }
 
+/** 第二课堂系统里的一条参与记录（「我的活动」） */
+export interface PracticeRecord {
+  id: string
+  name: string
+  /** 二 / 三 / 四课堂 */
+  classroom: 'second' | 'third' | 'fourth'
+  /** 已完成（审核通过）/ 审核中 / 未通过 */
+  status: 'done' | 'pending' | 'rejected'
+  /** 平台给的状态原文 */
+  statusLabel?: string
+  /** 项目分类、类型（如「美育」） */
+  category?: string
+  type?: string
+  points: number | null
+  time?: string
+  aesthetic: boolean
+  labor: boolean
+}
+
 /** 毕业自审：教务自审树 + 第二课堂系统，两部分各自可能失败 */
 export interface GraduationAudit {
   nodes: AuditNode[] | null
@@ -290,5 +309,7 @@ export interface GraduationAudit {
   classrooms: { second: ClassroomCredit; third: ClassroomCredit; fourth: ClassroomCredit } | null
   aesthetic: EducationCredit
   labor: EducationCredit
+  /** 第二课堂的参与记录；取不到时为 null */
+  records: PracticeRecord[] | null
   practiceError?: string
 }

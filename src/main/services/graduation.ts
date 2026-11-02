@@ -104,6 +104,7 @@ export async function fetchGraduation(): Promise<DataResult<GraduationAudit>> {
     classrooms: extra?.classrooms ?? null,
     aesthetic: { passed: null, points: null, ...extra?.aesthetic, ...creditsOf(nodes, /美育/) },
     labor: { passed: null, points: null, ...extra?.labor, ...creditsOf(nodes, /劳动|劳育/) },
+    records: extra?.records ?? null,
     practiceError: practice.status === 'rejected' ? message(practice.reason) : undefined
   }
   return { data, source: 'live', fetchedAt: Date.now() }

@@ -26,6 +26,9 @@ const ENGINE_URL =
 const MODEL_URL =
   'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin'
 const MODEL_NAME = 'ggml-large-v3-turbo-q5_0.bin'
+// 语音活动检测（Silero VAD，约 0.9MB）：只把有人说话的片段送进模型，静音处不再编句子（课末录像常有近一小时静音）
+const VAD_URL = 'https://hf-mirror.com/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin'
+const VAD_NAME = 'ggml-silero-v5.1.2.bin'
 const REFERER = 'https://classroom.zju.edu.cn/'
 const execFileAsync = promisify(execFile)
 
@@ -129,19 +132,26 @@ export function cleanSegments(
   return dropRepeats(filtered.slice(start, end))
 }
 
-// Whisper 在静音、杂音里会编句子：课末录像常比讲课长出很久，它在每个 30 秒窗口里都编一句「我们下期再见」「谢谢大家」，
-// 或把前面几句整段再说一遍。两条规则（只看 4 字以上的句子，正常讲课很少原样重复整句）：
-// 同一句在 150 秒内再次出现就丢掉；整份稿子里出现 6 次以上的句子只留第一次
+// 复读兜底（主要靠 VAD 不让静音进模型；读取时清洗，原始结果仍在缓存里）：
+// 同一句连着出现三遍以上、相邻不到 10 秒，只留第一句（「好好的」每秒一句）；4 字以上的句子 60 秒内原样再出现就丢掉；
+// 整份稿出现 8 次以上的句子只留第一次（旧稿里静音处每 30 秒一句的「我们下期再见」）
 function dropRepeats(segments: TranscriptSegment[]): TranscriptSegment[] {
   const keys = segments.map(segment => normalizeText(segment.text))
   const counts = new Map<string, number>()
   for (const key of keys) if (key.length >= 4) counts.set(key, (counts.get(key) ?? 0) + 1)
+  const near = (a: number, b: number): boolean => keys[a] === keys[b] && Math.abs(segments[b].start - segments[a].start) < 10
   const lastSeen = new Map<string, number>()
   return segments.filter((segment, i) => {
     const key = keys[i]
+    if (!key) return true
+    let first = i
+    while (first > 0 && near(first - 1, first)) first--
+    let last = i
+    while (last < segments.length - 1 && near(last, last + 1)) last++
+    if (last - first >= 2 && i !== first) return false
     if (key.length < 4) return true
     const seen = lastSeen.get(key)
-    if (seen !== undefined && (counts.get(key)! >= 6 || segment.start - seen < 150)) return false
+    if (seen !== undefined && (counts.get(key)! >= 8 || segment.start - seen < 60)) return false
     lastSeen.set(key, segment.start)
     return true
   })
@@ -391,6 +401,17 @@ async function installModel(): Promise<string> {
   return model
 }
 
+async function installVad(): Promise<string> {
+  const directory = join(rootPath(), 'models')
+  const vad = join(directory, VAD_NAME)
+  if (existsSync(vad)) return vad
+  await mkdir(directory, { recursive: true })
+  await download(VAD_URL, vad, detail => {
+    emit(modelReports, 'model', detail, '下载语音检测模型')
+  })
+  return vad
+}
+
 async function ensureEngine(report: Report): Promise<string> {
   report({ stage: 'engine', message: '准备 Whisper 引擎' })
   engineReports.add(report)
@@ -410,7 +431,7 @@ async function ensureModel(report: Report): Promise<string> {
   report({ stage: 'model', message: '准备 Whisper 模型' })
   modelReports.add(report)
   try {
-    modelTask ??= installModel().finally(() => {
+    modelTask ??= installModel().then(async model => (await installVad(), model)).finally(() => {
       modelTask = undefined
     })
     const model = await modelTask
@@ -447,6 +468,9 @@ async function extractAudio(
     '-y',
     '-i', media,
     '-vn',
+    // 按时间戳重采样：智云录像的 AAC 音轨解码出的采样比时间轴多（实测约 3 秒 / 50 分钟，有重叠的包），
+    // 直接拼起来文字稿会越往后越晚于画面；播放器是按时间戳对齐音画的
+    '-af', 'aresample=async=1:first_pts=0',
     '-ac', '1',
     '-ar', '16000',
     '-f', 'wav',
@@ -562,7 +586,7 @@ async function recognize(
       text: match[3].trim()
     }
     lastEnd = segment.end
-    partial.push(...cleanSegments([segment]))
+    partial.push(...cleanSegments([fixVadStart(segment)]))
     schedule()
   }
 
@@ -578,6 +602,7 @@ async function recognize(
     '-pp',
     // 只拿前文最近的 64 个 token 作上下文：全量上下文容易在课末静音处复读同一句
     '-mc', '64',
+    '--vad', '-vm', join(rootPath(), 'models', VAD_NAME),
     '--prompt', PROMPT
   ], onStderr, onStdout, true, plan.duty).finally(flush)
 
@@ -589,13 +614,21 @@ async function recognize(
     await readFile(`${output}.json`, 'utf8')
   ) as WhisperOutput
 
-  const segments = cleanSegments(json.transcription.map(segment => ({
+  const segments = json.transcription.map(segment => fixVadStart({
     start: segment.offsets.from / 1000,
     end: segment.offsets.to / 1000,
     text: segment.text.trim()
-  })))
+  }))
   report({ stage: 'transcribe', ratio: 1, eta: 0 })
   return segments
+}
+
+// VAD 把语音片段拼起来识别再映射回原时间轴；紧跟在长静音后的那一句，起点会被算在静音开头
+// （实测：一句 12 字的话标成 59.9–152.6 秒，实际从 150 秒说起）。时长远超字数所需时，按每字约 0.3 秒把起点挪到结尾前
+function fixVadStart(segment: TranscriptSegment): TranscriptSegment {
+  const chars = normalizeText(segment.text).length
+  if (segment.end - segment.start <= chars * 0.6 + 6) return segment
+  return { ...segment, start: Math.max(segment.start, segment.end - chars * 0.3 - 0.5) }
 }
 
 export async function readTranscript(
@@ -613,22 +646,12 @@ export async function readTranscript(
 interface TranscriptMeta {
   source: string
   transcribedAt: string
+  /** 转写流程版本：2 起音频按时间戳对齐并开启 VAD，之前的稿子越往后越偏，视为过期 */
+  pipeline?: number
 }
+const PIPELINE = 2
 
 const metaPath = (cacheKey: string): string => `${transcriptPath(cacheKey)}.meta.json`
-
-/** 回放视频的时长（秒）：ffmpeg 只读文件头 */
-async function mediaDuration(mediaUrl: string): Promise<number> {
-  let duration = 0
-  await run(ffmpegPath!.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1'), [
-    '-headers', `Referer: ${REFERER}\r\n`,
-    '-i', mediaUrl
-  ], line => {
-    const match = line.match(/Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/)
-    if (match) duration = seconds(match[1])
-  })
-  return duration
-}
 
 /**
  * 缓存的文字稿是否已不对应当前回放视频：有来源记录时比视频路径；
@@ -637,12 +660,10 @@ async function mediaDuration(mediaUrl: string): Promise<number> {
 export async function isTranscriptStale(cacheKey: string, mediaUrl: string): Promise<boolean> {
   const segments = await readTranscript(cacheKey)
   if (!segments?.length) return false
-  if (existsSync(metaPath(cacheKey))) {
-    const meta = JSON.parse(await readFile(metaPath(cacheKey), 'utf8')) as TranscriptMeta
-    return meta.source !== new URL(mediaUrl).pathname
-  }
-  const duration = await mediaDuration(mediaUrl)
-  return duration > 0 && segments[segments.length - 1].end < duration * 0.85
+  // 没有记录的是早期的稿子，也属于旧流程
+  if (!existsSync(metaPath(cacheKey))) return true
+  const meta = JSON.parse(await readFile(metaPath(cacheKey), 'utf8')) as TranscriptMeta
+  return meta.source !== new URL(mediaUrl).pathname || (meta.pipeline ?? 1) < PIPELINE
 }
 
 async function execute(
@@ -656,7 +677,9 @@ async function execute(
 
   const cli = await ensureEngine(report)
   const model = await ensureModel(report)
+  await removeStaleTemps()
   const temporary = await mkdtemp(join(rootPath(), 'task-'))
+  activeTemps.add(temporary)
 
   try {
     const media = join(temporary, 'media')
@@ -674,15 +697,28 @@ async function execute(
     const directory = join(app.getPath('userData'), 'transcripts')
     const target = transcriptPath(cacheKey)
     await mkdir(directory, { recursive: true })
+    // 存原始结果，清洗（去水印、去复读）在读取时做：规则调整后旧稿不必重转
     await writeFile(`${target}.part`, JSON.stringify(segments), 'utf8')
     await rename(`${target}.part`, target)
     await writeFile(metaPath(cacheKey), JSON.stringify({
       source: new URL(mediaUrl).pathname,
-      transcribedAt: new Date().toISOString()
+      transcribedAt: new Date().toISOString(),
+      pipeline: PIPELINE
     } satisfies TranscriptMeta), 'utf8')
-    return segments
+    return cleanSegments(segments)
   } finally {
+    activeTemps.delete(temporary)
     await rm(temporary, { recursive: true, force: true })
+  }
+}
+
+// 应用被强行结束（如卡死后被系统关掉）时 finally 来不及跑，临时目录里的回放与音频（每个数百 MB）会一直留着
+const activeTemps = new Set<string>()
+async function removeStaleTemps(): Promise<void> {
+  const entries = await readdir(rootPath()).catch(() => [])
+  for (const name of entries) {
+    const path = join(rootPath(), name)
+    if (name.startsWith('task-') && !activeTemps.has(path)) await rm(path, { recursive: true, force: true })
   }
 }
 

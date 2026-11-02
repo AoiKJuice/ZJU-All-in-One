@@ -152,7 +152,7 @@ function Body({ course }: { course: CourseOpen }) {
                     <span className="row-time">{a.deadline ? `${dotDate(a.deadline)} ${clock(a.deadline)}` : '不限'}</span>
                     <span className="row-title">{a.title}</span>
                     <span className="status-chip" data-state={state}>
-                      {state === 'done' ? '已交' : state === 'open' ? '未交' : '已截止'}
+                      {state === 'done' ? '已交' : state === 'open' ? '进行中' : '未交'}
                     </span>
                   </button>
                 </li>

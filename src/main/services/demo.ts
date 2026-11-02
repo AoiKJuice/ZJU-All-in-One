@@ -161,5 +161,15 @@ export const mockGraduation: GraduationAudit = {
     fourth: { points: 0, credits: 0, grade: null, passed: false }
   },
   aesthetic: { passed: true, points: 1.2, earnedCredits: '1.5', requiredCredits: '1' },
-  labor: { passed: false, points: 0.6, earnedCredits: '0', requiredCredits: '1' }
+  labor: { passed: false, points: 0.6, earnedCredits: '0', requiredCredits: '1' },
+  records: [
+    { id: 'r1', name: '新生入学教育', classroom: 'second', status: 'done', statusLabel: '审核通过', category: '思想成长', points: 1, time: '2025-09-12T02:00:00.000Z', aesthetic: false, labor: false },
+    { id: 'r2', name: '校园十佳歌手大赛观众', classroom: 'second', status: 'done', statusLabel: '审核通过', category: '文体活动', type: '美育', points: 0.5, time: '2025-11-03T11:00:00.000Z', aesthetic: true, labor: false },
+    { id: 'r3', name: '紫金港校区志愿清扫', classroom: 'second', status: 'done', statusLabel: '审核通过', category: '志愿公益', type: '劳育', points: 0.6, time: '2026-03-20T06:00:00.000Z', aesthetic: false, labor: true },
+    { id: 'r4', name: '学术讲座：大模型与科学发现', classroom: 'second', status: 'pending', statusLabel: '待审核', category: '学术科创', points: 0.5, time: '2026-10-25T07:00:00.000Z', aesthetic: false, labor: false },
+    { id: 'r5', name: '书画社作品展', classroom: 'second', status: 'rejected', statusLabel: '审核不通过', category: '文体活动', type: '美育', points: 0.5, time: '2026-05-18T08:00:00.000Z', aesthetic: true, labor: false },
+    { id: 'r6', name: '暑期社会实践：乡村振兴调研', classroom: 'third', status: 'done', statusLabel: '审核通过', category: '社会实践', points: 3, time: '2026-08-30T02:00:00.000Z', aesthetic: false, labor: false },
+    { id: 'r7', name: '国际交流夏令营', classroom: 'third', status: 'done', statusLabel: '审核通过', category: '国际交流', points: 1, time: '2026-07-15T02:00:00.000Z', aesthetic: false, labor: false },
+    { id: 'r8', name: '寒假返乡调研', classroom: 'third', status: 'pending', statusLabel: '待审核', category: '社会实践', points: 1, time: '2026-10-28T02:00:00.000Z', aesthetic: false, labor: false }
+  ]
 }

@@ -1,4 +1,4 @@
-import type { ClassroomCredit, EducationCredit } from '@shared/types'
+import type { ClassroomCredit, EducationCredit, PracticeRecord } from '@shared/types'
 import { ensureCas, zjuFetch } from '../http'
 
 // 第二课堂（浙江大学大学生素质拓展数智平台 sztz.zju.edu.cn/dekt）。照 Celechron lib/http/zjuServices/sztz.dart（已实测）与平台前端 bundle：
@@ -7,7 +7,8 @@ import { ensureCas, zjuFetch } from '../http'
 // - 汇总：GET student/home/getMyInfo → { code: 0, extend: { myInfo } }。myInfo 给 dekt / dskt / dsikt（二 / 三 / 四课堂）的
 //   Jf 记点、Xf 学分、Dj 等级、Tg 达标（dsiktTg 前端没用到，推测同名），以及 myTg / lyTg（美育 / 劳育达标）；
 // - 明细：GET student/home/getSqjl → { success, code: 0, data: 记录[] }。记录的 jd 为本人记点，cyrshzt.value === 5 为审核通过，
-//   sfsc 为已删除，xm.xmlx 为项目类型。
+//   sfsc 为已删除，xm.mc 项目名称，xm.xmfl / xmlb / xmlx 为分类 / 类别 / 类型（前端「我的活动」表格的列），czsj 时间；
+//   分类上 sfdekt / sfdskt 标记属于第二 / 第三课堂（后台「项目分类」编辑页），两者都不是的推测为第四课堂（社会实践）。
 // 平台上「学分情况」与首页只显示这些，没有学时字段。
 // 不调用 student/home/zhdsiktjf（那是把三课记点转成四课的写操作）。
 
@@ -32,11 +33,18 @@ interface MyInfo {
 }
 
 interface SqjlRecord {
+  id?: string | number
   jd?: number | string
   sfsc?: boolean
+  czsj?: number | string
   cyrshzt?: { value?: number; label?: string }
   // 推测：项目类型在后台有「美育」「劳育」两个互斥开关（xxgly/xmlx 编辑页的 my / ly），明细里是否带出未实测，退而按名称判断
-  xm?: { xmlx?: { mc?: string; my?: number | boolean; ly?: number | boolean } }
+  xm?: {
+    id?: string | number
+    mc?: string
+    xmfl?: { mc?: string; sfdekt?: boolean | number; sfdskt?: boolean | number }
+    xmlx?: { mc?: string; my?: number | boolean; ly?: number | boolean }
+  }
 }
 
 let loggedIn = false
@@ -105,6 +113,29 @@ export interface Practice {
   classrooms: { second: ClassroomCredit; third: ClassroomCredit; fourth: ClassroomCredit }
   aesthetic: EducationCredit
   labor: EducationCredit
+  records: PracticeRecord[] | null
+}
+
+const passed = (r: SqjlRecord): boolean => r.cyrshzt?.value === 5 || r.cyrshzt?.label === '审核通过'
+const isType = (r: SqjlRecord, key: 'my' | 'ly', name: string): boolean => Boolean(r.xm?.xmlx?.[key]) || Boolean(r.xm?.xmlx?.mc?.includes(name))
+
+function record(r: SqjlRecord, i: number): PracticeRecord {
+  const label = r.cyrshzt?.label
+  const date = r.czsj === undefined || r.czsj === null || r.czsj === '' ? null : new Date(r.czsj)
+  const time = date && !Number.isNaN(date.getTime()) ? date.toISOString() : undefined
+  return {
+    id: String(r.id ?? `${r.xm?.id ?? 'x'}-${i}`),
+    name: r.xm?.mc ?? '',
+    classroom: r.xm?.xmfl?.sfdekt ? 'second' : r.xm?.xmfl?.sfdskt ? 'third' : 'fourth',
+    status: passed(r) ? 'done' : label && /不通过|未通过|驳回|退回/.test(label) ? 'rejected' : 'pending',
+    statusLabel: label,
+    category: r.xm?.xmfl?.mc,
+    type: r.xm?.xmlx?.mc,
+    points: num(r.jd),
+    time,
+    aesthetic: isType(r, 'my', '美育'),
+    labor: isType(r, 'ly', '劳育')
+  }
 }
 
 export async function fetchPractice(): Promise<Practice> {
@@ -118,11 +149,7 @@ export async function fetchPractice(): Promise<Practice> {
   const points = (key: 'my' | 'ly', name: string): number | null => {
     if (!records) return null
     return records.data
-      .filter((r) => !r.sfsc && (r.cyrshzt?.value === 5 || r.cyrshzt?.label === '审核通过'))
-      .filter((r) => {
-        const type = r.xm?.xmlx
-        return Boolean(type?.[key]) || Boolean(type?.mc?.includes(name))
-      })
+      .filter((r) => !r.sfsc && passed(r) && isType(r, key, name))
       .reduce((sum, r) => sum + (num(r.jd) ?? 0), 0)
   }
 
@@ -133,6 +160,7 @@ export async function fetchPractice(): Promise<Practice> {
       fourth: classroom(my.dsiktJf, my.dsiktXf, my.dsiktDj, my.dsiktTg)
     },
     aesthetic: { passed: flag(my.myTg), points: points('my', '美育') },
-    labor: { passed: flag(my.lyTg), points: points('ly', '劳育') }
+    labor: { passed: flag(my.lyTg), points: points('ly', '劳育') },
+    records: records ? records.data.filter((r) => !r.sfsc).map(record) : null
   }
 }

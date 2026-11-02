@@ -55,6 +55,7 @@ html[data-style='glass'][data-theme='dark'] {
 }
 html[data-style='glass'] body {
   background-attachment: fixed;
+  background-size: auto;
 }
 html[data-style='glass'] :is(.page-title, .replay-title, .schedule-title) {
   font-weight: 700;
