@@ -105,11 +105,17 @@ const script = (op: 'install' | 'state' | 'describe' | 'answer' | 'submit', prof
 
 const LOGIN = /ptlogin|graph\.qq\.com|open\.weixin\.qq\.com|weixin\.qq\.com\/connect|passport\.|\/(login|signin|oauth|auth)\b/i
 
-/** 问卷站时钟与本机的差（毫秒）：Date 头只到秒，取往返中点并补半秒；取不到当 0 */
+/**
+ * 问卷站时钟与本机的差（毫秒）：Date 头只到秒，取往返中点并补半秒；取不到当 0。
+ * 必须绕过缓存——走问卷分区的 HTTP 缓存会拿到之前打开页面时缓存的响应，Date 是半小时前的（2026-11-02 实测差出 −29.6 分钟，定时晚了半小时）；
+ * 差出 5 分钟以上也当取错了，按本机时钟
+ */
 function serverOffset(url: string): Promise<number> {
   return new Promise((resolve) => {
     const sent = Date.now()
-    const req = net.request({ url, method: 'HEAD', session: session.fromPartition(PARTITION) })
+    const req = net.request({ url, method: 'HEAD', session: session.fromPartition(PARTITION), cache: 'no-store' })
+    req.setHeader('Cache-Control', 'no-cache')
+    req.setHeader('Pragma', 'no-cache')
     const timer = setTimeout(() => {
       req.abort()
       resolve(0)
@@ -118,7 +124,8 @@ function serverOffset(url: string): Promise<number> {
       clearTimeout(timer)
       const date = res.headers['date']
       const value = Array.isArray(date) ? date[0] : date
-      resolve(value ? Date.parse(value) + 500 - (sent + Date.now()) / 2 : 0)
+      const offset = value ? Date.parse(value) + 500 - (sent + Date.now()) / 2 : 0
+      resolve(Number.isFinite(offset) && Math.abs(offset) < 5 * 60_000 ? offset : 0)
     })
     req.on('error', () => {
       clearTimeout(timer)
@@ -240,7 +247,8 @@ async function poll(live: Live): Promise<void> {
       return
     }
     const state = await run<PageState>(live, script('state'))
-    if (!state) return
+    // 页面上没有填写脚本（统一身份认证跳转途中触发的 did-finish-load 注入落空）：再注入一次。2026-11-02 曾因此到点后一直卡在「填写中」
+    if (!state) return void (await install(live))
     const s = live.session
     // 登录页的标题（统一身份认证平台）不当问卷标题
     if (state.title && !live.onLogin) s.title = state.title
@@ -265,8 +273,8 @@ async function poll(live: Live): Promise<void> {
         live.reloads++
         later(live, 800, () => reopen(live))
       }
-      // 页面没写开放时刻（如浙大表单只说「未在开启时间范围内」），或到点重刷 15 次仍没开：每 30 秒重开一次看看
-      else if ((!s.at || live.reloads >= 15) && Date.now() - live.reopenedAt > 30_000) reopen(live)
+      // 页面没写开放时刻（如浙大表单只说「未在开启时间范围内」），或到点重刷 15 次仍没开：每 5 秒重开一次看看
+      else if ((!s.at || live.reloads >= 15) && Date.now() - live.reopenedAt > 5_000) reopen(live)
       return
     }
     if (state.questions === 0) {
@@ -285,7 +293,7 @@ async function poll(live: Live): Promise<void> {
       if (state.page === live.decided) return
     }
     if (state.page === live.decided) return
-    if (state.running || state.stableFor < 1000) {
+    if (state.running || state.stableFor < 600) {
       if (s.status !== 'asking') setStatus(live, 'filling')
       return
     }
@@ -477,7 +485,8 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     live.win = null
     if (live.session.status !== 'submitted') setStatus(live, 'closed')
   })
-  const ticker = setInterval(() => (live.win ? void poll(live) : clearInterval(ticker)), 800)
+  // 0.4 秒读一次、0.6 秒没变化算填稳：开放后约 2 秒弹窗（原来 0.8 秒 / 1 秒要 4 秒左右）
+  const ticker = setInterval(() => (live.win ? void poll(live) : clearInterval(ticker)), 400)
   live.timers.push(ticker)
 
   live.zju = isZju(host)
