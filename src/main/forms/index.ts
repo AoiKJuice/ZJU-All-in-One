@@ -4,6 +4,8 @@ import type { FormAnswer, FormOpenOptions, FormProfile, FormQuestion, FormSessio
 import { loadSecret, saveSecret } from '../secure'
 import { logDiagnostic } from '../diagnostics'
 import { zjuSession } from '../auth/zjuam'
+import { ensureCas, refreshCas } from '../http'
+import { OPEN_EVENT } from '@shared/ipc'
 import { formMatcher, formPage, type PageState } from './page.js'
 
 // 问卷填写：订阅后在后台开窗（不显示）加载问卷（问卷星 / 腾讯问卷 / 金数据等），注入 page.js 按题目标题填入本人信息。
@@ -69,6 +71,13 @@ interface Live {
   /** 到点后页面仍显示未开始时已重刷的次数 */
   reloads: number
   onLogin: boolean
+  /** 浙大自己的表单：登录交给应用的统一身份认证，不让用户在问卷窗口里再登 */
+  zju: boolean
+  /** 被弹回统一身份认证登录页后，用应用登录态重试的次数与上次时刻 */
+  casTries: number
+  casAt: number
+  /** 上次带进来的统一身份认证 cookie；应用重新登录后值会变，据此再试 */
+  casSeen: string | null
   polling: boolean
   /** 已经问过 / 交过的页（题目键串）；翻页、提交被拦下后重新判断 */
   decided: string | null
@@ -219,7 +228,8 @@ async function poll(live: Live): Promise<void> {
     const state = await run<PageState>(live, script('state'))
     if (!state) return
     const s = live.session
-    if (state.title) s.title = state.title
+    // 登录页的标题（统一身份认证平台）不当问卷标题
+    if (state.title && !live.onLogin) s.title = state.title
     if (state.alerts.length) s.message = state.alerts[state.alerts.length - 1]
 
     if (state.done || (state.questions === 0 && state.submittedAt > 0 && !state.notOpen)) return void (await finish(live))
@@ -227,7 +237,18 @@ async function poll(live: Live): Promise<void> {
       setStatus(live, 'verify')
       return reveal(live, 'auto')
     }
-    if (live.onLogin) return setStatus(live, 'login')
+    if (live.onLogin) {
+      setStatus(live, 'login')
+      // 浙大表单：应用登录上了（或重登成功）就带着新的登录态重开
+      if (live.zju && Date.now() - live.casAt > 3000) {
+        const value = await casValue()
+        if (value && value !== live.casSeen) {
+          live.casTries = 0
+          void useAppLogin(live)
+        }
+      }
+      return
+    }
     conceal(live)
 
     if (state.notOpen) {
@@ -303,8 +324,10 @@ function isLogin(target: string, formHost: string): boolean {
 }
 
 /** 浙大自己的表单（form.zju.edu.cn 等）走统一身份认证：把应用里已登录的 CAS cookie 带进问卷分区，不用再登一次 */
+const isZju = (host: string): boolean => /(^|\.)zju\.edu\.cn$/.test(host)
+
 async function shareCas(host: string): Promise<void> {
-  if (!/(^|\.)zju\.edu\.cn$/.test(host)) return
+  if (!isZju(host)) return
   const target = session.fromPartition(PARTITION).cookies
   const cookies = await zjuSession().cookies.get({ domain: 'zju.edu.cn' }).catch(() => [])
   for (const c of cookies) {
@@ -314,6 +337,34 @@ async function shareCas(host: string): Promise<void> {
       .set({ url: `https://${domain}${c.path ?? '/'}`, name: c.name, value: c.value, path: c.path, secure: c.secure, httpOnly: c.httpOnly, expirationDate: c.expirationDate, ...(c.hostOnly ? {} : { domain: c.domain }) })
       .catch(() => {})
   }
+}
+
+const casValue = async (): Promise<string | null> => (await zjuSession().cookies.get({ name: 'iPlanetDirectoryPro' }).catch(() => []))[0]?.value ?? null
+
+/**
+ * 浙大表单被弹回统一身份认证登录页：不显示登录页让用户再填，用应用的登录态——
+ * 第一次直接把应用的 cookie 带过来重开，第二次先用保存的账号重登再带过来；仍不行（应用没登录、没存账号）就打开应用自己的登录面板，
+ * 应用登上后 cookie 值变了，poll 里接着重开
+ */
+async function useAppLogin(live: Live): Promise<void> {
+  live.casAt = Date.now()
+  const tries = live.casTries++
+  if (tries === 1) await refreshCas().catch(() => false)
+  const value = await casValue()
+  live.casSeen = value
+  if (!value || tries >= 2) {
+    live.session.message = '先在应用里登录统一身份认证'
+    const win = appWindow
+    if (tries <= 2 && win && !win.isDestroyed()) {
+      win.show()
+      win.focus()
+      win.webContents.send(OPEN_EVENT, { login: true })
+    }
+    return
+  }
+  live.session.message = null
+  await shareCas(new URL(live.session.url).hostname)
+  if (live.win && !live.win.isDestroyed()) live.win.loadURL(live.session.url).catch(() => {})
 }
 
 function sameSite(a: string, b: string): boolean {
@@ -360,6 +411,10 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     armed: !timed,
     reloads: 0,
     onLogin: false,
+    zju: false,
+    casTries: 0,
+    casAt: 0,
+    casSeen: null,
     polling: false,
     decided: null,
     answers: {},
@@ -391,7 +446,8 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     live.onLogin = isLogin(target, host)
     if (!live.onLogin) return
     setStatus(live, 'login')
-    reveal(live, 'auto')
+    if (live.zju) void useAppLogin(live)
+    else reveal(live, 'auto')
   })
   win.webContents.on('did-fail-load', (_e, code, description, _target, isMainFrame) => {
     if (!isMainFrame || code === -3) return
@@ -399,7 +455,7 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     setStatus(live, 'error')
   })
   win.webContents.on('did-finish-load', () => void install(live))
-  win.on('page-title-updated', (_e, title) => title && (live.session.title = title.replace(/\s*[-_|｜—]\s*(金数据|问卷星|腾讯问卷|问卷网|jinshuju|wjx)\s*$/i, '')))
+  win.on('page-title-updated', (_e, title) => title && !live.onLogin && (live.session.title = title.replace(/\s*[-_|｜—]\s*(金数据|问卷星|腾讯问卷|问卷网|jinshuju|wjx)\s*$/i, '')))
   // 用户关掉显示出来的窗口只是藏起来，订阅还在；取消订阅才真的关
   win.on('close', (e) => {
     if (live.closing) return
@@ -415,7 +471,8 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
   const ticker = setInterval(() => (live.win ? void poll(live) : clearInterval(ticker)), 800)
   live.timers.push(ticker)
 
-  void shareCas(host).then(() => win.loadURL(url).catch(() => {}))
+  live.zju = isZju(host)
+  void (live.zju ? ensureCas().catch(() => {}).then(() => shareCas(host)) : Promise.resolve()).then(() => win.loadURL(url).catch(() => {}))
   if (timed) void schedule(live, at)
   logDiagnostic('form-open', { timed, autoSubmit: options.autoSubmit, optional: options.optional })
   return { ...live.session }
@@ -461,6 +518,11 @@ export async function focusForm(id: string): Promise<void> {
   const live = lives.get(id)
   if (live) {
     if (!live.win || live.win.isDestroyed()) throw new Error('问卷窗口已关闭')
+    // 浙大表单要登录时打开应用自己的登录面板，不显示问卷窗口里的登录页
+    if (live.zju && live.onLogin) {
+      appWindow?.webContents.send(OPEN_EVENT, { login: true })
+      return
+    }
     return reveal(live, 'user')
   }
   const done = (await loadHistory()).find((h) => h.id === id)
