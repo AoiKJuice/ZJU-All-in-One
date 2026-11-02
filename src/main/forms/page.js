@@ -217,8 +217,16 @@ export function formPage(profile, op, makeMatcher, arg) {
   const isMulti = (opts) => opts.some((o) => o.matches(MULTI) || (inputOf(o) && inputOf(o).type === 'checkbox'))
   // 「其他：____」这类选项里的输入框不算填空题
   const textsOf = (box) => [...box.querySelectorAll(TEXT)].filter((el) => visible(el) && isText(el) && !el.closest(OPTION))
-  const blankLabel = (el) =>
-    clean(el.getAttribute('aria-label') || el.placeholder || (el.previousElementSibling && el.previousElementSibling.textContent) || (el.parentElement && el.parentElement.previousElementSibling && el.parentElement.previousElementSibling.textContent) || '')
+  // 多项填空每个空的说明：自带的提示，否则往上几层找紧挨着的、不含输入框的前一个元素（问卷星矩阵填空的说明在同一行前一格 td 里）
+  const blankLabel = (el) => {
+    const own = el.getAttribute('aria-label') || el.placeholder
+    if (own) return clean(own)
+    for (let node = el, i = 0; node && i < 4; node = node.parentElement, i++) {
+      const prev = node.previousElementSibling
+      if (prev && !prev.querySelector('input, textarea, select') && clean(prev.textContent)) return clean(prev.textContent)
+    }
+    return ''
+  }
   const filledBox = (box) =>
     [...box.querySelectorAll(TEXT)].some((el) => el.value.trim()) ||
     [...box.querySelectorAll('select')].some((el) => el.selectedIndex > 0 || (el.value && !/^-?\d$/.test(el.value) && el.value !== '')) ||
@@ -486,7 +494,9 @@ export function formPage(profile, op, makeMatcher, arg) {
       void run()
     }
     // 页面写着的开放时刻（「开放时间为 2026-11-02 19:28」），立即订阅的也能显示倒计时
-    const when = /(?:开放|开始|开启)[^0-9]{0,12}(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})日?\s*(\d{1,2})[:：时](\d{2})(?:[:：分](\d{2}))?/.exec(text)
+    // 问卷星写在后面：「此问卷将于2026-11-02 21:10（北京时间）开放」
+    const date = /(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})日?\s*(\d{1,2})[:：时](\d{2})(?:[:：分](\d{2}))?/
+    const when = new RegExp('(?:开放|开始|开启)[^0-9]{0,12}' + date.source).exec(text) || new RegExp(date.source + '[^0-9]{0,16}(?:开放|开始|开启)').exec(text)
     return {
       title: clean(document.title).replace(/\s*[-_|｜—]\s*(金数据|问卷星|腾讯问卷|问卷网|jinshuju|wjx)\s*$/i, ''),
       page: list.map((q) => q.key).join('|'),
@@ -499,7 +509,7 @@ export function formPage(profile, op, makeMatcher, arg) {
       nextPage: !!button(NEXT, NEXT_WORDS),
       captcha: [...document.querySelectorAll(CAPTCHA)].some((el) => visible(el) && el.getBoundingClientRect().height > 30),
       done: (questions === 0 || s.submittedAt > 0) && /提交成功|感谢您?的?(参与|填写|作答|支持|提交)|答卷已(经)?提交|已提交|提交完成|报名成功|已收到|您已完成/.test(text),
-      notOpen: questions === 0 && /尚未开始|还未开始|未开始|尚未开放|暂未开放|未开放|尚未开启|暂未开启|未开启|即将开始|暂停收集|已暂停|[未不]在.{0,6}时间范围|not (yet )?(started|open)/i.test(text),
+      notOpen: questions === 0 && /尚未开始|还未开始|未开始|尚未开放|暂未开放|未开放|尚未开启|暂未开启|未开启|即将开始|暂停收集|已暂停|[未不]在.{0,6}时间范围|将于.{0,30}(开放|开始|开启)|距离?开始还有|not (yet )?(started|open)/i.test(text),
       opensAt: questions === 0 && when ? new Date(+when[1], +when[2] - 1, +when[3], +when[4], +when[5], +(when[6] || 0)).toISOString() : null,
       // 点过提交后页面标出的校验错误（必填没填、格式不对）
       invalid: s.submittedAt > 0 && [...document.querySelectorAll('.errorMessage, .question-error, .ant-form-item-has-error, .ant-form-item-explain-error, .el-form-item__error, .is-error, [aria-invalid="true"]')].some(visible),
