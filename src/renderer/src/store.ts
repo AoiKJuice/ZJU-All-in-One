@@ -5,7 +5,7 @@ import { applySettings, initialSettings, type Settings } from './lib/settings'
 
 export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
 /** 工具页里打开的工具（见 tools/index.ts） */
-export type ToolId = 'graduation'
+export type ToolId = 'graduation' | 'forms'
 
 /** 课表上点开的一节课：课程详情上拉面板 */
 export interface CourseOpen {

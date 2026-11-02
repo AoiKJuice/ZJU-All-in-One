@@ -18,6 +18,7 @@ import { answerConfirm, getMcpState, setMcp } from './mcp'
 import { onCasExpired } from './http'
 import * as eta from './services/eta'
 import { getTodoState, setIgnored, setRemind } from './todos'
+import { formsHandlers } from './forms/handlers'
 import {
   fetchSchedule as fetchZdbkSchedule,
   fetchExams,
@@ -294,7 +295,9 @@ const handlers: Handlers = {
 
   'mcp:state': async () => getMcpState(),
   'mcp:set': (_win, patch) => setMcp(patch),
-  'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve)
+  'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve),
+
+  ...formsHandlers
 }
 
 if (process.env['ZJU_DEMO'] === '1') {

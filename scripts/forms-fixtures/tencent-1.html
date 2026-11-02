@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>腾讯问卷 - 校园信息登记（测试1）</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f5f6f8; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; }
+  #app { max-width: 720px; margin: 0 auto; padding: 24px 16px 60px; }
+  .loading { text-align: center; padding: 80px 0; color: #999; font-size: 14px; }
+  .question { background: #fff; border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid transparent; transition: border-color .2s; }
+  .question-error { border-color: #e34d59; }
+  .question-title { display: flex; align-items: flex-start; margin-bottom: 14px; font-size: 16px; font-weight: 500; line-height: 1.5; }
+  .question-seq { margin-right: 6px; color: #1f2329; }
+  .question-required { color: #e34d59; margin-right: 4px; }
+  .question-main-title { flex: 1; }
+  .question-main-title p { margin: 0; }
+  .t-input__inner, .t-textarea__inner { width: 100%; border: 1px solid #d9d9d9; border-radius: 4px; padding: 8px 10px; font-size: 14px; line-height: 22px; outline: none; color: #1f2329; background: #fff; }
+  .t-input__inner:focus, .t-textarea__inner:focus { border-color: #0052d9; box-shadow: 0 0 0 2px rgba(0,82,217,.1); }
+  .t-textarea__inner { min-height: 90px; resize: vertical; }
+  .question-options { display: flex; flex-direction: column; gap: 10px; }
+  .t-radio, .t-checkbox { display: flex; align-items: center; cursor: pointer; font-size: 14px; line-height: 22px; position: relative; }
+  .t-radio__former, .t-checkbox__former { position: absolute; opacity: 0; width: 0; height: 0; }
+  .t-radio__input { width: 16px; height: 16px; border-radius: 50%; border: 1px solid #d9d9d9; margin-right: 8px; position: relative; flex: 0 0 auto; }
+  .t-radio__former:checked + .t-radio__input { border-color: #0052d9; }
+  .t-radio__former:checked + .t-radio__input::after { content: ""; position: absolute; left: 4px; top: 4px; width: 6px; height: 6px; border-radius: 50%; background: #0052d9; }
+  .t-checkbox__input { width: 16px; height: 16px; border-radius: 2px; border: 1px solid #d9d9d9; margin-right: 8px; position: relative; flex: 0 0 auto; }
+  .t-checkbox__former:checked + .t-checkbox__input { background: #0052d9; border-color: #0052d9; }
+  .t-checkbox__former:checked + .t-checkbox__input::after { content: "✓"; color: #fff; font-size: 11px; line-height: 16px; text-align: center; position: absolute; left: 0; top: 0; width: 16px; height: 16px; }
+  .btn-submit { display: block; width: 100%; padding: 12px; background: #0052d9; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 24px; }
+  .btn-submit:hover { background: #266fe8; }
+  .success { text-align: center; padding: 80px 20px; font-size: 18px; color: #2ba471; background: #fff; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">加载中...</div></div>
+<script>
+(function () {
+  'use strict';
+
+  var state = {};
+
+  var questions = [
+    { id: 'q-001', type: 'text', expect: 'studentId', required: true, title: '请填写您的学号（必填）', placeholder: '请输入学号' },
+    { id: 'q-002', type: 'text', expect: 'name', required: true, title: '姓名（请填写真实姓名）', placeholder: '请输入姓名' },
+    { id: 'q-003', type: 'radio', expect: 'gender', required: true, title: '性别', options: ['男生', '女生'] },
+    { id: 'q-004', type: 'text', expect: 'majorClass', required: true, title: '专业班级（如：计算机科学与技术 计科2203）', placeholder: '请输入专业班级' },
+    { id: 'q-005', type: 'text', expect: 'college', required: true, title: '所在学院', placeholder: '请输入学院' },
+    { id: 'q-006', type: 'radio', expect: 'grade', required: true, title: '年级', options: ['2021级', '2022级', '2023级', '2024级'] },
+    { id: 'q-007', type: 'radio', expect: 'campus', required: true, title: '常驻校区', options: ['紫金港校区', '玉泉校区', '海宁国际校区'] },
+    { id: 'q-008', type: 'text', expect: 'phone', required: true, title: '手机号码', placeholder: '请输入手机号码' },
+    { id: 'q-009', type: 'text', expect: 'email', required: true, title: '电子邮箱', placeholder: '请输入邮箱' },
+    { id: 'q-010', type: 'text', expect: 'qq', required: false, title: 'QQ号（选填）', placeholder: '请输入QQ号' },
+    { id: 'q-011', type: 'text', expect: 'wechat', required: false, title: '微信号（选填）', placeholder: '请输入微信号' },
+    { id: 'q-012', type: 'text', expect: 'dorm', required: true, title: '宿舍地址（如：碧峰5舍312）', placeholder: '请输入宿舍' },
+    { id: 'q-013', type: 'text', expect: 'className', required: true, title: '班级（如：计科2203）', placeholder: '请输入班级' },
+    { id: 'q-014', type: 'text', expect: 'none', required: false, title: '家长联系电话（选填）', placeholder: '请输入家长电话' },
+    { id: 'q-015', type: 'radio', expect: 'none', required: false, title: '意向校区（选填）', options: ['紫金港校区', '玉泉校区', '海宁国际校区'] },
+    { id: 'q-016', type: 'textarea', expect: 'none', required: false, title: '备注与建议（选填）', placeholder: '请输入备注' },
+    { id: 'q-017', type: 'checkbox', expect: 'none', required: false, title: '了解渠道（多选，选填）', options: ['微信公众号', '同学推荐', '海报', '其他'] },
+    { id: 'q-018', type: 'text', expect: 'none', required: false, title: '紧急联系人姓名（选填）', placeholder: '请输入姓名' }
+  ];
+
+  var app = document.getElementById('app');
+
+  function buildQuestion(q, index) {
+    var required = q.required ? '<span class="question-required">*</span>' : '';
+    var html = '<section class="question question-type-' + q.type + '" data-question-id="' + q.id + '" data-expect="' + q.expect + '">';
+    html += '<div class="question-title">';
+    html += '<span class="question-seq">' + (index + 1) + '</span>';
+    html += required;
+    html += '<div class="question-main-title"><p>' + q.title + '</p></div>';
+    html += '</div>';
+    if (q.type === 'text') {
+      html += '<div class="t-input"><input class="t-input__inner" placeholder="' + (q.placeholder || '请输入') + '" /></div>';
+    } else if (q.type === 'textarea') {
+      html += '<div class="t-textarea"><textarea class="t-textarea__inner" placeholder="' + (q.placeholder || '请输入') + '"></textarea></div>';
+    } else if (q.type === 'radio') {
+      html += '<div class="question-options">';
+      q.options.forEach(function (opt) {
+        html += '<label class="t-radio">';
+        html += '<input type="radio" class="t-radio__former" name="' + q.id + '" value="' + opt + '" />';
+        html += '<span class="t-radio__input"></span>';
+        html += '<span class="t-radio__label">' + opt + '</span>';
+        html += '</label>';
+      });
+      html += '</div>';
+    } else if (q.type === 'checkbox') {
+      html += '<div class="question-options">';
+      q.options.forEach(function (opt) {
+        html += '<label class="t-checkbox">';
+        html += '<input type="checkbox" class="t-checkbox__former" name="' + q.id + '" value="' + opt + '" />';
+        html += '<span class="t-checkbox__input"></span>';
+        html += '<span class="t-checkbox__label">' + opt + '</span>';
+        html += '</label>';
+      });
+      html += '</div>';
+    }
+    html += '</section>';
+    return html;
+  }
+
+  function render() {
+    var html = '';
+    questions.forEach(function (q, i) {
+      html += buildQuestion(q, i);
+    });
+    html += '<button class="btn-submit t-button" type="button">提交</button>';
+    app.innerHTML = html;
+    var btn = app.querySelector('.btn-submit');
+    if (btn) {
+      btn.addEventListener('click', submit);
+    }
+  }
+
+  function isEmpty(v) {
+    if (v === undefined || v === null) return true;
+    if (typeof v === 'string') return v.trim() === '';
+    if (Array.isArray(v)) return v.length === 0;
+    return false;
+  }
+
+  function submit() {
+    var missing = [];
+    questions.forEach(function (q) {
+      if (!q.required) return;
+      var sec = app.querySelector('[data-question-id="' + q.id + '"]');
+      if (isEmpty(state[q.id])) {
+        if (sec) sec.classList.add('question-error');
+        missing.push(q.id);
+      } else {
+        if (sec) sec.classList.remove('question-error');
+      }
+    });
+    if (missing.length === 0) {
+      window.__submitted = true;
+      app.innerHTML = '<div class="success">提交成功，感谢您的填写</div>';
+    } else {
+      window.__submitted = false;
+      var first = app.querySelector('.question-error');
+      if (first && first.scrollIntoView) {
+        first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }
+
+  app.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t || !t.classList) return;
+    if (t.classList.contains('t-input__inner') || t.classList.contains('t-textarea__inner')) {
+      var sec = t.closest('.question');
+      if (sec) {
+        state[sec.getAttribute('data-question-id')] = t.value;
+      }
+    }
+  });
+
+  app.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.classList) return;
+    var sec = t.closest('.question');
+    if (!sec) return;
+    var qid = sec.getAttribute('data-question-id');
+    if (t.type === 'radio') {
+      state[qid] = t.value;
+    } else if (t.type === 'checkbox') {
+      var arr = [];
+      var boxes = sec.querySelectorAll('input[type="checkbox"]');
+      for (var i = 0; i < boxes.length; i++) {
+        if (boxes[i].checked) arr.push(boxes[i].value);
+      }
+      state[qid] = arr;
+    }
+  });
+
+  function boot() {
+    setTimeout(render, 800);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>

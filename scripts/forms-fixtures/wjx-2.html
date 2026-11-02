@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>计算机学院学生信息采集问卷</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:20px 12px 60px; background:#eef1f6; font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif; color:#333; font-size:14px; }
+  .form-wrap { max-width:760px; margin:0 auto; background:#fff; border-radius:6px; padding:24px 28px 44px; box-shadow:0 1px 6px rgba(0,0,0,.08); }
+  .survey-title { font-size:20px; font-weight:700; text-align:center; margin:4px 0 6px; }
+  .survey-desc { text-align:center; color:#999; font-size:13px; margin-bottom:18px; }
+  .field { padding:14px 0 12px; border-bottom:1px dashed #e8e8e8; }
+  .field-label { display:flex; flex-wrap:wrap; align-items:baseline; font-size:15px; line-height:22px; margin-bottom:10px; }
+  .topicnumber { margin-right:4px; font-weight:700; }
+  .req { color:#e60012; margin-left:4px; }
+  .ui-input-text { display:block; }
+  input.ui-input-text, textarea { width:100%; border:1px solid #d9d9d9; border-radius:4px; padding:8px 10px; font-size:14px; font-family:inherit; outline:none; }
+  input.ui-input-text:focus, textarea:focus { border-color:#1e88e5; }
+  textarea { height:88px; resize:vertical; }
+  .ui-controlgroup { padding:2px 0; }
+  .ui-radio, .ui-checkbox { display:flex; align-items:center; padding:5px 2px; cursor:pointer; user-select:none; }
+  .jqradiowrapper { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-right:8px; }
+  .jqradio { display:block; width:16px; height:16px; border:1px solid #bfbfbf; border-radius:50%; background:#fff; }
+  .jqcheck { display:block; width:16px; height:16px; border:1px solid #bfbfbf; border-radius:3px; background:#fff; position:relative; }
+  .ui-radio.checked .jqradio { border:5px solid #1e88e5; }
+  .ui-checkbox.checked .jqcheck { border-color:#1e88e5; background:#1e88e5; }
+  .ui-checkbox.checked .jqcheck::after { content:""; position:absolute; left:4px; top:0; width:5px; height:10px; border:2px solid #fff; border-top:0; border-left:0; transform:rotate(45deg); }
+  .label { font-size:14px; line-height:20px; }
+  select { min-width:240px; padding:8px 10px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px; background:#fff; }
+  .errorMessage { color:#e60012; font-size:13px; margin-top:8px; }
+  .center { text-align:center; }
+  .submitbtn { display:inline-block; margin-top:28px; padding:11px 46px; background:#1e88e5; color:#fff; border-radius:4px; font-size:16px; cursor:pointer; letter-spacing:2px; }
+  .submitbtn:active { opacity:.85; }
+  .button { display:inline-block; margin-top:18px; padding:9px 34px; background:#1e88e5; color:#fff; border-radius:4px; font-size:15px; cursor:pointer; text-decoration:none; }
+  .submitted { max-width:760px; margin:80px auto; padding:60px 20px; background:#fff; border-radius:6px; text-align:center; font-size:20px; color:#333; box-shadow:0 1px 6px rgba(0,0,0,.08); }
+</style>
+</head>
+<body>
+<div class="form-wrap">
+  <div class="survey-title">计算机学院学生信息采集问卷</div>
+  <div class="survey-desc">请如实填写以下信息（本页面数据均为虚构）。</div>
+
+  <div class="field ui-field-contain" id="div1" topic="1" type="1" req="1" data-expect="studentId">
+    <div class="field-label"><div class="topicnumber">1.</div><div class="topichtml">学号 / 工号</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q1" name="q1" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div2" topic="2" type="1" req="1" data-expect="name">
+    <div class="field-label"><div class="topicnumber">2.</div><div class="topichtml">姓名（请与学籍系统保持一致）</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q2" name="q2" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div3" topic="3" type="3" req="1" data-expect="gender">
+    <div class="field-label"><div class="topicnumber">3.</div><div class="topichtml">您的性别</div><span class="req">*</span></div>
+    <div class="ui-controlgroup">
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q3_1" name="q3" value="1" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q3_1">男生</div></div>
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q3_2" name="q3" value="2" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q3_2">女生</div></div>
+    </div>
+  </div>
+
+  <div class="field ui-field-contain" id="div4" topic="4" type="1" req="1" data-expect="className">
+    <div class="field-label"><div class="topicnumber">4.</div><div class="topichtml">班级（如 计科2203）</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q4" name="q4" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div5" topic="5" type="1" req="1" data-expect="college">
+    <div class="field-label"><div class="topicnumber">5.</div><div class="topichtml">所在学院</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q5" name="q5" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div6" topic="6" type="3" req="1" data-expect="grade">
+    <div class="field-label"><div class="topicnumber">6.</div><div class="topichtml">年级（单选）</div><span class="req">*</span></div>
+    <div class="ui-controlgroup">
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q6_1" name="q6" value="1" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q6_1">2022级</div></div>
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q6_2" name="q6" value="2" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q6_2">2023级</div></div>
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q6_3" name="q6" value="3" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q6_3">2024级</div></div>
+    </div>
+  </div>
+
+  <div class="field ui-field-contain" id="div7" topic="7" type="7" req="1" data-expect="campus">
+    <div class="field-label"><div class="topicnumber">7.</div><div class="topichtml">您所在的校区</div><span class="req">*</span></div>
+    <select id="q7" name="q7">
+      <option value="-2">请选择</option>
+      <option value="1">紫金港校区</option>
+      <option value="2">玉泉校区</option>
+      <option value="3">海宁国际校区</option>
+    </select>
+  </div>
+
+  <div class="field ui-field-contain" id="div8" topic="8" type="1" req="1" data-expect="phone">
+    <div class="field-label"><div class="topicnumber">8.</div><div class="topichtml">手机号码（11 位）</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q8" name="q8" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div9" topic="9" type="1" req="0" data-expect="email">
+    <div class="field-label"><div class="topicnumber">9.</div><div class="topichtml">电子邮箱</div></div>
+    <div class="ui-input-text"><input type="text" id="q9" name="q9" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div10" topic="10" type="1" req="0" data-expect="qq">
+    <div class="field-label"><div class="topicnumber">10.</div><div class="topichtml">QQ 号</div></div>
+    <div class="ui-input-text"><input type="text" id="q10" name="q10" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div11" topic="11" type="1" req="0" data-expect="wechat">
+    <div class="field-label"><div class="topicnumber">11.</div><div class="topichtml">微信号</div></div>
+    <div class="ui-input-text"><input type="text" id="q11" name="q11" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div12" topic="12" type="1" req="0" data-expect="dorm">
+    <div class="field-label"><div class="topicnumber">12.</div><div class="topichtml">宿舍号</div></div>
+    <div class="ui-input-text"><input type="text" id="q12" name="q12" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div13" topic="13" type="1" req="1" data-expect="missed">
+    <div class="field-label"><div class="topicnumber">13.</div><div class="topichtml">身份证号</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q13" name="q13" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div14" topic="14" type="2" req="1" data-expect="missed">
+    <div class="field-label"><div class="topicnumber">14.</div><div class="topichtml">你为什么想参加本次活动</div><span class="req">*</span></div>
+    <textarea id="q14" name="q14"></textarea>
+  </div>
+
+  <div class="field ui-field-contain" id="div15" topic="15" type="1" req="0" data-expect="none">
+    <div class="field-label"><div class="topicnumber">15.</div><div class="topichtml">家长联系电话</div></div>
+    <div class="ui-input-text"><input type="text" id="q15" name="q15" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div16" topic="16" type="1" req="0" data-expect="none">
+    <div class="field-label"><div class="topicnumber">16.</div><div class="topichtml">辅导员姓名</div></div>
+    <div class="ui-input-text"><input type="text" id="q16" name="q16" class="ui-input-text" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div17" topic="17" type="3" req="0" data-expect="none">
+    <div class="field-label"><div class="topicnumber">17.</div><div class="topichtml">你从哪里了解到本次活动</div></div>
+    <div class="ui-controlgroup">
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q17_1" name="q17" value="1" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q17_1">微信公众号</div></div>
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q17_2" name="q17" value="2" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q17_2">校园海报</div></div>
+      <div class="ui-radio"><span class="jqradiowrapper"><input type="radio" id="q17_3" name="q17" value="3" style="display:none" /><a class="jqradio" href="javascript:;"></a></span><div class="label" for="q17_3">同学推荐</div></div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div id="ctlNext" class="submitbtn mainBgColor">提交</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function $(sel, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  }
+  function clearError(field) {
+    var e = field.querySelector('.errorMessage');
+    if (e && e.parentNode) e.parentNode.removeChild(e);
+  }
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+
+    var radioWrap = t.closest('.ui-radio');
+    if (radioWrap) {
+      var rin = radioWrap.querySelector('input[type="radio"]');
+      if (rin) {
+        if (!rin.checked) {
+          ev.preventDefault();
+          $('input[type="radio"][name="' + rin.name + '"]').forEach(function (i) {
+            i.checked = false;
+            var w = i.closest('.ui-radio');
+            if (w) w.classList.remove('checked');
+          });
+          rin.checked = true;
+          radioWrap.classList.add('checked');
+        }
+        var f = radioWrap.closest('.field');
+        if (f) clearError(f);
+      }
+      return;
+    }
+
+    var checkWrap = t.closest('.ui-checkbox');
+    if (checkWrap) {
+      var cin = checkWrap.querySelector('input[type="checkbox"]');
+      if (cin) {
+        ev.preventDefault();
+        cin.checked = !cin.checked;
+        checkWrap.classList.toggle('checked', cin.checked);
+        var f2 = checkWrap.closest('.field');
+        if (f2) clearError(f2);
+      }
+      return;
+    }
+  }, false);
+
+  document.addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (!t || !t.type || !t.closest) return;
+    if (t.type === 'radio') {
+      $('input[type="radio"][name="' + t.name + '"]').forEach(function (i) {
+        var w = i.closest('.ui-radio');
+        if (w) w.classList.toggle('checked', i.checked);
+      });
+    } else if (t.type === 'checkbox') {
+      var w = t.closest('.ui-checkbox');
+      if (w) w.classList.toggle('checked', t.checked);
+    }
+  }, false);
+
+  function validate() {
+    var ok = true;
+    var firstBad = null;
+    $('.field').forEach(function (f) { clearError(f); });
+    $('.field[req="1"]').forEach(function (f) {
+      var type = f.getAttribute('type');
+      var valid = true;
+      if (type === '1' || type === '2') {
+        var el = f.querySelector('input[type="text"], textarea');
+        valid = !!el && el.value.trim() !== '';
+      } else if (type === '3') {
+        valid = !!f.querySelector('input[type="radio"]:checked');
+      } else if (type === '4') {
+        valid = !!f.querySelector('input[type="checkbox"]:checked');
+      } else if (type === '7') {
+        var s = f.querySelector('select');
+        valid = !!s && s.value !== '-2' && s.value !== '';
+      }
+      if (!valid) {
+        ok = false;
+        var host = f.querySelector('.field-body') || f;
+        var d = document.createElement('div');
+        d.className = 'errorMessage';
+        d.textContent = '请填写此项';
+        host.appendChild(d);
+        if (!firstBad) firstBad = f;
+      }
+    });
+    if (firstBad && firstBad.scrollIntoView) {
+      try { firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    }
+    return ok;
+  }
+
+  function submit() {
+    if (!validate()) return;
+    window.__submitted = true;
+    document.body.innerHTML = '<div class="submitted">答卷已经提交，感谢您的参与！</div>';
+  }
+
+  var btn = document.getElementById('ctlNext');
+  if (btn) btn.addEventListener('click', submit, false);
+})();
+</script>
+</body>
+</html>

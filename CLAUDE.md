@@ -17,6 +17,7 @@ ZJU_PROFILE=test npm run dev # 另开一套数据目录（zju-all-in-one-test）
 npm run dist                 # 打包 Windows 安装包 + 便携版到 release/（先设 ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/）
 ZJU_DEMO=1 ZJU_DEMO_VIDEO=<本地 mp4> npm run dev # 演示模式下用本地视频调播放器
 ZJU_DEBUG=1 npm run dev      # 主进程打印每个 zjuFetch 请求的最终落点、状态码与响应开头，用于对照真实接口
+npx electron scripts/test-forms.mjs # 问卷填写回归：标题匹配词表 + 本地模拟的问卷星 / 腾讯问卷 / 金数据页（scripts/forms-fixtures，内容虚构）
 npm run build                # 构建到 out/
 npm run typecheck            # node（main/preload/shared）、web（renderer）、mobile（src/mobile）三套 tsconfig
 npm run mobile:dev -- --mode demo  # 浏览器里调手机界面（演示数据；内置浏览器 preview 名 mobile-demo，切到手机尺寸）
@@ -63,6 +64,19 @@ npm run mobile:build         # 安卓网页资源到 out/mobile 并 cap sync 到
 ### PTA（pintia.cn）
 
 `services/pta.ts`：浙大程序设计课的作业平台，账号与统一身份认证无关，设置里开关（默认关，存 userData/pta.json）并单独登录，用独立分区 `persist:pta`（退出统一身份认证不影响它）。接口逆向自 PTA 网页端与开源的 vscode-pintia：登录 `POST passport.pintia.cn/api/users/sessions` `{phone: "+86…" | email, password, rememberMe}`，成功写 `PTASession` cookie；网页端先不带验证码提交，服务端回 `GATEWAY_WRONG_CAPTCHA` 才弹腾讯滑块（CaptchaAppId `194593025`，`turing.captcha.qcloud.com/TCaptcha.js`）。应用内登录遇到时由 `solveCaptcha` 开一个小窗加载 `pintia.cn/robots.txt`（验证码校验来源域名，任一 pintia.cn 页面即可），注入 TCaptcha 让用户完成，再带 `ticket` / `randStr` 重提；后台自动重登遇到验证码直接失败、保留凭据，不突然弹窗。网页登录（弹窗加载 `pintia.cn/auth/login`）仍保留。界面显示的 PTA 账号脱敏（手机号留前三后四、邮箱留首字与域名）。当前用户 `passport.pintia.cn/api/u/current`；未截止题目集 `GET pintia.cn/api/problem-sets?filter={"endAtAfter":<now>}`；完成情况 `exam-problem-status`（`PROBLEM_ACCEPTED` 计通过）。**只读，不 POST `/exams`**（那会替用户开考）。凭据 safeStorage 加密存 pta-credentials.bin，401 时自动重登。`data:assignments` 合并学在浙大与 PTA（PTA 出错只记日志），PTA 条目 `type: 'pta'`、带 `progress`，作业侧页对它只显示进度与"在 PTA 打开"。
+
+### 问卷填写（工具页，仅桌面端）
+
+活动报名、讲座抢票类问卷：粘贴地址，应用开窗打开并按本人信息填写。代码全在独立文件里（与其他工具分支少冲突）：类型与通道 `src/shared/forms.ts`（`ZjuApi extends FormsApi`、`ZJU_CHANNELS` 展开 `FORMS_CHANNELS`），主进程 `src/main/forms/`（`index.ts` 窗口与记录、`page.js` 注入脚本、`handlers.ts` 通道与 MCP，`ipc.ts` / `mcp.ts` 各并入一行），界面 `components/FormFill.tsx` + `forms.css`，安卓桥 `src/mobile/forms.ts` 全部返回不支持、`tools/index.ts` 以 `desktop: true` 隐藏入口。
+- 个人信息（学号、姓名、性别、学院、专业、班级、年级、校区、手机、邮箱、QQ、微信、宿舍）`secure.ts` 加密存 userData/form-profile.bin；没存过时用教务姓名学号预填，本科学号 `3YY…` 推出年级。打开、重新填写前先存一次。
+- 窗口用独立分区 `persist:forms`（扫码登录的微信 / QQ 下次还在），同站与登录弹窗留在应用里，其他外链交给系统浏览器。**不调平台提交接口**，只操作页面。
+- `page.js` 经 `Function.toString` 注入主世界，两个函数必须自包含（写成 .js 是为了回归脚本不经构建直接加载，类型在 `page.d.ts`）。`formMatcher` 先去题号、星号、括号说明再按词表认字段（专业班级、学院专业是组合题）；`NOT` / `STRONG` 排除问的不是本人或不是这几项的题（家长、紧急联系人、队友、负责人、意向校区、辅修、身份证、后四位、群号……），明确排除的题不再看输入框提示文字。题目容器取已知题目块（问卷星 `[topic]` / `.field`、腾讯 `section.question`、金数据 / Ant `.ant-form-item` 等）的最内层，不在其中的控件往上找。文本框用原生 setter 赋值并派发 input / change / keyup / blur；原生下拉按选项文字选并补 jQuery change（select2）；单选点选项（已选中的不再点，免得多选被取消）；自绘下拉（Ant / Element / TDesign）先按下展开再点选项。选项文字按性别「男生 / 男性」、年级「2022级 / 22级 / 大N」、校区去掉「校区」容错。MutationObserver 去抖重跑，补上单页应用晚渲染、多页问卷翻页后出现的题；填过的控件记在 WeakMap 里，用户改过的不会被覆盖回去（「重新填写」才清掉）。认不出且没填的必填题在页面上描红并列进记录。
+- 状态（`FormStatus`）：等待开放 / 填写中 / 已填好 / 待补填（有必填题没认出、什么都没认出、或提交被页面校验拦下）/ 需验证（出现验证码）/ 需登录 / 已提交（成功页，或我们点过提交后题目消失）/ 已关闭 / 打不开。主进程每 0.8 秒读一次页面状态，页面 `alert`（作答时间太短等）记下显示在记录里，原对话框推迟弹出。
+- 自动提交只试一次：第一次填稳（1.2 秒没变化）时有没认出的必填题就放弃；多页问卷只在只剩「提交」、没有「下一页」时才交；验证码、扫码、最短作答时间一律交给用户在窗口里完成，不绕过。不做多账号、批量提交。
+- 定时：窗口先打开（可提前登录），HEAD 请求取问卷站 `Date` 头校准（往返中点 + 半秒），开放前 20 秒再校准一次，到点刷新再填；页面仍显示未开始 / 暂停时每 0.8 秒重刷，最多 15 次。界面倒计时按校准后的时钟走。
+- 记录只在本次运行里保留（最多 12 条，先丢已关的），工具页开着时每秒取一次；点开一条看已填字段（标签，悬停看原题）、未认出的题，操作为 前往窗口 / 重新填写 / 关闭窗口（已关的为移除）。
+- MCP：`fill_form`（界面组，只填不交，可带 `open_at`，返回几秒内的结果）与 `get_forms`（查询组）；返回的记录只含题目与字段，不带所填的值。
+- 回归：`npx electron scripts/test-forms.mjs [文件名片段]`，模拟页的题目块带 `data-expect`（字段键 / `none` 不该填 / `missed` 应标出），无 missed 时模拟自动提交并核对页面校验通过与成功页识别。新增平台结构时先加模拟页。**不要向真实问卷提交测试**。
 
 ### 待办忽略与截止提醒
 
@@ -121,7 +135,7 @@ npm run mobile:build         # 安卓网页资源到 out/mobile 并 cap sync 到
 - 设置（`lib/settings.ts` + 设置页）写到 `html` 的 `data-style` / `data-theme` / `data-font`（song 书宋、hei 黑体、kai 文楷）/ `data-accent`（blue 求是蓝 #003F88、red 求是红即浙大 VI 的"创新红" #B01F24、shu 朱砂），存 localStorage。`--shu` 是"当前主题色"的变量名，不一定是朱色。 字号四档（小 / 标准 / 大 / 特大）写成 `--scale`，乘在根字号上，不提供自定义数值。
 - 数字统一用 Source Serif 4 的等高数字（`AJ Digits` 只接管数字与常见符号的 unicode-range），不用 EB Garamond 的旧式数字。
 - `Reveal` 动画结束会清掉 filter/transform：带 filter 的祖先会让 `position: fixed` 的后代（如铺满的播放器）只相对它定位。
-- **工具页**（`pages/Tools.tsx` + `tools/`）：入口网格，每个工具一张卡片＝悬停时会动的细线徽标（`tools/icons.tsx`，墨色主体 + 一处主题色，动效写在 styles.css「工具页」一节）+ 名称，不写说明；点开后整页是该工具，标题左侧返回。路由用 store 的 `tool`（记入浏览历史，返回键 / 侧键回到入口）。新工具：`ToolId` 加 id、`tools/index.ts` 注册、画一个带悬停动效的徽标，View 不写页面标题。
+- **工具页**（`pages/Tools.tsx` + `tools/`）：入口网格，每个工具一张卡片＝悬停时会动的细线徽标（`tools/icons.tsx`，墨色主体 + 一处主题色，动效写在 styles.css「工具页」一节）+ 名称，不写说明；点开后整页是该工具，标题左侧返回。路由用 store 的 `tool`（记入浏览历史，返回键 / 侧键回到入口）。新工具：`ToolId` 加 id、`tools/index.ts` 注册（只在桌面端可用的标 `desktop: true`，安卓端不显示）、画一个带悬停动效的徽标，View 不写页面标题；工具自己的样式放独立 css 随组件引入。
 - **毕业自审**（`components/Graduation.tsx`，`services/graduation.ts` 教务自审树 + `services/sztz.ts` 第二课堂）：总览（毕业总学分 + 二三四课堂、美育、劳育数字块）与「待完成」清单（最深一层没达标的模块写还差几学分、几门在修 / 未修，加上未达标的课堂与美育劳育）在上，培养方案顶层模块按名称归入 通识类 / 专业类 / 实践类 / 认定类（美育、劳育、心理健康等）/ 其他 分组显示，卡片高度固定：有要求门数的按门数画进度，否则按学分；卡片底部只写在修 / 未修几门，不写差几学分；同名模块（选必修各一）靠右上的选必修小标签区分；「待完成」每行只写一项（差几门 / 差几学分 / 几门未完成 / 未达标）；点模块或数字块在自己的侧页（`.local-sheet`，Esc / 安卓返回键收起）看明细：模块的课（未完成 / 全部）、第二课堂记录（已完成 / 审核中 / 未通过，`getSqjl` 记录按项目分类的 `sfdekt` / `sfdskt` 分二 / 三课堂，其余推测为四课堂）。不要再做超长卡片。
 - 导航为主页、课表、工具、设置（安卓端见上文；设置是刊头里的独立标签，右上角只留未登录时的登录与深浅色切换，后者用细线日 / 月图标而非单字「昼 / 夜」）；设置页分 外观 / 账号（统一身份认证、PTA）/ 本地 Agent 三组，不加说明小字；回放页从主页回放条目进入，作业详情与提交在右侧侧页（`AssignmentSheet`）。主页为一屏布局（`.page-fit` + `.panes`），各区块内部滚动；根字号随视口缩放（`html { font-size: clamp(...) }`），小窗口时整体缩小而不是整页下滑。路由是 zustand `store.ts` 的 `page` 状态，`go`/`openReplay` 记入 `past`/`future`，鼠标侧键（button 3/4）返回 / 前进，作业侧页开着时返回先关侧页；主页滚到顶后继续上滚约三格触发刷新（`usePullRefresh`，刊头下一道细线示意）；登录状态变化时 `epoch` 自增，`useZju` 据此自动重拉。
 - **数据缓存**（`lib/cache.ts`）：`useZju` 与课表页的校历、各周课次先显示缓存，只有过期（5 分钟）或 `epoch` 变化（登录变化、下拉刷新）才在后台静默重取，切页面不重新加载；`useZju` 的结果同时存 localStorage，冷启动先显示上次数据；确认未登录时整体清空。
