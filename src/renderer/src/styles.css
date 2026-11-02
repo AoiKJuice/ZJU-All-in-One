@@ -2222,6 +2222,38 @@ html[data-theme='dark'] {
   stroke-dashoffset: 0;
   transition-delay: calc(0.15s * var(--speed, 1));
 }
+/* 选课：主题色课块跳起、落进格子时压扁一下，随后打勾；装订环晃一下 */
+.tool-icon :is(.ti-pick, .ti-rings) {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.tool-card:hover .ti-pick {
+  animation: ti-hop calc(0.75s * var(--speed, 1)) var(--ease);
+}
+@keyframes ti-hop {
+  30% {
+    transform: translateY(-6px);
+  }
+  55% {
+    transform: translateY(0) scale(1.1, 0.84);
+  }
+  75% {
+    transform: translateY(-1px) scale(0.97, 1.04);
+  }
+}
+.tool-card:hover .ti-rings {
+  animation: ti-swing calc(0.9s * var(--speed, 1)) var(--ease);
+}
+.tool-icon .ti-tick {
+  stroke: #fff;
+  stroke-dasharray: 10;
+  stroke-dashoffset: 10;
+  transition: stroke-dashoffset calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.tool-card:hover .ti-tick {
+  stroke-dashoffset: 0;
+  transition-delay: calc(0.5s * var(--speed, 1));
+}
 .tool-head {
   display: flex;
   align-items: center;
