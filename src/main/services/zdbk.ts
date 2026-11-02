@@ -43,6 +43,7 @@ let loggedIn = false
 
 export function reset(): void {
   loggedIn = false
+  xh = undefined
 }
 
 function live<T>(data: T): DataResult<T> {
@@ -126,6 +127,23 @@ export async function post<T>(path: string, fields?: Record<string, string>): Pr
   if (text.includes('captcha_error')) throw new Error('需要验证码')
 
   return JSON.parse(text) as T
+}
+
+/** 教务页面（如选课首页）的 HTML，选课（xk.ts）用 */
+export async function page(path: string): Promise<string> {
+  await ensureLogin()
+  const response = await zjuFetch(`${BASE}${path}`, { headers: { Referer: `${BASE}/xtgl/index_initMenu.html` } })
+  checkResponse(response)
+  return response.text()
+}
+
+let xh: string | undefined
+
+/** 功能模块 URL 要带 su=<学号>：从课表接口的个人信息取一次 */
+export async function studentId(): Promise<string> {
+  xh ??= (await loadSchedule())?.xsxx.XH
+  if (!xh) throw new Error('教务个人信息为空')
+  return xh
 }
 
 function loadSchedule(): Promise<ScheduleResponse | null> {

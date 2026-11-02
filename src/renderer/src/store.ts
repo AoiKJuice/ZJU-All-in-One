@@ -5,7 +5,7 @@ import { applySettings, initialSettings, type Settings } from './lib/settings'
 
 export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
 /** 工具页里打开的工具（见 tools/index.ts） */
-export type ToolId = 'graduation'
+export type ToolId = 'graduation' | 'course'
 
 /** 课表上点开的一节课：课程详情上拉面板 */
 export interface CourseOpen {
@@ -208,6 +208,7 @@ window.zju.onOpen((request) => {
   if ('page' in request) s.go(request.page)
   else if ('login' in request) s.setLoginOpen(true)
   else if ('assignment' in request) s.openAssignment(request.assignment)
+  else if ('tool' in request) s.openTool(request.tool as ToolId)
   else s.openReplay(request.replay)
 })
 
