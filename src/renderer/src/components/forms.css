@@ -199,6 +199,27 @@
 .forms-modal-head .section-title {
   text-wrap: balance;
 }
+.forms-modal-titlebar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+/* 右上角「剩余 / 共」 */
+.forms-count {
+  flex: none;
+  padding: 0.0625rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+/* 逐题时「稍后」靠左，上一题 / 下一题靠右 */
+.forms-modal-foot .forms-later {
+  margin-right: auto;
+}
 .forms-modal-message {
   margin: 0.5rem 0 0;
   font-size: 0.9375rem;

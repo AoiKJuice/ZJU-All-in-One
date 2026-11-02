@@ -54,12 +54,19 @@ export function FormPrompt() {
   )
 }
 
-/** 补填 / 确认：每题给输入框或选项，提交按钮固定在弹窗底部 */
+/**
+ * 补填 / 确认：没填上的题一题一题问（右上角「剩余 / 共」），单选点了就进下一题；
+ * 自动提交问完最后一题直接交，检查后提交问完再列出全部题目核对。按钮固定在弹窗底部
+ */
 function Answer({ session }: { session: FormSession }) {
   const notify = useApp((s) => s.notify)
   const postpone = useForms((s) => s.postpone)
   const show = useForms((s) => s.show)
   const [answers, setAnswers] = useState<Record<string, FormAnswer>>(() => Object.fromEntries(session.questions.map((q) => [q.key, q.value])))
+  // 这一轮要逐题问的：弹出时还空着的题（应用里填不了的除外），之后页面轮询换了对象也按键认
+  const [blanks] = useState(() => session.questions.filter((q) => !q.filled && q.kind !== 'other').map((q) => q.key))
+  const [step, setStep] = useState(0)
+  const [review, setReview] = useState(blanks.length === 0)
   const [checked, setChecked] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -71,12 +78,21 @@ function Answer({ session }: { session: FormSession }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [postpone, session])
 
-  const set = (key: string, value: FormAnswer): void => setAnswers((a) => ({ ...a, [key]: value }))
+  const byKey = (key: string): FormQuestion | undefined => session.questions.find((q) => q.key === key)
+  const current = review ? undefined : byKey(blanks[step])
+  const last = step === blanks.length - 1
+  const left = blanks.filter((key) => isEmpty(answers[key])).length
   const missing = session.questions.filter((q) => q.required && q.kind !== 'other' && isEmpty(answers[q.key]))
+  const set = (key: string, value: FormAnswer): void => setAnswers((a) => ({ ...a, [key]: value }))
 
-  const submit = (): void => {
+  const send = (): void => {
     setChecked(true)
-    if (missing.length) return notify('还有必填题没填')
+    if (missing.length) {
+      // 回到第一道还空着的必填题
+      const at = blanks.findIndex((key) => missing.some((m) => m.key === key))
+      if (at >= 0 && !review) setStep(at)
+      return notify('还有必填题没填')
+    }
     setBusy(true)
     const given = Object.fromEntries(session.questions.filter((q) => q.kind !== 'other').map((q) => [q.key, answers[q.key] ?? '']))
     window.zju['forms:answer'](session.id, given)
@@ -85,31 +101,93 @@ function Answer({ session }: { session: FormSession }) {
       .finally(() => setBusy(false))
   }
 
+  const next = (): void => {
+    if (current?.required && isEmpty(answers[current.key])) {
+      setChecked(true)
+      return notify('这题必填')
+    }
+    setChecked(false)
+    if (!last) setStep(step + 1)
+    else if (session.autoSubmit) send()
+    else setReview(true)
+  }
+
+  // 单选点了就进下一题（最后一题不自动交，等用户点）
+  const change = (q: FormQuestion, value: FormAnswer): void => {
+    set(q.key, value)
+    if (!review && q.kind === 'radio' && value && !last) setTimeout(() => setStep((s) => (s === step ? s + 1 : s)), 220)
+  }
+  const web = (): void => void window.zju['forms:focus'](session.id).catch((e) => notify(errorText(e)))
+
   return (
     <>
       <header className="forms-modal-head">
-        <h2 className="section-title">{session.title}</h2>
+        <div className="forms-modal-titlebar">
+          <h2 className="section-title">{session.title}</h2>
+          {!review && (
+            <span className="forms-count" aria-label="剩余未填">
+              {left}/{blanks.length}
+            </span>
+          )}
+        </div>
         {session.message && <p className="forms-modal-message">{session.message}</p>}
       </header>
       <div className="forms-modal-body">
-        {session.questions.length === 0 && <p className="quiet">无</p>}
-        {session.questions.map((q) => (
-          <Question key={q.key} q={q} value={answers[q.key]} error={checked && missing.some((m) => m.key === q.key)} onChange={(v) => set(q.key, v)} onWeb={() => void window.zju['forms:focus'](session.id).catch((e) => notify(errorText(e)))} />
-        ))}
+        {review ? (
+          <>
+            {session.questions.length === 0 && <p className="quiet">无</p>}
+            {session.questions.map((q) => (
+              <Question key={q.key} q={q} value={answers[q.key]} error={checked && missing.some((m) => m.key === q.key)} onChange={(v) => change(q, v)} onWeb={web} />
+            ))}
+          </>
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            {current && (
+              <motion.div key={current.key} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: dur(0.2), ease: [0.22, 1, 0.36, 1] }}>
+                <Question q={current} value={answers[current.key]} error={checked && missing.some((m) => m.key === current.key)} onChange={(v) => change(current, v)} onWeb={web} autoFocus />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
       </div>
       <footer className="forms-modal-foot">
-        <button className="btn" onClick={() => postpone(session)}>
+        <button className="btn forms-later" onClick={() => postpone(session)}>
           稍后
         </button>
-        <button className="btn btn-solid" disabled={busy} onClick={submit}>
-          {busy ? '提交中' : '提交'}
-        </button>
+        {!review && step > 0 && (
+          <button className="btn" onClick={() => setStep(step - 1)}>
+            上一题
+          </button>
+        )}
+        {review ? (
+          <button className="btn btn-solid" disabled={busy} onClick={send}>
+            {busy ? '提交中' : '提交'}
+          </button>
+        ) : (
+          <button className="btn btn-solid" disabled={busy} onClick={next}>
+            {!last ? '下一题' : session.autoSubmit ? (busy ? '提交中' : '提交') : '核对全部'}
+          </button>
+        )}
       </footer>
     </>
   )
 }
 
-function Question({ q, value, error, onChange, onWeb }: { q: FormQuestion; value: FormAnswer | undefined; error: boolean; onChange: (v: FormAnswer) => void; onWeb: () => void }) {
+function Question({
+  q,
+  value,
+  error,
+  onChange,
+  onWeb,
+  autoFocus = false
+}: {
+  q: FormQuestion
+  value: FormAnswer | undefined
+  error: boolean
+  onChange: (v: FormAnswer) => void
+  onWeb: () => void
+  autoFocus?: boolean
+}) {
   const text = typeof value === 'string' ? value : ''
   const list = Array.isArray(value) ? value : value ? [value] : []
   return (
@@ -119,8 +197,8 @@ function Question({ q, value, error, onChange, onWeb }: { q: FormQuestion; value
         {q.required && <span className="forms-q-star">*</span>}
         {KIND[q.kind] && <span className="forms-q-kind">{KIND[q.kind]}</span>}
       </p>
-      {q.kind === 'text' && <input className="field forms-input" spellCheck={false} value={text} onChange={(e) => onChange(e.target.value)} />}
-      {q.kind === 'textarea' && <textarea className="field forms-input forms-textarea" rows={3} value={text} onChange={(e) => onChange(e.target.value)} />}
+      {q.kind === 'text' && <input className="field forms-input" spellCheck={false} autoFocus={autoFocus} value={text} onChange={(e) => onChange(e.target.value)} />}
+      {q.kind === 'textarea' && <textarea className="field forms-input forms-textarea" rows={3} autoFocus={autoFocus} value={text} onChange={(e) => onChange(e.target.value)} />}
       {(q.kind === 'radio' || q.kind === 'checkbox') && (
         <div className="forms-choices" role={q.kind === 'radio' ? 'radiogroup' : 'group'}>
           {q.options.map((o) => {
