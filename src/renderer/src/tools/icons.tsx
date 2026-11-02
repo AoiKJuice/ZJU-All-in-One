@@ -34,3 +34,19 @@ export function CourseIcon() {
     </svg>
   )
 }
+
+/** 问卷填写：夹板上的问卷，悬停时笔提起回到行首，落笔写出最后一行 */
+export function FormIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect className="ti-ink" x="8" y="9" width="26" height="33" rx="3" />
+      <rect className="ti-ink" x="15" y="5.5" width="12" height="6" rx="1.8" />
+      <path className="ti-ink" d="M14 19h11M14 26h14" />
+      <path className="ti-accent ti-write" d="M14 33.5h10" />
+      <g className="ti-pen">
+        <path className="ti-accent" d="M25.5 33.5l1.6-5.2 12.6-12.6a2.6 2.6 0 0 1 3.7 3.7L30.8 32Z" />
+        <path className="ti-accent" d="M37.4 18l3.7 3.7" />
+      </g>
+    </svg>
+  )
+}

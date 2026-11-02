@@ -18,6 +18,7 @@ import { answerConfirm, getMcpState, setMcp } from './mcp'
 import { onCasExpired } from './http'
 import * as eta from './services/eta'
 import { getTodoState, setIgnored, setRemind } from './todos'
+import { formsHandlers } from './forms/handlers'
 import {
   fetchSchedule as fetchZdbkSchedule,
   fetchExams,
@@ -300,7 +301,8 @@ const handlers: Handlers = {
   'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve),
 
   // 选课与查老师（含演示模式的替换）见 xkIpc.ts
-  ...xkChannels(process.env['ZJU_DEMO'] === '1')
+  ...xkChannels(process.env['ZJU_DEMO'] === '1'),
+  ...formsHandlers
 }
 
 if (process.env['ZJU_DEMO'] === '1') {

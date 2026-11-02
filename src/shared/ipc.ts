@@ -25,13 +25,14 @@ import type {
   TranscriptSegment
 } from './types'
 import { XK_CHANNELS, type XkApi } from './xk'
+import { FORMS_CHANNELS, type FormsApi } from './forms'
 
 /**
  * Single source of truth for renderer ⇄ main communication.
  * Each key is an `ipcMain.handle` channel; preload exposes them 1:1 as `window.zju[key]` (arguments pass through).
  * Adding a channel = add it here and to ZJU_CHANNELS, implement it in `src/main/ipc.ts`.
  */
-export interface ZjuApi extends XkApi {
+export interface ZjuApi extends XkApi, FormsApi {
   'auth:state': () => Promise<AuthState>
   /** 带账号密码：程序内登录并加密保存，过期时自动重登；不带：弹出统一身份认证网页（验证码等兜底） */
   'auth:login': (account?: { username: string; password: string }) => Promise<AuthState>
@@ -144,7 +145,8 @@ export const ZJU_CHANNELS = [
   'mcp:state',
   'mcp:set',
   'mcp:answer',
-  ...XK_CHANNELS
+  ...XK_CHANNELS,
+  ...FORMS_CHANNELS
 ] as const satisfies readonly ZjuChannel[]
 
 /** 主进程 → 渲染进程的推送事件 */

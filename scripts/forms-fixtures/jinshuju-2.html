@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>2024 年计算机学院迎新活动报名表 - 金数据</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #f0f2f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.88);
+      padding: 24px 16px 64px;
+      line-height: 1.5715;
+    }
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 8px;
+      padding: 32px 40px 40px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 2px 8px rgba(0,0,0,.06);
+    }
+    .form-title { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
+    .form-description { color: rgba(0,0,0,.45); margin-bottom: 28px; font-size: 13px; }
+    .form-field { margin-bottom: 24px; }
+    .ant-form-item-label { margin-bottom: 8px; }
+    .ant-form-item-label > label { font-size: 14px; color: rgba(0,0,0,.88); }
+    .ant-form-item-required::before {
+      display: inline-block; margin-right: 4px; color: #ff4d4f;
+      font-size: 14px; font-family: SimSun, sans-serif; line-height: 1; content: '*';
+    }
+    .ant-form-item-control { position: relative; }
+    .ant-input {
+      width: 100%; height: 32px; padding: 4px 11px; font-size: 14px;
+      font-family: inherit; color: rgba(0,0,0,.88); background: #fff;
+      border: 1px solid #d9d9d9; border-radius: 6px; outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    textarea.ant-input { height: auto; min-height: 76px; padding: 6px 11px; resize: vertical; }
+    .ant-input:hover { border-color: #4096ff; }
+    .ant-input:focus { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(5,145,255,.1); }
+    .field-description { margin-top: 4px; font-size: 12px; color: rgba(0,0,0,.45); }
+    .ant-radio-group { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+    .ant-radio-wrapper { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+    .ant-radio { position: relative; display: inline-block; width: 16px; height: 16px; }
+    .ant-radio-input { position: absolute; inset: 0; width: 16px; height: 16px; margin: 0; opacity: 0; cursor: pointer; z-index: 2; }
+    .ant-radio-inner { position: absolute; inset: 0; background: #fff; border: 1px solid #d9d9d9; border-radius: 50%; transition: all .2s; }
+    .ant-radio-wrapper-checked .ant-radio-inner { border-color: #1677ff; }
+    .ant-radio-wrapper-checked .ant-radio-inner::after {
+      content: ''; position: absolute; top: 3px; left: 3px; width: 8px; height: 8px;
+      border-radius: 50%; background: #1677ff;
+    }
+    .ant-select { position: relative; width: 100%; }
+    .ant-select-selector {
+      position: relative; display: flex; align-items: center;
+      min-height: 32px; padding: 4px 30px 4px 11px; background: #fff;
+      border: 1px solid #d9d9d9; border-radius: 6px; cursor: pointer;
+      transition: border-color .2s, box-shadow .2s; user-select: none;
+    }
+    .ant-select-selector::after {
+      content: ''; position: absolute; right: 13px; top: 50%; width: 6px; height: 6px;
+      border-right: 1.5px solid rgba(0,0,0,.35); border-bottom: 1.5px solid rgba(0,0,0,.35);
+      transform: translateY(-70%) rotate(45deg); pointer-events: none;
+    }
+    .ant-select-selection-placeholder { color: rgba(0,0,0,.25); }
+    .ant-select-selection-item { color: rgba(0,0,0,.88); }
+    .ant-select-dropdown {
+      position: absolute; z-index: 1050; min-width: 120px; padding: 4px;
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12), 0 9px 28px 8px rgba(0,0,0,.05);
+    }
+    .ant-select-item { padding: 5px 12px; border-radius: 4px; cursor: pointer; line-height: 22px; }
+    .ant-select-item-option:hover { background: rgba(0,0,0,.04); }
+    .ant-select-item-option-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ant-form-item-has-error .ant-input,
+    .ant-form-item-has-error .ant-select-selector { border-color: #ff4d4f; }
+    .form-submit { margin-top: 32px; }
+    .ant-btn {
+      display: inline-block; height: 32px; padding: 4px 15px; font-size: 14px; font-family: inherit;
+      border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: all .2s;
+    }
+    .ant-btn-primary { color: #fff; background: #1677ff; border-color: #1677ff; box-shadow: 0 2px 0 rgba(5,145,255,.1); }
+    .ant-btn-primary:hover { background: #4096ff; border-color: #4096ff; }
+    .submit-result {
+      margin-top: 16px; padding: 10px 16px; background: #f6ffed; border: 1px solid #b7eb8f;
+      border-radius: 6px; color: #389e0d;
+    }
+    .submit-result[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="form-header">
+    <h1 class="form-title">2024 年计算机学院迎新活动报名表</h1>
+    <div class="form-description">请如实填写以下信息，带 * 的为必填项。提交后我们会在三个工作日内与您联系。</div>
+  </div>
+
+  <form id="form" class="ant-form" novalidate autocomplete="off">
+
+    <div class="ant-form-item form-field" data-field-id="field_1" data-expect="name" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="姓名">1. 请填写您的姓名</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入姓名" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_2" data-expect="studentId" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="学号">2. 学号（10 位数字）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入学号" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_3" data-expect="gender" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="性别">3. 您的性别</label>
+      </div>
+      <div class="ant-form-item-control">
+        <div class="ant-radio-group">
+          <label class="ant-radio-wrapper">
+            <span class="ant-radio">
+              <input type="radio" class="ant-radio-input" name="field_3" value="男生" />
+              <span class="ant-radio-inner"></span>
+            </span>
+            <span>男生</span>
+          </label>
+          <label class="ant-radio-wrapper">
+            <span class="ant-radio">
+              <input type="radio" class="ant-radio-input" name="field_3" value="女生" />
+              <span class="ant-radio-inner"></span>
+            </span>
+            <span>女生</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_4" data-expect="phone" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="手机号码">4. 手机号码（用于接收活动通知）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="tel" placeholder="请输入 11 位手机号" />
+      </div>
+      <div class="field-description">请填写常用手机号，我们会通过短信通知活动安排。</div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_5" data-expect="email" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="电子邮箱">5. 电子邮箱</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="email" placeholder="请输入邮箱地址" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_6" data-expect="majorClass" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="专业班级">6. 专业班级（例如：计算机科学与技术 2203 班）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请按「专业 + 班级」的格式填写" />
+      </div>
+      <div class="field-description">请按「专业 + 班级」的格式填写，例如：计算机科学与技术 2203 班。</div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_7" data-expect="college" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="所在学院">7. 所在学院</label>
+      </div>
+      <div class="ant-form-item-control">
+        <div class="ant-select">
+          <div class="ant-select-selector">
+            <span class="ant-select-selection-placeholder">请选择学院</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_8" data-expect="grade" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="年级">8. 年级</label>
+      </div>
+      <div class="ant-form-item-control">
+        <div class="ant-select">
+          <div class="ant-select-selector">
+            <span class="ant-select-selection-placeholder">请选择年级</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_9" data-expect="campus" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="常驻校区">9. 常驻校区</label>
+      </div>
+      <div class="ant-form-item-control">
+        <div class="ant-select">
+          <div class="ant-select-selector">
+            <span class="ant-select-selection-placeholder">请选择校区</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_10" data-expect="missed" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="身份证号">10. 身份证号</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入 18 位身份证号" />
+      </div>
+      <div class="field-description">用于购买活动保险，请如实填写。</div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_11" data-expect="missed" data-required="true">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-required" title="你为什么想参加本次活动">11. 你为什么想参加本次活动？</label>
+      </div>
+      <div class="ant-form-item-control">
+        <textarea class="ant-input" rows="3" placeholder="请输入您的回答"></textarea>
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_12" data-expect="qq" data-required="false">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-label" title="QQ 号">12. QQ 号（选填）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入 QQ 号" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_13" data-expect="wechat" data-required="false">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-label" title="微信号">13. 微信号（选填）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入微信号" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_14" data-expect="dorm" data-required="false">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-label" title="宿舍">14. 宿舍（楼栋 + 房间号，选填）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="如：碧峰5舍312" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_15" data-expect="none" data-required="false">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-label" title="辅导员姓名">15. 辅导员姓名（选填）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入辅导员姓名" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_16" data-expect="none" data-required="false">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-label" title="你最喜欢的讲座主题">16. 你最喜欢的讲座主题（选填）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <input class="ant-input" type="text" placeholder="请输入讲座主题" />
+      </div>
+    </div>
+
+    <div class="ant-form-item form-field" data-field-id="field_17" data-expect="none" data-required="false">
+      <div class="ant-form-item-label">
+        <label class="ant-form-item-label" title="意向校区">17. 意向校区（仅作意向调查，选填）</label>
+      </div>
+      <div class="ant-form-item-control">
+        <div class="ant-select">
+          <div class="ant-select-selector">
+            <span class="ant-select-selection-placeholder">请选择</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-submit">
+      <button type="submit" class="ant-btn ant-btn-primary">提交</button>
+    </div>
+    <div id="result" class="submit-result" hidden>提交成功</div>
+  </form>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  window.__submitted = false;
+  var state = Object.create(null);
+  window.__state = state;
+
+  var SELECT_OPTIONS = {
+    field_7: ['计算机科学与技术学院', '软件学院', '信息与电子工程学院', '外国语学院', '管理学院'],
+    field_8: ['2021级', '2022级', '2023级', '2024级'],
+    field_9: ['紫金港校区', '玉泉校区', '西溪校区', '华家池校区', '海宁国际校区', '舟山校区'],
+    field_17: ['紫金港校区', '玉泉校区', '海宁国际校区']
+  };
+
+  var form = document.getElementById('form');
+  var resultEl = document.getElementById('result');
+
+  function closest(el, sel) {
+    while (el && el.nodeType === 1) {
+      if (el.matches && el.matches(sel)) return el;
+      el = el.parentNode;
+    }
+    return null;
+  }
+
+  function fieldOf(el) { return closest(el, '.form-field'); }
+
+  function fieldIdOf(el) {
+    var f = fieldOf(el);
+    return f ? f.getAttribute('data-field-id') : null;
+  }
+
+  /* ---------------- 文本 / 多行文本：只在 input 事件里更新状态 ---------------- */
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t || !t.classList) return;
+    if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') return;
+    if (!t.classList.contains('ant-input')) return;
+    var id = fieldIdOf(t);
+    if (!id) return;
+    state[id] = t.value;
+    var f = fieldOf(t);
+    if (f) f.classList.remove('ant-form-item-has-error');
+  });
+
+  /* ---------------- 单选 ---------------- */
+  function syncRadio(groupEl) {
+    var wrappers = groupEl.querySelectorAll('.ant-radio-wrapper');
+    for (var i = 0; i < wrappers.length; i++) {
+      var input = wrappers[i].querySelector('.ant-radio-input');
+      if (input && input.checked) wrappers[i].classList.add('ant-radio-wrapper-checked');
+      else wrappers[i].classList.remove('ant-radio-wrapper-checked');
+    }
+  }
+
+  function onRadioMaybe(e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains('ant-radio-input')) return;
+    if (!t.checked) return;
+    var f = fieldOf(t);
+    if (!f) return;
+    var id = f.getAttribute('data-field-id');
+    if (id) state[id] = t.value;
+    f.classList.remove('ant-form-item-has-error');
+    var group = closest(t, '.ant-radio-group');
+    if (group) syncRadio(group);
+  }
+
+  document.addEventListener('click', onRadioMaybe, true);
+  document.addEventListener('change', onRadioMaybe, true);
+
+  /* ---------------- 自绘下拉 ---------------- */
+  var openDropdown = null;
+  var openSelectEl = null;
+
+  function closeDropdown() {
+    if (openDropdown && openDropdown.parentNode) openDropdown.parentNode.removeChild(openDropdown);
+    openDropdown = null;
+    openSelectEl = null;
+  }
+
+  function chooseOption(selectEl, value) {
+    var selector = selectEl.querySelector('.ant-select-selector');
+    if (selector) {
+      var ph = selector.querySelector('.ant-select-selection-placeholder');
+      if (ph && ph.parentNode) ph.parentNode.removeChild(ph);
+      var item = selector.querySelector('.ant-select-selection-item');
+      if (!item) {
+        item = document.createElement('span');
+        item.className = 'ant-select-selection-item';
+        selector.appendChild(item);
+      }
+      item.textContent = value;
+      item.setAttribute('title', value);
+    }
+    var f = fieldOf(selectEl);
+    if (f) {
+      var id = f.getAttribute('data-field-id');
+      if (id) state[id] = value;
+      f.classList.remove('ant-form-item-has-error');
+    }
+    closeDropdown();
+  }
+
+  function openDropdownFor(selectEl) {
+    if (!selectEl) return;
+    closeDropdown();
+    var f = fieldOf(selectEl);
+    var id = f ? f.getAttribute('data-field-id') : null;
+    var options = (id && SELECT_OPTIONS[id]) || [];
+
+    var dd = document.createElement('div');
+    dd.className = 'ant-select-dropdown';
+    dd.setAttribute('data-field-id', id || '');
+
+    for (var i = 0; i < options.length; i++) {
+      (function (value) {
+        var item = document.createElement('div');
+        item.className = 'ant-select-item ant-select-item-option';
+        item.setAttribute('title', value);
+        var content = document.createElement('div');
+        content.className = 'ant-select-item-option-content';
+        content.textContent = value;
+        item.appendChild(content);
+        item.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          chooseOption(selectEl, value);
+        });
+        dd.appendChild(item);
+      })(options[i]);
+    }
+
+    document.body.appendChild(dd);
+
+    var rect = selectEl.getBoundingClientRect();
+    dd.style.position = 'absolute';
+    dd.style.left = (rect.left + (window.pageXOffset || 0)) + 'px';
+    dd.style.top = (rect.bottom + (window.pageYOffset || 0) + 4) + 'px';
+    dd.style.minWidth = Math.max(rect.width, 120) + 'px';
+
+    openDropdown = dd;
+    openSelectEl = selectEl;
+  }
+
+  document.addEventListener('mousedown', function (e) {
+    var selector = closest(e.target, '.ant-select-selector');
+    if (!selector) return;
+    var selectEl = closest(selector, '.ant-select');
+    if (!selectEl) return;
+    e.preventDefault();
+    openDropdownFor(selectEl);
+  });
+
+  document.addEventListener('click', function (e) {
+    var selector = closest(e.target, '.ant-select-selector');
+    if (selector) {
+      var selectEl = closest(selector, '.ant-select');
+      if (selectEl && openSelectEl !== selectEl) openDropdownFor(selectEl);
+      return;
+    }
+    if (!closest(e.target, '.ant-select-dropdown')) closeDropdown();
+  });
+
+  /* ---------------- 提交与校验 ---------------- */
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fields = document.querySelectorAll('.form-field');
+    var ok = true;
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var id = f.getAttribute('data-field-id');
+      var required = f.getAttribute('data-required') === 'true';
+      var val = state[id];
+      var filled = val !== undefined && val !== null && String(val).trim() !== '';
+      if (required && !filled) {
+        f.classList.add('ant-form-item-has-error');
+        ok = false;
+      } else {
+        f.classList.remove('ant-form-item-has-error');
+      }
+    }
+    if (ok) {
+      window.__submitted = true;
+      if (resultEl) { resultEl.hidden = false; resultEl.textContent = '提交成功'; }
+    } else {
+      window.__submitted = false;
+      if (resultEl) { resultEl.hidden = true; }
+    }
+  });
+})();
+</script>
+</body>
+</html>

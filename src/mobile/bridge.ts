@@ -6,6 +6,7 @@ import { logDiagnostic } from './diagnostics'
 import { native } from './native'
 import { picked } from './shims/fs'
 import { getTodoState, onReminderTap, setIgnored, setRemind, updateAssignments } from './todos'
+import { formsHandlers } from './forms'
 import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from '../main/auth/password'
 import * as eta from '../main/services/eta'
 import { fetchSchedule as fetchZdbkSchedule, fetchExams, fetchProfile, reset as resetZdbk } from '../main/services/zdbk'
@@ -199,7 +200,8 @@ const handlers: Handlers = {
   ...xkHandlers,
   'xk:watches': async () => [],
   'xk:watch': unsupported,
-  'xk:unwatch': unsupported
+  'xk:unwatch': unsupported,
+  ...formsHandlers
 }
 
 // 演示模式（VITE_ZJU_DEMO=1 构建）：数据通道换成演示数据，便于在浏览器里调手机界面
