@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { FormAnswer, FormOpenOptions, FormProfile, FormQuestion, FormSession, FormStatus } from '@shared/forms'
 import { loadSecret, saveSecret } from '../secure'
 import { logDiagnostic } from '../diagnostics'
-import { zjuSession } from '../auth/zjuam'
+import { casCookieValue, zjuSession } from '../auth/zjuam'
 import { ensureCas, refreshCas } from '../http'
 import { OPEN_EVENT } from '@shared/ipc'
 import { formMatcher, formPage, type PageState } from './page.js'
@@ -86,6 +86,7 @@ interface Live {
   /** 各页提交时的答卷，按页的题目键串存，同一页重交时覆盖 */
   pages: Map<string, { title: string; value: string }[]>
   submittingAt: number
+  reopenedAt: number
   /** 窗口因验证码 / 登录被自动显示出来（处理完再藏起来），或用户要求显示 */
   shown: 'auto' | 'user' | null
   closing: boolean
@@ -225,6 +226,19 @@ async function poll(live: Live): Promise<void> {
   if (!live.win || live.win.isDestroyed() || !live.armed || live.polling || live.session.status === 'submitted') return
   live.polling = true
   try {
+    // 登录页上没装填写脚本，读不到页面状态，要在读状态之前处理
+    if (live.onLogin) {
+      setStatus(live, 'login')
+      // 浙大表单：应用登录上了（或重登成功）就带着新的登录态重开
+      if (live.zju && Date.now() - live.casAt > 3000) {
+        const value = (await casCookieValue()) ?? null
+        if (value && value !== live.casSeen) {
+          live.casTries = 0
+          void useAppLogin(live)
+        }
+      }
+      return
+    }
     const state = await run<PageState>(live, script('state'))
     if (!state) return
     const s = live.session
@@ -236,18 +250,6 @@ async function poll(live: Live): Promise<void> {
     if (state.captcha) {
       setStatus(live, 'verify')
       return reveal(live, 'auto')
-    }
-    if (live.onLogin) {
-      setStatus(live, 'login')
-      // 浙大表单：应用登录上了（或重登成功）就带着新的登录态重开
-      if (live.zju && Date.now() - live.casAt > 3000) {
-        const value = await casValue()
-        if (value && value !== live.casSeen) {
-          live.casTries = 0
-          void useAppLogin(live)
-        }
-      }
-      return
     }
     conceal(live)
 
@@ -261,8 +263,10 @@ async function poll(live: Live): Promise<void> {
       // 到点了页面却还没开放（本机时钟误差、平台慢几秒）：隔一会儿再刷，最多刷 15 次
       if (s.at && Date.now() + s.offset >= Date.parse(s.at) && live.reloads < 15) {
         live.reloads++
-        later(live, 800, () => live.win && !live.win.isDestroyed() && live.win.webContents.reload())
+        later(live, 800, () => reopen(live))
       }
+      // 页面没写开放时刻（如浙大表单只说「未在开启时间范围内」），或到点重刷 15 次仍没开：每 30 秒重开一次看看
+      else if ((!s.at || live.reloads >= 15) && Date.now() - live.reopenedAt > 30_000) reopen(live)
       return
     }
     if (state.questions === 0) {
@@ -298,11 +302,17 @@ async function poll(live: Live): Promise<void> {
   }
 }
 
+/** 重开问卷地址：不能 reload——单页表单未开放时会跳到错误页路由（form.zju.edu.cn 的 #/dform/formError/…），刷新的只是错误页 */
+function reopen(live: Live): void {
+  live.reopenedAt = Date.now()
+  if (live.win && !live.win.isDestroyed()) live.win.loadURL(live.session.url).catch(() => {})
+}
+
 function arm(live: Live): void {
   if (live.armed || !live.win || live.win.isDestroyed()) return
   live.armed = true
   setStatus(live, 'filling')
-  live.win.webContents.reload()
+  reopen(live)
 }
 
 /** 定时：先按当前校准排到开放前 20 秒，那时再校准一次，排到开放时刻 */
@@ -339,8 +349,6 @@ async function shareCas(host: string): Promise<void> {
   }
 }
 
-const casValue = async (): Promise<string | null> => (await zjuSession().cookies.get({ name: 'iPlanetDirectoryPro' }).catch(() => []))[0]?.value ?? null
-
 /**
  * 浙大表单被弹回统一身份认证登录页：不显示登录页让用户再填，用应用的登录态——
  * 第一次直接把应用的 cookie 带过来重开，第二次先用保存的账号重登再带过来；仍不行（应用没登录、没存账号）就打开应用自己的登录面板，
@@ -350,7 +358,7 @@ async function useAppLogin(live: Live): Promise<void> {
   live.casAt = Date.now()
   const tries = live.casTries++
   if (tries === 1) await refreshCas().catch(() => false)
-  const value = await casValue()
+  const value = (await casCookieValue()) ?? null
   live.casSeen = value
   if (!value || tries >= 2) {
     live.session.message = '先在应用里登录统一身份认证'
@@ -420,6 +428,7 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     answers: {},
     pages: new Map(),
     submittingAt: 0,
+    reopenedAt: Date.now(),
     shown: null,
     closing: false
   }

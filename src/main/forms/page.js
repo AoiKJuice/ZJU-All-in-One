@@ -50,7 +50,7 @@ export function formPage(profile, op, makeMatcher, arg) {
   let s = w.__zjuForms
   if (!s) {
     if (op !== 'install') return null
-    s = w.__zjuForms = { profile, answers: {}, done: new WeakMap(), seen: new Map(), filled: [], missed: [], lacking: [], placed: [], touched: [], drifts: 0, alerts: [], running: false, again: false, submittedAt: 0, changedAt: Date.now(), ranQuestions: -1 }
+    s = w.__zjuForms = { profile, answers: {}, done: new WeakMap(), seen: new Map(), filled: [], missed: [], lacking: [], placed: [], touched: [], drifts: 0, alerts: [], running: false, again: false, submittedAt: 0, changedAt: Date.now(), ranQuestions: -1, pagePrefilled: new WeakSet() }
     s.match = makeMatcher()
     // 用户亲手改过的控件（真实的输入、点击）不再按资料改回去；我们自己派发的事件 isTrusted 为 false
     for (const type of ['input', 'change', 'click']) {
@@ -111,15 +111,22 @@ export function formPage(profile, op, makeMatcher, arg) {
   const display = (t) =>
     clean(t.replace(/^\s*(第?\s*\d+\s*[题.、．:：)）]?|Q\d+[.:：]?)\s*/i, '').replace(/[*＊]/g, '').replace(/必填|选填/g, '').replace(/[，,、;；]\s*([）)])/g, '$1').replace(/[（(]\s*[）)]/g, ''))
   const required = (box, title) =>
-    !!box.querySelector('.req, .required, .is-required, .ant-form-item-required, .question-required, .t-form__label--required, [class*="_required"], [aria-required="true"], [required]') ||
+    !!box.querySelector('.req, .required, .is-required, .ant-form-item-required, .question-required, .t-form__label--required, [class*="_required"], [class*="requiredSign"], [aria-required="true"], [required]') ||
     box.getAttribute('req') === '1' ||
     /[*＊]|必填/.test(title)
 
+  // 题目块里没有标题（form.zju.edu.cn：标题在外层 comBoxName，Ant 的 form-item 只包输入框）时往上提到只含这一题的外层
+  const lift = (box) => {
+    let node = box
+    const count = controls(box).length
+    while (!titleOf(node) && node.parentElement && node.parentElement !== document.body && controls(node.parentElement).length === count && node.parentElement.textContent.length < 600) node = node.parentElement
+    return node
+  }
   // 题目容器：已知的题目块取最内层；不在任何题目块里的控件往上找到只含这一题的祖先
   const boxes = () => {
     const known = [...document.querySelectorAll(BOX)].filter(visible)
-    const inner = known.filter((b) => !known.some((o) => o !== b && b.contains(o)) && controls(b).length > 0)
-    const list = [...inner]
+    const inner = known.filter((b) => !known.some((o) => o !== b && b.contains(o)) && controls(b).length > 0).map(lift)
+    const list = [...new Set(inner)]
     for (const el of controls(document.body)) {
       if (!visible(el) && !el.matches('input[type=radio], input[type=checkbox]')) continue
       if (list.some((b) => b.contains(el))) continue
@@ -220,8 +227,12 @@ export function formPage(profile, op, makeMatcher, arg) {
     !!box.querySelector('.ant-select-selection-item, .el-select__selected-item')
 
   const touched = (box) => s.touched.some((t) => box.contains(t))
-  // 文本框的值与我们填的不同就重填：页面水合、到点刷新后受控输入框会被页面清空（金数据新版实测），只看「填过」会误报已填
-  const putText = (box, el, value) => {
+  // 文本框的值与我们填的不同就重填：页面水合、到点刷新后受控输入框会被页面清空（金数据新版实测），只看「填过」会误报已填。
+  // 页面自己带出来的值（form.zju.edu.cn 按登录账号填好学工号、姓名）不按资料改；用户在应用里给的答案（force）照填
+  const putText = (box, el, value, force = false) => {
+    if (!force && !s.done.has(el) && el.value.trim()) s.pagePrefilled.add(el)
+    if (!force && s.pagePrefilled.has(el)) return
+    if (force) s.pagePrefilled.delete(el)
     if (!touched(box) && norm(el.value) !== norm(value)) setText(el, value)
     s.placed.push([box, el, value])
   }
@@ -345,7 +356,7 @@ export function formPage(profile, op, makeMatcher, arg) {
       texts.forEach((el, i) => {
         const v = s.answers[`${key}/${i}`]
         if (typeof v !== 'string') return
-        putText(box, el, v)
+        putText(box, el, v, true)
         any = true
       })
       return any
@@ -378,7 +389,7 @@ export function formPage(profile, op, makeMatcher, arg) {
       return dropTo(drop, (items) => exact(items, list[0]))
     }
     if (texts.length === 1 && typeof v === 'string') {
-      putText(box, texts[0], v)
+      putText(box, texts[0], v, true)
       return !!v
     }
     return false
@@ -488,7 +499,7 @@ export function formPage(profile, op, makeMatcher, arg) {
       nextPage: !!button(NEXT, NEXT_WORDS),
       captcha: [...document.querySelectorAll(CAPTCHA)].some((el) => visible(el) && el.getBoundingClientRect().height > 30),
       done: (questions === 0 || s.submittedAt > 0) && /提交成功|感谢您?的?(参与|填写|作答|支持|提交)|答卷已(经)?提交|已提交|提交完成|报名成功|已收到|您已完成/.test(text),
-      notOpen: questions === 0 && /尚未开始|还未开始|未开始|尚未开放|暂未开放|未开放|即将开始|暂停收集|已暂停|not (yet )?(started|open)/i.test(text),
+      notOpen: questions === 0 && /尚未开始|还未开始|未开始|尚未开放|暂未开放|未开放|尚未开启|暂未开启|未开启|即将开始|暂停收集|已暂停|[未不]在.{0,6}时间范围|not (yet )?(started|open)/i.test(text),
       opensAt: questions === 0 && when ? new Date(+when[1], +when[2] - 1, +when[3], +when[4], +when[5], +(when[6] || 0)).toISOString() : null,
       // 点过提交后页面标出的校验错误（必填没填、格式不对）
       invalid: s.submittedAt > 0 && [...document.querySelectorAll('.errorMessage, .question-error, .ant-form-item-has-error, .ant-form-item-explain-error, .el-form-item__error, .is-error, [aria-invalid="true"]')].some(visible),
