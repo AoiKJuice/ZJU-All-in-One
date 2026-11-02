@@ -149,6 +149,10 @@
   letter-spacing: 0.06em;
   background: var(--surface-2);
 }
+.forms-tag.forms-tag-lack {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
 .forms-missed {
   margin: 0;
   padding: 0;

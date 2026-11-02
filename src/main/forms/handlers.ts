@@ -4,7 +4,8 @@ import { z } from 'zod'
 import type { FormsApi, FormSession } from '@shared/forms'
 import type { McpToolGroup } from '@shared/types'
 import { fetchProfile } from '../services/zdbk'
-import { closeForm, EMPTY_PROFILE, focusForm, listForms, loadProfile, openForm, refillForm, saveProfile } from './index'
+import { loadCredentials } from '../auth/password'
+import { closeForm, EMPTY_PROFILE, focusForm, listForms, loadProfile, openForm, refillForm, refillLacking, saveProfile } from './index'
 
 // 问卷填写的 IPC 通道与 MCP 工具，ipc.ts / mcp.ts 各并入一行
 
@@ -13,14 +14,20 @@ type FormsHandlers = { [K in keyof FormsApi]: (win: BrowserWindow | null, ...arg
 export const formsHandlers: FormsHandlers = {
   'forms:profile': async () => {
     const saved = await loadProfile()
-    if (saved) return saved
-    // 首次使用：用教务的姓名学号预填；本科学号 3YY……的 YY 是入学年份
+    if (saved?.studentId && saved.name) return saved
+    // 学号、姓名还空着时预填：教务（选课期间常取不到）退回保存的统一身份认证账号；本科学号 3YY……的 YY 是入学年份
     const user = await fetchProfile().then((r) => r.data, () => null)
-    if (!user) return { ...EMPTY_PROFILE }
-    const year = /^3(\d{2})\d{7}$/.exec(user.studentId)?.[1]
-    return { ...EMPTY_PROFILE, studentId: user.studentId, name: user.name, grade: year ? `20${year}` : '' }
+    const account = (await loadCredentials().catch(() => null))?.username ?? ''
+    const base = saved ?? EMPTY_PROFILE
+    const studentId = base.studentId || user?.studentId || (/^\d{8,12}$/.test(account) ? account : '')
+    const year = /^3(\d{2})\d{7}$/.exec(studentId)?.[1]
+    return { ...base, studentId, name: base.name || user?.name || '', grade: base.grade || (year ? `20${year}` : '') }
   },
-  'forms:saveProfile': (_win, profile) => saveProfile(profile),
+  'forms:saveProfile': async (_win, profile) => {
+    const saved = await saveProfile(profile)
+    void refillLacking()
+    return saved
+  },
   'forms:open': (_win, url, options) => openForm(url, options),
   'forms:sessions': async () => listForms(),
   'forms:focus': async (_win, id) => focusForm(id),
@@ -31,12 +38,12 @@ export const formsHandlers: FormsHandlers = {
 const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] })
 
 /** 给 Agent 的记录：只留题目与字段，不带所填的值 */
-const brief = (s: FormSession) => ({ id: s.id, url: s.url, title: s.title, status: s.status, open_at: s.at, filled: s.filled, missed: s.missed, message: s.message })
+const brief = (s: FormSession) => ({ id: s.id, url: s.url, title: s.title, status: s.status, open_at: s.at, filled: s.filled, missed: s.missed, lacking: s.lacking, message: s.message })
 
 export function registerFormTools(mcp: McpServer, tools: Record<McpToolGroup, boolean>): void {
   if (tools.query) {
     mcp.registerTool('get_forms', {
-      description: '本次运行里在应用中打开过的问卷与填写结果：状态（waiting 等待开放 / filling 填写中 / filled 已填好待用户提交 / attention 有必填题没认出 / verify 需要验证码 / login 需要登录 / submitted 已提交 / closed 窗口已关 / error 打不开）、已填的题与对应字段、没认出的必填题',
+      description: '本次运行里在应用中打开过的问卷与填写结果：状态（waiting 等待开放 / filling 填写中 / filled 已填好待用户提交 / attention 有必填题没认出 / verify 需要验证码 / login 需要登录 / submitted 已提交 / closed 窗口已关 / error 打不开）、已填的题与对应字段、没认出的必填题、认出了题但用户资料里没填的字段（lacking，需用户在应用里补资料）',
       annotations: { readOnlyHint: true, openWorldHint: false }
     }, async () => json(listForms().map(brief)))
   }

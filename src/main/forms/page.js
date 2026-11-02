@@ -50,7 +50,7 @@ export function formPage(profile, op, makeMatcher) {
   let s = w.__zjuForms
   if (!s) {
     if (op !== 'install') return null
-    s = w.__zjuForms = { profile, done: new WeakMap(), seen: new Map(), filled: [], missed: [], alerts: [], running: false, again: false, submittedAt: 0, changedAt: Date.now() }
+    s = w.__zjuForms = { profile, done: new WeakMap(), seen: new Map(), filled: [], missed: [], lacking: [], alerts: [], running: false, again: false, submittedAt: 0, changedAt: Date.now(), ranQuestions: -1 }
     s.match = makeMatcher()
     // 页面的 alert（作答时间太短、提交被拒等）记下来交给工具页显示；原对话框推迟弹出，不卡住注入脚本
     const alert = w.alert
@@ -71,7 +71,8 @@ export function formPage(profile, op, makeMatcher) {
     s.seen = new Map()
   }
 
-  const BOX = '[topic], .field.ui-field-contain, section.question, .question, [data-question-id], .ant-form-item, .form-field, [data-field-id], .el-form-item, .t-form__item, .form-group, .form-item'
+  // 金数据新版（jsjform.com）类名带构建哈希，题目块只有 j-field-field_N 稳定
+  const BOX = '[topic], .field.ui-field-contain, section.question, .question, [data-question-id], .ant-form-item, .form-field, [data-field-id], [class*="j-field-field_"], .el-form-item, .t-form__item, .form-group, .form-item'
   const TITLE = '.topichtml, .field-label, .question-main-title, .question-title, .ant-form-item-label, .el-form-item__label, .t-form__label, .form-label, .control-label, legend, label, h1, h2, h3, h4, h5, [class*="title"], [class*="label"]'
   const TEXT = 'input:not([type]), input[type=text], input[type=tel], input[type=email], input[type=number], input[type=search], input[type=url], textarea'
   const OPTION = '.ui-radio, .ui-checkbox, [role=radio], [role=checkbox], .ant-radio-wrapper, .ant-checkbox-wrapper, .t-radio, .t-checkbox, .el-radio, .el-checkbox, label'
@@ -100,7 +101,7 @@ export function formPage(profile, op, makeMatcher) {
   }
   const display = (t) => clean(t.replace(/^\s*(第?\s*\d+\s*[题.、．:：)）]?|Q\d+[.:：]?)\s*/i, '').replace(/[*＊]/g, '').replace(/必填|选填/g, '').replace(/[（(]\s*[）)]/g, ''))
   const required = (box, title) =>
-    !!box.querySelector('.req, .required, .is-required, .ant-form-item-required, .question-required, .t-form__label--required, [aria-required="true"], [required]') ||
+    !!box.querySelector('.req, .required, .is-required, .ant-form-item-required, .question-required, .t-form__label--required, [class*="_required"], [aria-required="true"], [required]') ||
     box.getAttribute('req') === '1' ||
     /[*＊]|必填/.test(title)
 
@@ -191,6 +192,7 @@ export function formPage(profile, op, makeMatcher) {
         const label = clean(el.getAttribute('aria-label') || el.placeholder || (el.previousElementSibling && el.previousElementSibling.textContent) || (el.parentElement && el.parentElement.previousElementSibling && el.parentElement.previousElementSibling.textContent) || '')
         const field = s.match(label)
         const value = field ? valueOf(field) : ''
+        if (field && !value) s.lacking.push(field)
         if (!value) continue
         if (!s.done.has(el)) setText(el, value)
         s.done.set(el, field)
@@ -204,7 +206,11 @@ export function formPage(profile, op, makeMatcher) {
     if (field === null && texts.length === 1) field = s.match(texts[0].getAttribute('aria-label') || texts[0].placeholder || '')
     if (!field) return null
     const value = valueOf(field)
-    if (!value) return false
+    // 认出了题，资料里却没有这一项：记下来让用户补资料
+    if (!value) {
+      s.lacking.push(field)
+      return false
+    }
     const record = () => {
       s.filled.push({ title: display(title), field })
       return true
@@ -276,14 +282,22 @@ export function formPage(profile, op, makeMatcher) {
     }
     s.running = true
     try {
-      const before = JSON.stringify([s.filled, s.missed])
+      const before = JSON.stringify([s.filled, s.missed, s.lacking])
+      const list = boxes()
+      s.ranQuestions = list.length
       s.filled = []
       s.missed = []
-      for (const box of boxes()) {
+      s.lacking = []
+      s.blocked = false
+      for (const box of list) {
         const title = titleOf(box)
-        const result = await fillBox(box, title)
+        // 一题出错不能连累后面的题
+        const lacked = s.lacking.length
+        const result = await fillBox(box, title).catch(() => null)
         const missed = result !== true && required(box, title) && !filledBox(box)
-        if (missed) s.missed.push(display(title) || '未命名的题')
+        // 认出了题、只是资料里没有：列在「缺资料」里，不算没认出，但同样拦住自动提交
+        if (missed && s.lacking.length > lacked) s.blocked = true
+        else if (missed) s.missed.push(display(title) || '未命名的题')
         if (missed && !box.dataset.zjuMissed) {
           box.dataset.zjuMissed = '1'
           box.style.outline = '2px solid #c4372b'
@@ -296,7 +310,8 @@ export function formPage(profile, op, makeMatcher) {
       }
       // 多页问卷翻页后前一页的题被隐藏，填过的仍记在 seen 里
       for (const f of s.filled) s.seen.set(`${f.field}|${f.title}`, f)
-      if (JSON.stringify([s.filled, s.missed]) !== before) s.changedAt = Date.now()
+      s.lacking = [...new Set(s.lacking)]
+      if (JSON.stringify([s.filled, s.missed, s.lacking]) !== before) s.changedAt = Date.now()
     } finally {
       s.running = false
       if (s.again) {
@@ -313,10 +328,14 @@ export function formPage(profile, op, makeMatcher) {
   const state = () => {
     const text = clean(document.body ? document.body.innerText : '').slice(0, 3000)
     const questions = boxes().length
+    // 兜底：题目数和上次填写时不一样（倒计时到点换出题目、整页被替换，监听没赶上），再填一遍
+    if (op === 'state' && questions !== s.ranQuestions && !s.running) void run()
     return {
       title: clean(document.title),
       filled: [...s.seen.values()],
       missed: s.missed,
+      lacking: s.lacking,
+      blocked: s.missed.length > 0 || !!s.blocked,
       questions,
       submitReady: !!button(SUBMIT, /^(提\s*交|提交问卷|提交答卷|确认提交|submit)$/i),
       nextPage: !!button(NEXT, /^(下一页|下一步|next)$/i),

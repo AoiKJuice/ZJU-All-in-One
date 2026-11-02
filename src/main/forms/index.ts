@@ -119,6 +119,7 @@ async function poll(live: Live): Promise<void> {
     if (state.questions > 0) {
       s.filled = state.filled
       s.missed = state.missed
+      s.lacking = state.lacking
     }
     if (state.alerts.length) s.message = state.alerts[state.alerts.length - 1]
     else if (state.invalid) s.message = '提交被页面拦下'
@@ -131,9 +132,9 @@ async function poll(live: Live): Promise<void> {
     else if (state.questions === 0 && state.submittedAt > 0) status = 'submitted'
     // 还在渲染或正在填：已有结果时先保持，免得用户一边改一边闪
     else if (state.questions === 0 || state.running || state.stableFor < 800) status = s.status === 'filled' || s.status === 'attention' ? s.status : 'filling'
-    else if (state.missed.length || !state.filled.length || state.invalid) status = 'attention'
+    else if (state.missed.length || state.lacking.length || !state.filled.length || state.invalid) status = 'attention'
     else status = 'filled'
-    if (status !== s.status) logDiagnostic('form-status', { status, filled: state.filled.length, missed: state.missed.length })
+    if (status !== s.status) logDiagnostic('form-status', { status, questions: state.questions, filled: state.filled.length, missed: state.missed.length, lacking: state.lacking.length })
     s.status = status
 
     // 到点了页面却还没开放（本机时钟误差、平台慢几秒）：隔一会儿再刷，最多刷 15 次
@@ -143,7 +144,7 @@ async function poll(live: Live): Promise<void> {
     }
 
     if (s.autoSubmit && !live.autoDecided && state.questions > 0 && !state.running && state.stableFor > 1200 && !state.captcha) {
-      if (state.missed.length || !state.filled.length) live.autoDecided = true
+      if (state.blocked || !state.filled.length) live.autoDecided = true
       // 多页问卷翻到最后一页（只有提交、没有下一页）才交
       else if (state.submitReady && !state.nextPage) {
         live.autoDecided = true
@@ -204,6 +205,7 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
       openedAt: new Date().toISOString(),
       filled: [],
       missed: [],
+      lacking: [],
       message: null
     },
     win: null,
@@ -276,6 +278,15 @@ export async function refillForm(id: string): Promise<FormSession> {
   if (live.armed) await live.win.webContents.executeJavaScript(script('refill', (await loadProfile()) ?? EMPTY_PROFILE)).catch(() => null)
   await poll(live)
   return { ...live.session }
+}
+
+/** 资料改过后：之前因缺资料没填上的窗口按新资料重填 */
+export async function refillLacking(): Promise<void> {
+  const profile = await loadProfile()
+  for (const live of lives.values()) {
+    if (!live.armed || !live.win || live.win.isDestroyed() || !live.session.lacking.length || live.session.status === 'submitted') continue
+    await live.win.webContents.executeJavaScript(script('install', profile)).catch(() => null)
+  }
 }
 
 export function closeForm(id: string): void {

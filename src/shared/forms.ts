@@ -49,6 +49,8 @@ export interface FormSession {
   filled: { title: string; field: FormField }[]
   /** 没认出的必填题 */
   missed: string[]
+  /** 认出了题、个人信息里却没填的项 */
+  lacking: FormField[]
   /** 页面弹出的提示（如作答时间太短、提交被拒）、出错原因 */
   message: string | null
 }

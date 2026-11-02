@@ -119,6 +119,10 @@ export function FormFill() {
   // 打开前先存一遍资料（首次预填的还没落盘），保证窗口里按眼前这份填
   const submit = (): void => {
     if (!url.trim() || !profile) return
+    if (!Object.values(profile).some(Boolean)) {
+      notify('先填个人信息')
+      return
+    }
     save()
       .then(() => window.zju['forms:open'](url.trim(), { autoSubmit, ...(timed ? { at: new Date(at).toISOString() } : {}) }))
       .then((session) => {
@@ -300,6 +304,18 @@ function Record({
                 <span className="forms-tags">
                   {fields.map((f) => (
                     <span key={f} className="forms-tag" title={s.filled.filter((x) => x.field === f).map((x) => x.title).join('\n')}>
+                      {LABEL[f]}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+            {s.lacking.length > 0 && (
+              <div className="forms-line">
+                <span className="forms-label">缺资料</span>
+                <span className="forms-tags">
+                  {s.lacking.map((f) => (
+                    <span key={f} className="forms-tag forms-tag-lack">
                       {LABEL[f]}
                     </span>
                   ))}

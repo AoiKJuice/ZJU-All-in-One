@@ -5,6 +5,10 @@ export interface PageState {
   title: string
   filled: { title: string; field: FormField }[]
   missed: string[]
+  /** 认出了题、资料里却没有的项 */
+  lacking: FormField[]
+  /** 有必填题没填上（没认出，或缺资料），不能自动提交 */
+  blocked: boolean
   /** 可见的题目数 */
   questions: number
   /** 页面上有可见的提交按钮（多页问卷只在最后一页有） */
