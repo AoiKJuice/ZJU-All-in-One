@@ -84,6 +84,11 @@
     var app = document.getElementById('app')
     app.innerHTML = ''
     app.appendChild(document.getElementById('form-tpl').content.cloneNode(true))
+    // 水合：受控输入框按初始状态重渲染，已写进去的值被清空，不派发事件、不改 DOM（真实页面到点刷新后实测如此）
+    setTimeout(function () {
+      document.querySelectorAll('#app input').forEach(function (el) { if (el.type !== 'checkbox') el.value = '' })
+      values = {}
+    }, 600)
     document.getElementById('published-form-demo').addEventListener('submit', function (e) {
       e.preventDefault()
       var bad = false

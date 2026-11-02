@@ -50,8 +50,12 @@ export function formPage(profile, op, makeMatcher) {
   let s = w.__zjuForms
   if (!s) {
     if (op !== 'install') return null
-    s = w.__zjuForms = { profile, done: new WeakMap(), seen: new Map(), filled: [], missed: [], lacking: [], alerts: [], running: false, again: false, submittedAt: 0, changedAt: Date.now(), ranQuestions: -1 }
+    s = w.__zjuForms = { profile, done: new WeakMap(), seen: new Map(), filled: [], missed: [], lacking: [], placed: [], touched: [], drifts: 0, alerts: [], running: false, again: false, submittedAt: 0, changedAt: Date.now(), ranQuestions: -1 }
     s.match = makeMatcher()
+    // 用户亲手改过的控件（真实的输入、点击）不再按资料改回去；我们自己派发的事件 isTrusted 为 false
+    for (const type of ['input', 'change', 'click']) {
+      document.addEventListener(type, (e) => e.isTrusted && e.target instanceof Element && s.touched.length < 200 && s.touched.push(e.target), true)
+    }
     // 页面的 alert（作答时间太短、提交被拒等）记下来交给工具页显示；原对话框推迟弹出，不卡住注入脚本
     const alert = w.alert
     w.alert = function (message) {
@@ -171,8 +175,15 @@ export function formPage(profile, op, makeMatcher) {
     Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value)
     for (const type of ['input', 'change', 'keyup', 'blur']) el.dispatchEvent(new Event(type, { bubbles: true }))
   }
+  const inputOf = (opt) => {
+    if (opt.matches('input')) return opt
+    const inner = opt.querySelector('input[type=radio], input[type=checkbox]')
+    if (inner) return inner
+    const target = opt.htmlFor && document.getElementById(opt.htmlFor)
+    return target && target.matches('input[type=radio], input[type=checkbox]') ? target : null
+  }
   const checked = (opt) => {
-    const input = opt.matches('input') ? opt : opt.querySelector('input[type=radio], input[type=checkbox]')
+    const input = inputOf(opt)
     return (input && input.checked) || /(^|[\s-])(checked|is-checked|active|selected)(\s|$)/.test(opt.className) || opt.getAttribute('aria-checked') === 'true'
   }
   const filledBox = (box) =>
@@ -182,8 +193,16 @@ export function formPage(profile, op, makeMatcher) {
     [...box.querySelectorAll(OPTION)].some(checked) ||
     !!box.querySelector('.ant-select-selection-item, .el-select__selected-item')
 
+  const touched = (box) => s.touched.some((t) => box.contains(t))
+  // 文本框的值与我们填的不同就重填：页面水合、到点刷新后受控输入框会被页面清空（金数据新版实测），只看「填过」会误报已填
+  const putText = (box, el, value) => {
+    if (!touched(box) && norm(el.value) !== norm(value)) setText(el, value)
+    s.placed.push([box, el, value])
+  }
+
   // 填一题：返回 true 已填 / false 有字段但没对上 / null 不认识
   const fillBox = async (box, title) => {
+    const mine = !touched(box)
     const texts = [...box.querySelectorAll(TEXT)].filter((el) => visible(el) && isText(el))
     // 多项填空：一题里几个空，各按自己旁边的文字认
     if (texts.length > 1) {
@@ -194,7 +213,7 @@ export function formPage(profile, op, makeMatcher) {
         const value = field ? valueOf(field) : ''
         if (field && !value) s.lacking.push(field)
         if (!value) continue
-        if (!s.done.has(el)) setText(el, value)
+        putText(box, el, value)
         s.done.set(el, field)
         s.filled.push({ title: display(label), field })
         any = true
@@ -217,21 +236,24 @@ export function formPage(profile, op, makeMatcher) {
     }
     if (texts.length === 1) {
       const el = texts[0]
-      if (!s.done.has(el)) setText(el, value)
+      putText(box, el, value)
       s.done.set(el, field)
       return record()
     }
     const targets = wants(field, value)
     const select = [...box.querySelectorAll('select')].find((el) => !el.disabled)
     if (select) {
-      if (s.done.has(select)) return record()
+      if (s.done.has(select) && !mine) return record()
       const option = pick([...select.options].filter((o) => o.index > 0 || o.value), targets)
       if (!option) return false
-      select.value = option.value
-      select.dispatchEvent(new Event('input', { bubbles: true }))
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-      if (w.jQuery) w.jQuery(select).trigger('change')
+      if (select.value !== option.value) {
+        select.value = option.value
+        select.dispatchEvent(new Event('input', { bubbles: true }))
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+        if (w.jQuery) w.jQuery(select).trigger('change')
+      }
       s.done.set(select, field)
+      s.placed.push([box, select, option.value])
       return record()
     }
     // 选项：已知的选项类名，或包着单选 / 多选框（或用 for 指向它）的 label；题目标题的 label 不算
@@ -244,18 +266,20 @@ export function formPage(profile, op, makeMatcher) {
     if (options.length) {
       const option = pick(options, targets)
       if (!option) return false
-      if (!s.done.has(option) && !checked(option)) {
-        const input = option.matches('label') ? null : option.querySelector('input')
+      // 有真实单选 / 多选框时按它的 checked 判断，被页面清掉可以再点；只靠类名的自绘选项只点一次，免得多选被来回切换
+      const input = inputOf(option)
+      if (mine && !checked(option) && (input || !s.done.has(option))) {
         option.click()
-        if (input && !input.checked && !checked(option)) input.click()
+        if (input && !input.checked && !option.matches('label')) input.click()
       }
       s.done.set(option, field)
+      if (input) s.placed.push([box, option, null])
       return record()
     }
     // 自绘下拉：按下展开，等选项层出来再点
     const drop = box.querySelector(DROPDOWN)
     if (drop) {
-      if (s.done.has(drop)) return record()
+      if (s.done.has(drop) && (!mine || filledBox(box))) return record()
       const trigger = drop.querySelector('.ant-select-selector, .el-select__wrapper, .el-input, .t-input') || drop
       for (const type of ['mousedown', 'mouseup', 'click']) trigger.dispatchEvent(new MouseEvent(type, { bubbles: true }))
       let option = null
@@ -288,6 +312,7 @@ export function formPage(profile, op, makeMatcher) {
       s.filled = []
       s.missed = []
       s.lacking = []
+      s.placed = []
       s.blocked = false
       for (const box of list) {
         const title = titleOf(box)
@@ -328,8 +353,13 @@ export function formPage(profile, op, makeMatcher) {
   const state = () => {
     const text = clean(document.body ? document.body.innerText : '').slice(0, 3000)
     const questions = boxes().length
-    // 兜底：题目数和上次填写时不一样（倒计时到点换出题目、整页被替换，监听没赶上），再填一遍
-    if (op === 'state' && questions !== s.ranQuestions && !s.running) void run()
+    // 兜底：题目数和上次填写时不一样（倒计时到点换出题目、整页被替换，监听没赶上），
+    // 或填过的值被页面清掉（水合重置受控输入框，改 value 不触发 DOM 变化），再填一遍；值始终放不进去的（页面拒收）最多重试 20 次
+    const drifted = s.drifts < 20 && s.placed.some(([box, el, value]) => el.isConnected && !touched(box) && (value === null ? !checked(el) : norm(el.value) !== norm(value)))
+    if (op === 'state' && !s.running && (questions !== s.ranQuestions || drifted)) {
+      if (drifted) s.drifts++
+      void run()
+    }
     return {
       title: clean(document.title),
       filled: [...s.seen.values()],
@@ -345,7 +375,8 @@ export function formPage(profile, op, makeMatcher) {
       // 点过提交后页面标出的校验错误（必填没填、格式不对）
       invalid: s.submittedAt > 0 && [...document.querySelectorAll('.errorMessage, .question-error, .ant-form-item-has-error, .ant-form-item-explain-error, .el-form-item__error, .is-error, [aria-invalid="true"]')].some(visible),
       alerts: s.alerts.slice(-3),
-      stableFor: Date.now() - s.changedAt,
+      // 值被清掉、还没重填好时不算填稳，免得自动提交交出空表
+      stableFor: drifted ? 0 : Date.now() - s.changedAt,
       running: s.running,
       submittedAt: s.submittedAt
     }
