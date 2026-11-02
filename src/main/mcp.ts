@@ -14,6 +14,7 @@ import { call } from './ipc'
 import { downloadToFile } from './download'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { getTodoState, setIgnored } from './todos'
+import { registerXkTools } from './mcpXk'
 
 // 本地 MCP 服务：让本机的 Agent（Claude Code 等）调用课表、作业、回放等信息与工具。
 // 只监听 127.0.0.1，请求需带 Authorization: Bearer <token>；无状态模式，每个请求新建一个 McpServer。
@@ -346,6 +347,9 @@ function buildServer(tools: Config['tools']): McpServer {
       return json({ retracted: true })
     })
   }
+
+  // 选课与查老师（各组的工具见 mcpXk.ts）
+  registerXkTools(mcp, tools, askUser)
 
   return mcp
 }

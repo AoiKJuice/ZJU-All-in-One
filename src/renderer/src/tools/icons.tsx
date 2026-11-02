@@ -17,3 +17,20 @@ export function GraduationIcon() {
     </svg>
   )
 }
+
+/** 选课：一页课表，悬停时主题色的课块跳起落进格子、打上勾，顶上的装订环晃一下 */
+export function CourseIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect className="ti-ink" x="5" y="10" width="38" height="32" rx="4" />
+      <path className="ti-ink" d="M5 18.5h38" />
+      <path className="ti-ink ti-rings" d="M15 6.5v7M33 6.5v7" />
+      <rect className="ti-ink" x="10.5" y="23.5" width="9" height="6.5" rx="1.6" />
+      <rect className="ti-ink" x="19.5" y="33" width="9" height="5" rx="1.6" />
+      <g className="ti-pick">
+        <rect className="ti-accent ti-fill" x="27.5" y="23" width="11" height="8" rx="1.8" />
+        <path className="ti-tick" d="M30.2 27.1l2.2 2.1 3.9-4" />
+      </g>
+    </svg>
+  )
+}

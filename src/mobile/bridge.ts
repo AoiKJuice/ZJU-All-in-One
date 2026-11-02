@@ -13,6 +13,8 @@ import { fetchAssignments, fetchCourseHomework, getAssignmentDetail, submitHomew
 import { fetchReplays, fetchLectures, listSlides, getPlaybackSource, getPlatformTranscript, reset as resetClassroom } from '../main/services/classroom'
 import { fetchCalendar } from '../main/services/calendar'
 import * as graduation from '../main/services/graduation'
+import { resetXk, xkHandlers } from '../main/services/xkApi'
+import { demoXk } from '../main/services/demoXk'
 import * as pta from '../main/services/pta'
 import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
 
@@ -29,6 +31,7 @@ function resetServices(): void {
   resetClassroom()
   eta.reset()
   graduation.reset()
+  resetXk()
 }
 
 const authListeners = new Set<() => void>()
@@ -190,7 +193,13 @@ const handlers: Handlers = {
 
   'mcp:state': async () => MCP_OFF,
   'mcp:set': async () => MCP_OFF,
-  'mcp:answer': async () => {}
+  'mcp:answer': async () => {},
+
+  // 选课与查老师；订阅与自动选课只在桌面端
+  ...xkHandlers,
+  'xk:watches': async () => [],
+  'xk:watch': unsupported,
+  'xk:unwatch': unsupported
 }
 
 // 演示模式（VITE_ZJU_DEMO=1 构建）：数据通道换成演示数据，便于在浏览器里调手机界面
@@ -220,7 +229,8 @@ if (import.meta.env.VITE_ZJU_DEMO === '1') {
     'todo:state': async () => demoTodos,
     'todo:ignore': async (id: string, ignored: boolean) =>
       Object.assign(demoTodos, { ignored: ignored ? [...demoTodos.ignored, id] : demoTodos.ignored.filter((x) => x !== id) }),
-    'todo:remind': async (on: boolean) => Object.assign(demoTodos, { remind: on })
+    'todo:remind': async (on: boolean) => Object.assign(demoTodos, { remind: on }),
+    ...demoXk
   } satisfies Partial<Handlers>)
 }
 

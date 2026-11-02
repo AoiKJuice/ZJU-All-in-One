@@ -1,3 +1,5 @@
+import type { XkConfirmAction } from './xk'
+
 // Domain models shared by the main process (producers) and the renderer (consumers).
 
 export interface UserProfile {
@@ -21,6 +23,8 @@ export type OpenRequest =
   | { login: true }
   | { assignment: Assignment }
   | { replay: LectureReplay }
+  /** 工具页里的某个工具（renderer store 的 ToolId） */
+  | { tool: string }
 
 export interface McpState {
   enabled: boolean
@@ -185,7 +189,8 @@ export interface FilePreview {
 /** 本地 Agent 经 MCP 发起、需用户在应用内确认的操作 */
 export interface ConfirmRequest {
   id: string
-  action: 'submit' | 'retract'
+  /** 选课的几种见 shared/xk.ts；title 为教学班说明 */
+  action: 'submit' | 'retract' | XkConfirmAction
   courseName: string
   title: string
   /** 提交：要上传的本机文件；撤回：被撤回那次提交的文件 */

@@ -6,7 +6,11 @@ import { dur } from '@renderer/lib/motion'
 
 const ACTION: Record<ConfirmRequest['action'], { title: string; ok: string }> = {
   submit: { title: '提交作业', ok: '提交' },
-  retract: { title: '撤回提交', ok: '撤回' }
+  retract: { title: '撤回提交', ok: '撤回' },
+  select: { title: '加入选课志愿', ok: '加入' },
+  drop: { title: '退选', ok: '退选' },
+  reorder: { title: '调整志愿顺序', ok: '调整' },
+  autoselect: { title: '有余量时自动选课', ok: '授权' }
 }
 
 /** 本地 Agent 经 MCP 发起的提交 / 撤回：应用内确认，文件可点开预览；排队逐个处理 */
