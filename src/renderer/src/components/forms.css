@@ -1,4 +1,4 @@
-/* 工具「问卷填写」（components/FormFill.tsx）。只用主题变量，三种风格经 .panel 与变量自动适配 */
+/* 工具「问卷填写」（components/FormFill.tsx）与它的全局弹窗（components/FormPrompt.tsx）。只用主题变量，三种风格经 .panel 与变量自动适配 */
 /* 本文件随组件引入，注入顺序可能早于 styles.css：覆盖 .row、.field 等通用类时选择器要多一级 */
 
 .forms-grid {
@@ -34,7 +34,8 @@
 }
 
 /* 输入框：浅底圆角，单行 */
-.forms-grid .field.forms-input {
+.forms-grid .field.forms-input,
+.forms-modal .field.forms-input {
   min-height: 0;
   resize: none;
   padding: 0.4375rem 0.875rem;
@@ -42,7 +43,7 @@
   font-variant-numeric: lining-nums tabular-nums;
 }
 
-/* 打开问卷 */
+/* 订阅问卷 */
 .forms-open .forms-url {
   display: block;
   width: calc(100% - 1.5rem);
@@ -66,30 +67,43 @@
   padding: 0.5rem 0.75rem 0.875rem;
 }
 
-/* 记录 */
+/* 订阅列表：剩余时间（开放后为时刻）、标题、状态、取消 */
 .forms-grid .quiet.forms-quiet {
   padding: 0.5rem 0.75rem 1rem;
 }
 .forms-records .rows {
   padding-bottom: 0.375rem;
 }
-.forms-record[data-closed] > .forms-row {
-  opacity: 0.55;
-}
 .forms-grid .row.forms-row {
-  grid-template-columns: 5.5em minmax(0, 1fr) auto;
+  grid-template-columns: 5.5em minmax(0, 1fr) auto auto;
   align-items: center;
+  gap: 0.75rem;
 }
-.forms-row .row-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.forms-row[data-click] {
+  cursor: pointer;
+}
+.forms-row[data-done] > :not(.forms-x) {
+  opacity: 0.55;
 }
 .forms-row .row-time[data-hot] {
   color: var(--shu);
 }
-.forms-record[data-open] > .forms-row {
-  background: var(--surface-2);
+.forms-row-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.forms-row-main .row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.forms-row-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
 }
 
 .forms-status {
@@ -101,11 +115,11 @@
   color: var(--ink-3);
   background: var(--surface-2);
 }
-.forms-status:is([data-s='attention'], [data-s='verify'], [data-s='login'], [data-s='error']) {
+.forms-status[data-hot] {
   color: var(--shu);
   background: rgba(var(--shu-rgb), 0.12);
 }
-.forms-status:is([data-s='waiting'], [data-s='filling']) {
+.forms-status:is([data-s='waiting'], [data-s='filling'], [data-s='submitting']) {
   color: var(--shu);
   background: rgba(var(--shu-rgb), 0.06);
 }
@@ -113,66 +127,20 @@
   background: transparent;
 }
 
-.forms-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem 0.75rem 1rem calc(5.5em + 2rem);
-}
-.forms-meta {
-  margin: 0;
-  font-size: 0.875rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-}
-.forms-meta .part {
-  margin: 0 0.375rem 0 0;
-  padding: 0.0625rem 0.625rem;
-  border-radius: 999px;
-  background: var(--surface-2);
-}
-.forms-line {
+.forms-x {
   display: grid;
-  grid-template-columns: 3.5em minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: baseline;
-}
-.forms-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-.forms-tag {
-  padding: 0.0625rem 0.625rem;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 999px;
-  font-size: 0.875rem;
-  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  transition:
+    background calc(0.2s * var(--speed, 1)),
+    color calc(0.2s * var(--speed, 1));
+}
+.forms-x:hover {
+  color: var(--ink);
   background: var(--surface-2);
-}
-.forms-tag.forms-tag-lack {
-  color: var(--shu);
-  background: rgba(var(--shu-rgb), 0.1);
-}
-.forms-missed {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: var(--shu);
-  text-wrap: pretty;
-}
-.forms-message {
-  margin: 0;
-  font-size: 0.9375rem;
-  color: var(--ink-2);
-  text-wrap: pretty;
-}
-.forms-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-top: 0.25rem;
 }
 
 /* 个人信息：文本项两列，性别与校区各占一行 */
@@ -206,4 +174,212 @@
   .forms-fields {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* 弹窗：标题在上，题目区单独滚动，按钮固定在底部 */
+.forms-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 56;
+  display: flex;
+  flex-direction: column;
+  width: min(38rem, calc(100vw - 2 * var(--gutter, 1rem)));
+  max-height: calc(100vh - 2 * var(--mast-h, 56px));
+  translate: -50% -50%;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+.forms-modal-head {
+  flex: none;
+  padding: 1.5rem 1.75rem 0.5rem;
+}
+.forms-modal-head .section-title {
+  text-wrap: balance;
+}
+.forms-modal-message {
+  margin: 0.5rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--shu);
+  text-wrap: pretty;
+}
+.forms-modal-head .forms-meta {
+  margin: 0.5rem 0 0;
+}
+.forms-meta {
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.forms-meta .part {
+  margin: 0 0.375rem 0 0;
+  padding: 0.0625rem 0.625rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.forms-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.5rem 1.75rem 1rem;
+  overscroll-behavior: contain;
+}
+.forms-modal-foot {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem 1.25rem;
+  background: var(--surface);
+}
+/* 题目区滚到底部按钮下面时渐隐，不画分隔线 */
+.forms-modal-foot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 1.25rem;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+}
+
+.forms-q {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+}
+.forms-q > .field {
+  width: 100%;
+}
+.forms-q-title {
+  margin: 0;
+  font-weight: 500;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.forms-q-star {
+  margin-left: 0.25rem;
+  color: var(--shu);
+}
+.forms-q-kind {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0.08em;
+  vertical-align: 0.1em;
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+.forms-q[data-error] .forms-q-title {
+  color: var(--shu);
+}
+/* 弹窗里的选项：一项一行，左边圆点（单选）或方框（多选），选中时标记填主题色、整行浅主题色底 */
+.forms-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 100%;
+}
+.forms-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5625rem 0.875rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: left;
+  transition: background calc(0.2s * var(--speed, 1));
+}
+.forms-choice:hover {
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--ink) 6%);
+}
+.forms-choice[data-on] {
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.forms-choice-text {
+  min-width: 0;
+  text-wrap: pretty;
+}
+.forms-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1.5px solid var(--ink-3);
+  border-radius: 999px;
+  transition:
+    border-color calc(0.2s * var(--speed, 1)),
+    background calc(0.2s * var(--speed, 1));
+}
+.forms-choice[data-kind='checkbox'] .forms-mark {
+  border-radius: 0.3rem;
+}
+.forms-choice[data-on] .forms-mark {
+  border-color: var(--shu);
+}
+.forms-choice[data-kind='checkbox'][data-on] .forms-mark {
+  background: var(--shu);
+}
+.forms-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--shu);
+  scale: 0;
+  transition: scale calc(0.2s * var(--speed, 1)) cubic-bezier(0.22, 1, 0.36, 1);
+}
+.forms-choice[data-on] .forms-dot {
+  scale: 1;
+}
+.forms-mark svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity calc(0.15s * var(--speed, 1));
+}
+.forms-choice[data-on] .forms-mark svg {
+  opacity: 1;
+}
+
+.forms-modal .field.forms-textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.forms-backup {
+  margin: 0;
+}
+.forms-backup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+.forms-backup-row dt {
+  color: var(--ink-3);
+  text-wrap: pretty;
+}
+.forms-backup-row dd {
+  margin: 0;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

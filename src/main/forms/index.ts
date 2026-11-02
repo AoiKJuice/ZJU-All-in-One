@@ -1,18 +1,20 @@
 import { BrowserWindow, net, session, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
-import type { FormOpenOptions, FormProfile, FormSession, FormStatus } from '@shared/forms'
+import type { FormAnswer, FormOpenOptions, FormProfile, FormQuestion, FormSession, FormStatus } from '@shared/forms'
 import { loadSecret, saveSecret } from '../secure'
 import { logDiagnostic } from '../diagnostics'
 import { formMatcher, formPage, type PageState } from './page.js'
 
-// 问卷填写：开窗加载问卷（问卷星 / 腾讯问卷 / 金数据等），注入 page.js 按题目标题填入本人信息。
-// 不调平台接口，只操作页面；有必填题没认出时不自动提交；验证码、扫码登录、最短作答时间都由用户在窗口里处理，不绕过。
-// 定时开放：窗口先打开（可提前扫码登录），用问卷站响应头的 Date 校准本机时钟，到点刷新再填，页面仍显示未开始时隔一会儿再刷新。
-// 窗口用独立分区 persist:forms，扫码登录过的微信 / QQ 下次还在。记录只在本次运行里保留
+// 问卷填写：订阅后在后台开窗（不显示）加载问卷（问卷星 / 腾讯问卷 / 金数据等），注入 page.js 按题目标题填入本人信息。
+// 开放后：自动提交时全部填上就直接交，有没填上的题在应用里弹窗问；检查后提交时弹窗列出全部题目，用户确认后交。
+// 不调平台接口，只操作页面；验证码、扫码登录时把窗口显示出来交给用户，不绕过。
+// 定时开放：窗口先打开，用问卷站响应头的 Date 校准本机时钟，到点刷新再填，页面仍显示未开始时隔一会儿再刷新。
+// 窗口用独立分区 persist:forms，扫码登录过的微信 / QQ 下次还在。进行中的订阅只在本次运行里保留，提交后的答卷备份加密存本机
 
 const PROFILE_FILE = 'form-profile.bin'
+const HISTORY_FILE = 'form-history.bin'
 const PARTITION = 'persist:forms'
-const MAX_SESSIONS = 12
+const MAX_HISTORY = 50
 
 export const EMPTY_PROFILE: FormProfile = {
   studentId: '',
@@ -42,24 +44,53 @@ export async function saveProfile(profile: FormProfile): Promise<FormProfile> {
   return clean
 }
 
+// 已提交的答卷备份
+let history: FormSession[] | null = null
+
+async function loadHistory(): Promise<FormSession[]> {
+  if (!history) {
+    const text = await loadSecret(HISTORY_FILE).catch(() => null)
+    history = text ? (JSON.parse(text) as FormSession[]) : []
+  }
+  return history
+}
+
+async function saveHistory(): Promise<void> {
+  await saveSecret(HISTORY_FILE, JSON.stringify((history ?? []).slice(0, MAX_HISTORY))).catch(() => {})
+}
+
 interface Live {
   session: FormSession
   win: BrowserWindow | null
   timers: NodeJS.Timeout[]
-  /** 到了开放时刻（或立即打开），开始填写 */
+  /** 到了开放时刻（或立即订阅），开始填写 */
   armed: boolean
-  /** 自动提交只试一次：第一次填稳时有没认出的必填题就放弃 */
-  autoDecided: boolean
   /** 到点后页面仍显示未开始时已重刷的次数 */
   reloads: number
   onLogin: boolean
   polling: boolean
+  /** 已经问过 / 交过的页（题目键串）；翻页、提交被拦下后重新判断 */
+  decided: string | null
+  /** 用户在应用里填的答案，页面刷新后随资料一起重新填进去 */
+  answers: Record<string, FormAnswer>
+  /** 各页提交时的答卷，按页的题目键串存，同一页重交时覆盖 */
+  pages: Map<string, { title: string; value: string }[]>
+  submittingAt: number
+  /** 窗口因验证码 / 登录被自动显示出来（处理完再藏起来），或用户要求显示 */
+  shown: 'auto' | 'user' | null
+  closing: boolean
 }
 
 const lives = new Map<string, Live>()
 
-const script = (op: 'install' | 'refill' | 'state' | 'submit', profile: FormProfile | null = null): string =>
-  `(${formPage.toString()})(${JSON.stringify(profile)}, ${JSON.stringify(op)}, ${formMatcher.toString()})`
+// 主窗口：问卷开放、要用户补填时提到前面
+let appWindow: BrowserWindow | null = null
+export function setAppWindow(win: BrowserWindow | null): void {
+  if (win && !win.isDestroyed()) appWindow = win
+}
+
+const script = (op: 'install' | 'state' | 'describe' | 'answer' | 'submit', profile: FormProfile | null = null, arg: Record<string, FormAnswer> | null = null): string =>
+  `(${formPage.toString()})(${JSON.stringify(profile)}, ${JSON.stringify(op)}, ${formMatcher.toString()}, ${JSON.stringify(arg)})`
 
 const LOGIN = /ptlogin|graph\.qq\.com|open\.weixin\.qq\.com|weixin\.qq\.com\/connect|passport\.|\/(login|signin|oauth|auth)\b/i
 
@@ -86,71 +117,159 @@ function serverOffset(url: string): Promise<number> {
   })
 }
 
-function update(live: Live, patch: Partial<FormSession>): void {
-  Object.assign(live.session, patch)
-}
-
 function later(live: Live, ms: number, fn: () => void): void {
   live.timers.push(setTimeout(fn, Math.max(0, ms)))
 }
 
-async function install(live: Live): Promise<void> {
+/** 页面里跑脚本；页面卡住（对话框、长任务）时按超时放弃 */
+function run<T>(live: Live, code: string, timeout = 3000): Promise<T | null> {
   const win = live.win
-  if (!win || win.isDestroyed() || !live.armed) return
-  const profile = (await loadProfile()) ?? EMPTY_PROFILE
-  await win.webContents.executeJavaScript(script('install', profile)).catch(() => null)
+  if (!win || win.isDestroyed()) return Promise.resolve(null)
+  return Promise.race([win.webContents.executeJavaScript(code).catch(() => null) as Promise<T | null>, new Promise<null>((r) => setTimeout(() => r(null), timeout))])
 }
 
-/** 读页面状态，推导记录的状态；该自动提交时点提交 */
-async function poll(live: Live): Promise<void> {
+function setStatus(live: Live, status: FormStatus, extra?: Record<string, number>): void {
+  if (live.session.status === status) return
+  live.session.status = status
+  logDiagnostic('form-status', { status, ...extra })
+}
+
+async function install(live: Live): Promise<void> {
+  if (!live.armed) return
+  await run(live, script('install', (await loadProfile()) ?? EMPTY_PROFILE, live.answers))
+}
+
+/** 验证码、扫码登录：窗口显示出来交给用户 */
+function reveal(live: Live, why: 'auto' | 'user'): void {
   const win = live.win
-  if (!win || win.isDestroyed() || !live.armed || live.polling) return
+  if (!win || win.isDestroyed()) return
+  if (live.shown !== 'user') live.shown = why
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+function conceal(live: Live): void {
+  if (live.shown !== 'auto' || !live.win || live.win.isDestroyed()) return
+  live.shown = null
+  live.win.hide()
+}
+
+/** 该问用户的题：不列选填题时只留必填的；自动提交只问没填上的 */
+function toAsk(live: Live, questions: FormQuestion[]): FormQuestion[] {
+  const shown = live.session.optional ? questions : questions.filter((q) => q.required)
+  return live.session.autoSubmit ? shown.filter((q) => !q.filled) : shown
+}
+
+/** 要用户在应用里补填 / 确认：记下题目，主窗口提到前面 */
+function ask(live: Live, questions: FormQuestion[], message: string | null = null): void {
+  const s = live.session
+  s.questions = questions
+  s.round++
+  s.message = message
+  setStatus(live, 'asking', { questions: questions.length })
+  const win = appWindow
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    win.flashFrame(true)
+  }
+}
+
+const answerText = (value: FormAnswer): string => (Array.isArray(value) ? value.join('、') : value.trim())
+
+/** 记下这一页的答卷并点提交（多页问卷点下一页） */
+async function submitPage(live: Live, page: string, questions: FormQuestion[]): Promise<void> {
+  live.pages.set(
+    page,
+    questions.filter((q) => q.filled && q.kind !== 'other').map((q) => ({ title: q.title, value: answerText(q.value) }))
+  )
+  live.session.questions = []
+  live.session.message = null
+  live.submittingAt = Date.now()
+  setStatus(live, 'submitting')
+  await run(live, script('submit'))
+}
+
+/** 提交成功：答卷存进备份，关掉窗口 */
+async function finish(live: Live): Promise<void> {
+  const s = live.session
+  s.status = 'submitted'
+  s.submittedAt = new Date().toISOString()
+  s.backup = [...live.pages.values()].flat()
+  s.questions = []
+  logDiagnostic('form-status', { status: 'submitted', answers: s.backup.length })
+  lives.delete(s.id)
+  const list = await loadHistory()
+  history = [{ ...s }, ...list.filter((h) => h.id !== s.id)].slice(0, MAX_HISTORY)
+  await saveHistory()
+  live.closing = true
+  live.timers.forEach(clearTimeout)
+  setTimeout(() => live.win && !live.win.isDestroyed() && live.win.destroy(), 1500)
+}
+
+/** 读页面状态，推导记录的状态；开放后决定直接提交还是在应用里问 */
+async function poll(live: Live): Promise<void> {
+  if (!live.win || live.win.isDestroyed() || !live.armed || live.polling || live.session.status === 'submitted') return
   live.polling = true
   try {
-    // 页面弹着 alert 时脚本会等到对话框关掉，所以加个超时
-    const state = (await Promise.race([
-      win.webContents.executeJavaScript(script('state')),
-      new Promise((r) => setTimeout(() => r(null), 3000))
-    ])) as PageState | null
+    const state = await run<PageState>(live, script('state'))
     if (!state) return
     const s = live.session
     if (state.title) s.title = state.title
-    // 提交后的成功页没有题目，保留最后一次的填写结果
-    if (state.questions > 0) {
-      s.filled = state.filled
-      s.missed = state.missed
-      s.lacking = state.lacking
-    }
     if (state.alerts.length) s.message = state.alerts[state.alerts.length - 1]
-    else if (state.invalid) s.message = '提交被页面拦下'
 
-    let status: FormStatus
-    if (state.done) status = 'submitted'
-    else if (state.captcha) status = 'verify'
-    else if (live.onLogin) status = 'login'
-    else if (state.notOpen) status = 'waiting'
-    else if (state.questions === 0 && state.submittedAt > 0) status = 'submitted'
-    // 还在渲染或正在填：已有结果时先保持，免得用户一边改一边闪
-    else if (state.questions === 0 || state.running || state.stableFor < 800) status = s.status === 'filled' || s.status === 'attention' ? s.status : 'filling'
-    else if (state.missed.length || state.lacking.length || !state.filled.length || state.invalid) status = 'attention'
-    else status = 'filled'
-    if (status !== s.status) logDiagnostic('form-status', { status, questions: state.questions, filled: state.filled.length, missed: state.missed.length, lacking: state.lacking.length })
-    s.status = status
-
-    // 到点了页面却还没开放（本机时钟误差、平台慢几秒）：隔一会儿再刷，最多刷 15 次
-    if (state.notOpen && live.reloads < 15 && s.at) {
-      live.reloads++
-      later(live, 800, () => win.isDestroyed() || win.webContents.reload())
+    if (state.done || (state.questions === 0 && state.submittedAt > 0 && !state.notOpen)) return void (await finish(live))
+    if (state.captcha) {
+      setStatus(live, 'verify')
+      return reveal(live, 'auto')
     }
+    if (live.onLogin) return setStatus(live, 'login')
+    conceal(live)
 
-    if (s.autoSubmit && !live.autoDecided && state.questions > 0 && !state.running && state.stableFor > 1200 && !state.captcha) {
-      if (state.blocked || !state.filled.length) live.autoDecided = true
-      // 多页问卷翻到最后一页（只有提交、没有下一页）才交
-      else if (state.submitReady && !state.nextPage) {
-        live.autoDecided = true
-        await win.webContents.executeJavaScript(script('submit'))
+    if (state.notOpen) {
+      setStatus(live, 'waiting')
+      // 立即订阅的：页面写着开放时刻就按它倒计时
+      if (!s.at && state.opensAt) {
+        s.at = state.opensAt
+        void serverOffset(s.url).then((offset) => (s.offset = offset))
       }
+      // 到点了页面却还没开放（本机时钟误差、平台慢几秒）：隔一会儿再刷，最多刷 15 次
+      if (s.at && Date.now() + s.offset >= Date.parse(s.at) && live.reloads < 15) {
+        live.reloads++
+        later(live, 800, () => live.win && !live.win.isDestroyed() && live.win.webContents.reload())
+      }
+      return
     }
+    if (state.questions === 0) {
+      if (s.status !== 'asking') setStatus(live, 'filling')
+      return
+    }
+
+    if (s.status === 'submitting') {
+      const stuck = Date.now() - live.submittingAt > 10_000
+      // 提交被页面拦下（必填没填、格式不对），或点了没反应：列出全部题目再问
+      if (state.page === live.decided && (state.invalid || stuck)) {
+        const questions = await run<FormQuestion[]>(live, script('describe'), 5000)
+        if (questions) ask(live, live.session.optional ? questions : questions.filter((q) => q.required || !q.filled), s.message ?? (stuck ? '提交后页面没有反应' : '提交被页面拦下'))
+        return
+      }
+      if (state.page === live.decided) return
+    }
+    if (state.page === live.decided) return
+    if (state.running || state.stableFor < 1000) {
+      if (s.status !== 'asking') setStatus(live, 'filling')
+      return
+    }
+
+    // 新的一页填稳了：自动提交时全部填上就交，否则在应用里问
+    const questions = await run<FormQuestion[]>(live, script('describe'), 5000)
+    if (!questions) return
+    live.decided = state.page
+    const asking = toAsk(live, questions)
+    if (s.autoSubmit && !asking.length) await submitPage(live, state.page, questions)
+    else ask(live, asking)
   } finally {
     live.polling = false
   }
@@ -159,14 +278,14 @@ async function poll(live: Live): Promise<void> {
 function arm(live: Live): void {
   if (live.armed || !live.win || live.win.isDestroyed()) return
   live.armed = true
-  update(live, { status: 'filling' })
+  setStatus(live, 'filling')
   live.win.webContents.reload()
 }
 
 /** 定时：先按当前校准排到开放前 20 秒，那时再校准一次，排到开放时刻 */
 async function schedule(live: Live, at: number): Promise<void> {
   const offset = await serverOffset(live.session.url)
-  update(live, { offset })
+  live.session.offset = offset
   const wait = at - (Date.now() + offset)
   if (wait > 30_000) later(live, wait - 20_000, () => void schedule(live, at))
   else later(live, wait, () => arm(live))
@@ -202,34 +321,39 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
       at: timed ? new Date(at).toISOString() : null,
       offset: 0,
       autoSubmit: options.autoSubmit,
+      optional: options.optional ?? true,
       openedAt: new Date().toISOString(),
-      filled: [],
-      missed: [],
-      lacking: [],
-      message: null
+      questions: [],
+      round: 0,
+      message: null,
+      submittedAt: null,
+      backup: []
     },
     win: null,
     timers: [],
     armed: !timed,
-    autoDecided: false,
     reloads: 0,
     onLogin: false,
-    polling: false
+    polling: false,
+    decided: null,
+    answers: {},
+    pages: new Map(),
+    submittingAt: 0,
+    shown: null,
+    closing: false
   }
   lives.set(live.session.id, live)
-  // 只留最近的几条，先丢已关的
-  for (const [id, old] of lives) {
-    if (lives.size <= MAX_SESSIONS) break
-    if (!old.win) lives.delete(id)
-  }
 
+  // 窗口不显示，填写、提交都在后台；验证码与扫码登录时才显示出来
   const win = new BrowserWindow({
+    show: false,
     width: 1000,
     height: 860,
     title: '问卷',
     autoHideMenuBar: true,
     webPreferences: { partition: PARTITION, contextIsolation: true, sandbox: true, backgroundThrottling: false }
   })
+  win.webContents.setAudioMuted(true)
   live.win = win
   // 同站与扫码登录的弹窗留在应用里（共用分区），其他外链交给系统浏览器
   win.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -239,59 +363,94 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
   })
   win.webContents.on('did-navigate', (_e, target) => {
     live.onLogin = !sameSite(target, url) && LOGIN.test(target)
-    if (live.onLogin) update(live, { status: 'login' })
+    if (!live.onLogin) return
+    setStatus(live, 'login')
+    reveal(live, 'auto')
   })
   win.webContents.on('did-fail-load', (_e, code, description, _target, isMainFrame) => {
-    if (isMainFrame && code !== -3) update(live, { status: 'error', message: description || `加载失败（${code}）` })
+    if (!isMainFrame || code === -3) return
+    live.session.message = description || `加载失败（${code}）`
+    setStatus(live, 'error')
   })
   win.webContents.on('did-finish-load', () => void install(live))
-  win.on('page-title-updated', (_e, title) => title && update(live, { title }))
+  win.on('page-title-updated', (_e, title) => title && (live.session.title = title.replace(/\s*[-_|｜—]\s*(金数据|问卷星|腾讯问卷|问卷网|jinshuju|wjx)\s*$/i, '')))
+  // 用户关掉显示出来的窗口只是藏起来，订阅还在；取消订阅才真的关
+  win.on('close', (e) => {
+    if (live.closing) return
+    e.preventDefault()
+    live.shown = null
+    win.hide()
+  })
   win.on('closed', () => {
     live.timers.forEach(clearTimeout)
     live.win = null
-    if (live.session.status !== 'submitted') update(live, { status: 'closed' })
+    if (live.session.status !== 'submitted') setStatus(live, 'closed')
   })
   const ticker = setInterval(() => (live.win ? void poll(live) : clearInterval(ticker)), 800)
   live.timers.push(ticker)
 
   win.loadURL(url).catch(() => {})
   if (timed) void schedule(live, at)
-  logDiagnostic('form-open', { timed, autoSubmit: options.autoSubmit })
+  logDiagnostic('form-open', { timed, autoSubmit: options.autoSubmit, optional: options.optional })
   return { ...live.session }
 }
 
-export function listForms(): FormSession[] {
-  return [...lives.values()].reverse().map((l) => ({ ...l.session }))
+export async function listForms(): Promise<FormSession[]> {
+  const live = [...lives.values()].reverse().map((l) => ({ ...l.session }))
+  return [...live, ...(await loadHistory())]
 }
 
-export function focusForm(id: string): void {
-  const win = lives.get(id)?.win
-  if (!win || win.isDestroyed()) throw new Error('窗口已关闭')
-  if (win.isMinimized()) win.restore()
-  win.show()
-  win.focus()
-}
-
-export async function refillForm(id: string): Promise<FormSession> {
+/** 用户在应用里填的答案：填进页面，必填题都有了就提交，否则继续问 */
+export async function answerForm(id: string, answers: Record<string, FormAnswer>): Promise<FormSession> {
   const live = lives.get(id)
-  if (!live?.win || live.win.isDestroyed()) throw new Error('窗口已关闭')
-  if (live.armed) await live.win.webContents.executeJavaScript(script('refill', (await loadProfile()) ?? EMPTY_PROFILE)).catch(() => null)
-  await poll(live)
+  if (!live?.win || live.win.isDestroyed()) throw new Error('问卷窗口已关闭')
+  if (live.session.status !== 'asking') throw new Error('问卷不在等待填写')
+  live.answers = { ...live.answers, ...answers }
+  const filled = await run<PageState>(live, script('answer', null, answers), 5000)
+  // 等页面把答案吃进去（自绘下拉要展开、点选项）
+  for (let i = 0; i < 10; i++) {
+    const state = await run<PageState>(live, script('state'))
+    if (state && !state.running && state.stableFor > 300) break
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  const questions = await run<FormQuestion[]>(live, script('describe'), 5000)
+  if (!filled || !questions) throw new Error('问卷页面没有响应')
+  const empty = questions.filter((q) => q.required && !q.filled && q.kind !== 'other')
+  if (empty.length) ask(live, toAsk(live, questions), `还有必填题没填上：${empty.map((q) => q.title).join('、')}`)
+  else await submitPage(live, live.decided ?? filled.page, questions)
   return { ...live.session }
 }
 
-/** 资料改过后：之前因缺资料没填上的窗口按新资料重填 */
-export async function refillLacking(): Promise<void> {
+/** 资料改过后：还在进行的订阅按新资料重填，正在问的重新判断（可能已经不用问了） */
+export async function applyProfile(): Promise<void> {
   const profile = await loadProfile()
   for (const live of lives.values()) {
-    if (!live.armed || !live.win || live.win.isDestroyed() || !live.session.lacking.length || live.session.status === 'submitted') continue
-    await live.win.webContents.executeJavaScript(script('install', profile)).catch(() => null)
+    if (!live.armed || !live.win || live.win.isDestroyed() || live.session.status === 'submitting') continue
+    await run(live, script('install', profile, live.answers))
+    if (live.session.status === 'asking') live.decided = null
   }
 }
 
-export function closeForm(id: string): void {
+export async function focusForm(id: string): Promise<void> {
   const live = lives.get(id)
-  if (!live) return
-  if (live.win && !live.win.isDestroyed()) live.win.close()
-  else lives.delete(id)
+  if (live) {
+    if (!live.win || live.win.isDestroyed()) throw new Error('问卷窗口已关闭')
+    return reveal(live, 'user')
+  }
+  const done = (await loadHistory()).find((h) => h.id === id)
+  if (done) await shell.openExternal(done.url)
+}
+
+export async function closeForm(id: string): Promise<void> {
+  const live = lives.get(id)
+  if (live) {
+    live.closing = true
+    live.timers.forEach(clearTimeout)
+    if (live.win && !live.win.isDestroyed()) live.win.destroy()
+    lives.delete(id)
+    return
+  }
+  const list = await loadHistory()
+  history = list.filter((h) => h.id !== id)
+  await saveHistory()
 }

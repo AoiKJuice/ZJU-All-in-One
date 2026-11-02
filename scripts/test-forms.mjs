@@ -1,7 +1,7 @@
 // 问卷填写脚本回归：npx electron scripts/test-forms.mjs [文件名片段]
 // 先用 forms-fixtures/titles.json（各字段的标题说法与容易误认的反例）核对标题匹配；
 // 逐个加载 scripts/forms-fixtures 里的模拟问卷（问卷星 / 腾讯问卷 / 金数据结构，内容虚构），注入 src/main/forms/page.js 填写，
-// 按题目块的 data-expect 核对：字段键 = 应填成该项，none = 不该动，missed = 认不出的必填题应被标出；
+// 按题目块的 data-expect 核对：字段键 = 应填成该项，none = 不该动，missed = 认不出的必填题应列进 missed；
 // 没有 missed 时模拟自动提交，页面校验通过会置 window.__submitted；有 missed 时不应提交。问卷星多页样例翻页后再核对第二页
 import { app, BrowserWindow } from 'electron'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -27,10 +27,13 @@ const PROFILE = {
   dorm: '碧峰5舍312'
 }
 
-const script = (op) => `(${formPage.toString()})(${JSON.stringify(PROFILE)}, ${JSON.stringify(op)}, ${formMatcher.toString()})`
+const script = (op, arg) => `(${formPage.toString()})(${JSON.stringify(PROFILE)}, ${JSON.stringify(op)}, ${formMatcher.toString()}, ${JSON.stringify(arg ?? null)})`
+
+// 应用弹窗里用户会给的答案：选择题取第一项，填空写一句（身份证号给个虚构的 18 位）
+const answerFor = (q) => (q.kind === 'checkbox' ? [q.options[0]] : q.kind === 'radio' ? q.options[0] : /身份证/.test(q.title) ? '110101200001011234' : '想认识更多同学')
 
 // 在页面里核对每个题目块
-function check(profile) {
+function check(profile, missed) {
   const norm = (t) => (t || '').toLowerCase().replace(/[\s,，.。:：;；、*()（）\-_/级校区]/g, '')
   const problems = []
   const value = (box) => {
@@ -48,7 +51,7 @@ function check(profile) {
     if (expect === 'none') {
       if (got) problems.push(`不该填：${title} → ${got}`)
     } else if (expect === 'missed') {
-      if (!box.dataset.zjuMissed) problems.push(`没标出：${title}`)
+      if (!missed.some((m) => box.textContent.includes(m))) problems.push(`没列出：${title}`)
     } else {
       const want = expect === 'majorClass' ? [profile.major + profile.className, profile.className] : expect === 'grade' ? [profile.grade, profile.grade.slice(2)] : expect === 'gender' ? [profile.gender] : [profile[expect]]
       if (!got || !want.some((w) => norm(got).includes(norm(w)) || norm(w).includes(norm(got)))) problems.push(`${expect}：${title} → ${got || '（空）'}`)
@@ -86,12 +89,12 @@ app.whenReady().then(async () => {
     await new Promise((r) => setTimeout(r, 1000))
     await win.webContents.executeJavaScript(script('install'))
     let state = await settle(win)
-    const problems = await win.webContents.executeJavaScript(`(${check.toString()})(${JSON.stringify(PROFILE)})`)
+    const problems = await win.webContents.executeJavaScript(`(${check.toString()})(${JSON.stringify(PROFILE)}, ${JSON.stringify(state.missed)})`)
     if (state.nextPage) {
       await win.webContents.executeJavaScript(`document.querySelector('#divNext').click()`)
       await new Promise((r) => setTimeout(r, 300))
       state = await settle(win)
-      problems.push(...(await win.webContents.executeJavaScript(`(${check.toString()})(${JSON.stringify(PROFILE)})`)).map((p) => `第二页 ${p}`))
+      problems.push(...(await win.webContents.executeJavaScript(`(${check.toString()})(${JSON.stringify(PROFILE)}, ${JSON.stringify(state.missed)})`)).map((p) => `第二页 ${p}`))
     }
     const expectMissed = await win.webContents.executeJavaScript(`!!document.querySelector('[data-expect=missed]')`)
     if (!state.missed.length) {
@@ -103,6 +106,19 @@ app.whenReady().then(async () => {
       if (submitted && !after.done) problems.push('提交后没认出成功页')
     }
     if (expectMissed && !state.missed.length) problems.push('有认不出的必填题却会提交')
+    // 应用内弹窗的流程：列出全部题目，没填的按用户答案填上，再提交
+    if (state.missed.length) {
+      const questions = await win.webContents.executeJavaScript(script('describe'))
+      const pending = questions.filter((q) => !q.filled && q.kind !== 'other')
+      if (state.missed.some((m) => !pending.some((q) => q.title.includes(m)))) problems.push('列出的题目里缺了没认出的题')
+      await win.webContents.executeJavaScript(script('answer', Object.fromEntries(pending.map((q) => [q.key, answerFor(q)]))))
+      await settle(win)
+      const left = (await win.webContents.executeJavaScript(script('describe'))).filter((q) => q.required && !q.filled)
+      if (left.length) problems.push(`按答案填后仍空着：${left.map((q) => q.title).join('、')}`)
+      await win.webContents.executeJavaScript(script('submit'))
+      await new Promise((r) => setTimeout(r, 400))
+      if (!(await win.webContents.executeJavaScript('window.__submitted === true'))) problems.push('按答案填完后提交未通过页面校验')
+    }
     console.log(`${problems.length ? '✗' : '✓'} ${file}  填 ${state.filled.length}  未认出 ${state.missed.length}${state.missed.length ? '（' + state.missed.join('、') + '）' : ''}`)
     for (const p of problems) console.log('    ' + p)
     if (problems.length) failed++
