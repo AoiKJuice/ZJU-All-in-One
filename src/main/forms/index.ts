@@ -273,8 +273,8 @@ async function poll(live: Live): Promise<void> {
         live.reloads++
         later(live, 800, () => reopen(live))
       }
-      // 页面没写开放时刻（如浙大表单只说「未在开启时间范围内」），或到点重刷 15 次仍没开：每 5 秒重开一次看看
-      else if ((!s.at || live.reloads >= 15) && Date.now() - live.reopenedAt > 5_000) reopen(live)
+      // 页面没写开放时刻（如浙大表单只说「未在开启时间范围内」），或到点重刷 15 次仍没开：每 2 秒重开一次看看（实测从开放到被发现最多差一个间隔，5 秒太慢）
+      else if ((!s.at || live.reloads >= 15) && Date.now() - live.reopenedAt > 2_000) reopen(live)
       return
     }
     if (state.questions === 0) {
