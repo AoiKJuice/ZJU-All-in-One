@@ -17,10 +17,14 @@ export interface PageState {
   submitReady: boolean
   nextPage: boolean
   captcha: boolean
+  /** 页面写着登录后才能填写，题目都填不了 */
+  needLogin: boolean
   /** 已提交成功（成功页） */
   done: boolean
   /** 还没开放（没有题目，页面写着未开始 / 暂停） */
   notOpen: boolean
+  /** 已停止收集 / 已截止 / 已填写过（页面上的原话），不会再开放 */
+  ended: string | null
   /** 未开放页面上写着的开放时刻（ISO） */
   opensAt: string | null
   /** 点过提交后页面上有校验错误 */

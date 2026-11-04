@@ -30,7 +30,8 @@ const PROFILE = {
 const script = (op, arg) => `(${formPage.toString()})(${JSON.stringify(PROFILE)}, ${JSON.stringify(op)}, ${formMatcher.toString()}, ${JSON.stringify(arg ?? null)})`
 
 // 应用弹窗里用户会给的答案：选择题取第一项，填空写一句（身份证号给个虚构的 18 位）
-const answerFor = (q) => (q.kind === 'checkbox' ? [q.options[0]] : q.kind === 'radio' ? q.options[0] : /身份证/.test(q.title) ? '110101200001011234' : '想认识更多同学')
+const answerFor = (q) =>
+  q.kind === 'checkbox' ? [q.options[0]] : q.kind === 'radio' ? q.options[0] : q.input === 'date' ? '2026-11-05' : /身份证/.test(q.title) ? '110101200001011234' : '想认识更多同学'
 
 // 在页面里核对每个题目块
 function check(profile, missed) {

@@ -197,7 +197,7 @@ function Question({
         {q.required && <span className="forms-q-star">*</span>}
         {KIND[q.kind] && <span className="forms-q-kind">{KIND[q.kind]}</span>}
       </p>
-      {q.kind === 'text' && <input className="field forms-input" spellCheck={false} autoFocus={autoFocus} value={text} onChange={(e) => onChange(e.target.value)} />}
+      {q.kind === 'text' && <input className="field forms-input" type={q.input ?? 'text'} spellCheck={false} autoFocus={autoFocus} value={text} onChange={(e) => onChange(e.target.value)} />}
       {q.kind === 'textarea' && <textarea className="field forms-input forms-textarea" rows={3} autoFocus={autoFocus} value={text} onChange={(e) => onChange(e.target.value)} />}
       {(q.kind === 'radio' || q.kind === 'checkbox') && (
         <div className="forms-choices" role={q.kind === 'radio' ? 'radiogroup' : 'group'}>

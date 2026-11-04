@@ -104,6 +104,8 @@ const script = (op: 'install' | 'state' | 'describe' | 'answer' | 'submit', prof
   `(${formPage.toString()})(${JSON.stringify(profile)}, ${JSON.stringify(op)}, ${formMatcher.toString()}, ${JSON.stringify(arg)})`
 
 const LOGIN = /ptlogin|graph\.qq\.com|open\.weixin\.qq\.com|weixin\.qq\.com\/connect|passport\.|\/(login|signin|oauth|auth)\b/i
+const LOGIN_HOST = /ptlogin|graph\.qq\.com|open\.weixin\.qq\.com|passport\.|accounts\.(feishu|larksuite)|login\.(dingtalk|taobao|alipay)|zjuam\./i
+const LOGIN_PATH = /(^|\/)(r\/)?(login|signin|sign_in|oauth2?|sso|cas\/login)(\.html?|\/|$)/i
 
 /**
  * 问卷站时钟与本机的差（毫秒）：Date 头只到秒，取往返中点并补半秒；取不到当 0。
@@ -259,8 +261,19 @@ async function poll(live: Live): Promise<void> {
       setStatus(live, 'verify')
       return reveal(live, 'auto')
     }
+    // 页面上写着要先登录（腾讯文档收集表「登录后才能填写」，题目都是禁用的）：同被弹到登录页
+    if (state.needLogin) {
+      setStatus(live, 'login')
+      if (!live.zju) return reveal(live, 'auto')
+      if (Date.now() - live.casAt > 3000) void useAppLogin(live)
+      return
+    }
     conceal(live)
 
+    if (state.ended) {
+      s.message = state.ended
+      return setStatus(live, 'error')
+    }
     if (state.notOpen) {
       setStatus(live, 'waiting')
       // 立即订阅的：页面写着开放时刻就按它倒计时
@@ -332,10 +345,15 @@ async function schedule(live: Live, at: number): Promise<void> {
   else later(live, wait, () => arm(live))
 }
 
-/** 登录页：换了主机且地址像登录（zjuam 与问卷同在 zju.edu.cn 下，不能按站点比） */
-function isLogin(target: string, formHost: string): boolean {
+/**
+ * 登录页：主机像登录服务（ptlogin、passport、accounts.feishu……），或路径里有 login / signin / oauth / sso 一段。
+ * 不按站点比——zjuam 与问卷同在 zju.edu.cn 下；也不要求换主机——腾讯问卷的登录页 wj.qq.com/r/login.html 与问卷同主机
+ */
+function isLogin(target: string, formUrl: string): boolean {
   try {
-    return new URL(target).hostname !== formHost && LOGIN.test(target)
+    const u = new URL(target)
+    if (u.href.split('#')[0] === formUrl.split('#')[0]) return false
+    return LOGIN_HOST.test(u.hostname) || LOGIN_PATH.test(u.pathname)
   } catch {
     return false
   }
@@ -460,7 +478,7 @@ export async function openForm(url: string, options: FormOpenOptions): Promise<F
     return { action: 'deny' }
   })
   win.webContents.on('did-navigate', (_e, target) => {
-    live.onLogin = isLogin(target, host)
+    live.onLogin = isLogin(target, url)
     if (!live.onLogin) return
     setStatus(live, 'login')
     if (live.zju) void useAppLogin(live)

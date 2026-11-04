@@ -39,6 +39,8 @@ export interface FormQuestion {
   key: string
   title: string
   kind: FormQuestionKind
+  /** 填空题的原生输入类型（日期、时间、手机号、数字……），应用里用同样的输入框 */
+  input?: 'date' | 'time' | 'datetime-local' | 'month' | 'tel' | 'email' | 'number'
   required: boolean
   options: string[]
   /** 页面上现在的值（已按资料填好的也在这里） */
