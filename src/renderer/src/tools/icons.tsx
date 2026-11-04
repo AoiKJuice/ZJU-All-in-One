@@ -50,3 +50,20 @@ export function FormIcon() {
     </svg>
   )
 }
+
+/** 图书馆预约：一把阅览椅，悬停时主题色的定位针落到椅背上、弹一下，椅子轻轻下沉接住 */
+export function LibraryIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <g className="ti-chair">
+        <rect className="ti-ink" x="14" y="22" width="20" height="10" rx="3" />
+        <path className="ti-ink" d="M10.5 35.5h27" />
+        <path className="ti-ink" d="M13.5 35.5v7M34.5 35.5v7M10.5 35.5c0-2 1.2-3.5 3.5-3.5h20c2.3 0 3.5 1.5 3.5 3.5" />
+      </g>
+      <g className="ti-pin">
+        <path className="ti-accent" d="M24 18.5c-3.8-4-5.5-6.8-5.5-9.1a5.5 5.5 0 0 1 11 0c0 2.3-1.7 5.1-5.5 9.1Z" />
+        <circle className="ti-accent ti-fill" cx="24" cy="9.4" r="1.7" />
+      </g>
+    </svg>
+  )
+}

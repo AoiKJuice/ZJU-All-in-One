@@ -16,6 +16,8 @@ import { fetchCalendar } from '../main/services/calendar'
 import * as graduation from '../main/services/graduation'
 import { resetXk, xkHandlers } from '../main/services/xkApi'
 import { demoXk } from '../main/services/demoXk'
+import { libraryHandlers, resetLibrary } from '../main/services/libraryApi'
+import { demoLibrary } from '../main/services/demoLibrary'
 import * as pta from '../main/services/pta'
 import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
 
@@ -33,6 +35,7 @@ function resetServices(): void {
   eta.reset()
   graduation.reset()
   resetXk()
+  resetLibrary()
 }
 
 const authListeners = new Set<() => void>()
@@ -201,6 +204,13 @@ const handlers: Handlers = {
   'xk:watches': async () => [],
   'xk:watch': unsupported,
   'xk:unwatch': unsupported,
+  ...libraryHandlers,
+  'lib:watches': async () => [],
+  'lib:watch': unsupported,
+  'lib:unwatch': unsupported,
+  'lib:presets': async () => [],
+  'lib:savePreset': unsupported,
+  'lib:removePreset': unsupported,
   ...formsHandlers
 }
 
@@ -232,7 +242,8 @@ if (import.meta.env.VITE_ZJU_DEMO === '1') {
     'todo:ignore': async (id: string, ignored: boolean) =>
       Object.assign(demoTodos, { ignored: ignored ? [...demoTodos.ignored, id] : demoTodos.ignored.filter((x) => x !== id) }),
     'todo:remind': async (on: boolean) => Object.assign(demoTodos, { remind: on }),
-    ...demoXk
+    ...demoXk,
+    ...demoLibrary
   } satisfies Partial<Handlers>)
 }
 

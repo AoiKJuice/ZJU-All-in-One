@@ -2288,6 +2288,37 @@ html[data-theme='dark'] {
     stroke-dashoffset: 0;
   }
 }
+/* 图书馆预约：定位针抬起后落到椅背上、压扁回弹，椅子轻轻下沉接住 */
+.tool-icon :is(.ti-pin, .ti-chair) {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.tool-card:hover .ti-pin {
+  animation: ti-drop calc(0.9s * var(--speed, 1)) var(--ease);
+}
+.tool-card:hover .ti-chair {
+  animation: ti-sink calc(0.9s * var(--speed, 1)) var(--ease);
+}
+@keyframes ti-drop {
+  25% {
+    transform: translateY(-5px);
+  }
+  50% {
+    transform: translateY(2px) scale(1.12, 0.86);
+  }
+  70% {
+    transform: translateY(-1px) scale(0.96, 1.05);
+  }
+}
+@keyframes ti-sink {
+  0%,
+  42% {
+    transform: none;
+  }
+  55% {
+    transform: translateY(1.2px) scale(1.02, 0.97);
+  }
+}
 .tool-head {
   display: flex;
   align-items: center;

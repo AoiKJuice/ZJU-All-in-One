@@ -10,7 +10,10 @@ const ACTION: Record<ConfirmRequest['action'], { title: string; ok: string }> = 
   select: { title: '加入选课志愿', ok: '加入' },
   drop: { title: '退选', ok: '退选' },
   reorder: { title: '调整志愿顺序', ok: '调整' },
-  autoselect: { title: '有余量时自动选课', ok: '授权' }
+  autoselect: { title: '有余量时自动选课', ok: '授权' },
+  libreserve: { title: '预约座位', ok: '预约' },
+  libcancel: { title: '取消座位预约', ok: '取消预约' },
+  libauto: { title: '有空座时自动预约', ok: '授权' }
 }
 
 /** 本地 Agent 经 MCP 发起的提交 / 撤回：应用内确认，文件可点开预览；排队逐个处理 */

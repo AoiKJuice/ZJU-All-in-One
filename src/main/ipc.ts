@@ -46,6 +46,8 @@ import { fetchCalendar } from './services/calendar'
 import * as graduation from './services/graduation'
 import { resetXk } from './services/xkApi'
 import { xkChannels } from './xkIpc'
+import { resetLibrary } from './services/libraryApi'
+import { libraryChannels } from './libIpc'
 import * as pta from './services/pta'
 import { getSystemStats } from './stats'
 import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
@@ -68,6 +70,7 @@ function resetServices(): void {
   eta.reset()
   graduation.reset()
   resetXk()
+  resetLibrary()
 }
 
 // 课表以 ETA 为主（返回干净、少出错），ETA 失败或为空（选课排课期间）时退回教务
@@ -302,6 +305,8 @@ const handlers: Handlers = {
 
   // 选课与查老师（含演示模式的替换）见 xkIpc.ts
   ...xkChannels(process.env['ZJU_DEMO'] === '1'),
+  // 图书馆预约（含演示模式的替换）见 libIpc.ts
+  ...libraryChannels(process.env['ZJU_DEMO'] === '1'),
   ...formsHandlers
 }
 

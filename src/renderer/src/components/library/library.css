@@ -1,0 +1,573 @@
+/* 工具「图书馆预约」（components/library/）。只用主题变量，三种风格经 .panel 与变量自动适配 */
+/* 本文件随组件引入，注入顺序可能早于 styles.css：覆盖 .field 等通用类时选择器要多一级 */
+
+/* 主题色实底上的字色，与 .btn-solid 各风格一致 */
+.lib {
+  --lib-on-shu: #fff;
+  /* 余量条的剩余（绿）与已占（红） */
+  --lib-free: #3f9a68;
+  --lib-used: rgba(201, 84, 74, 0.55);
+}
+html[data-theme='dark'] .lib {
+  --lib-free: #5cb985;
+  --lib-used: rgba(222, 112, 104, 0.5);
+}
+html[data-style='material'][data-theme='dark'] .lib {
+  --lib-on-shu: color-mix(in srgb, var(--shu) 22%, #000);
+}
+html[data-style='glass'][data-theme='dark'] .lib {
+  --lib-on-shu: #0b0e15;
+}
+
+/* 一屏：找座与预约两栏各自滚动 */
+.tools-page:has(.lib) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 36rem;
+  padding-bottom: clamp(1rem, 3vh, 2rem);
+}
+.tools-page:has(.lib) > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lib {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+  margin-top: clamp(1rem, 3vh, 1.75rem);
+}
+.lib-find,
+.lib-mine {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.lib-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.375rem 0.375rem;
+}
+.lib-choices {
+  display: flex;
+  gap: 0.25rem;
+}
+.lib-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem 0.125rem 0.5rem;
+}
+.lib-tabs .choice {
+  white-space: nowrap;
+}
+.lib-tab-free {
+  margin-left: 0.45em;
+  font-size: 0.8em;
+  color: var(--ink-3);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lib-tabs .choice[data-active] .lib-tab-free {
+  color: inherit;
+  opacity: 0.7;
+}
+.lib-tabs-end {
+  margin-left: auto;
+}
+
+/* ---- 楼层与区域 ---- */
+.lib-floor + .lib-floor {
+  margin-top: 1rem;
+}
+.lib-floor-head {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 1.125rem 0.25rem 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.lib-floor-name {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0.375rem;
+}
+.lib-floor-head .lib-count {
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.lib-areas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lib-areas > li {
+  border-radius: var(--r-md);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-areas > li + li {
+  margin-top: 0.125rem;
+}
+.lib-areas > li[data-open] {
+  background: var(--surface-2);
+}
+.lib-area {
+  display: flex;
+  align-items: center;
+  padding-left: 0.375rem;
+  border-radius: var(--r-md);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-areas > li:not([data-open]) > .lib-area:hover {
+  background: var(--surface-2);
+}
+.lib-area-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.625rem 1.125rem 0.625rem 0.375rem;
+  text-align: left;
+}
+.lib-area-name {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.lib-area-main:hover .lib-area-name {
+  color: var(--shu);
+}
+.lib-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  text-align: right;
+}
+.lib-count {
+  font-size: 1.375rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lib-count small {
+  margin-left: 0.3em;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+.lib-count[data-full] {
+  color: var(--ink-3);
+}
+/* 余量条：左绿为剩余、右红为已占，约满时整条红 */
+.lib-gauge {
+  display: flex;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--lib-used);
+  overflow: hidden;
+}
+.lib-gauge > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lib-free);
+  transition: width calc(0.5s * var(--speed, 1)) var(--ease);
+}
+
+/* 行首勾选：勾上为主题色实心，被整层 / 整馆带上的为浅色 */
+.lib-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-check svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.lib-check-ring {
+  stroke: currentColor;
+  transition: fill calc(0.25s * var(--speed, 1)) var(--ease), stroke calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.lib-check-tick {
+  stroke: var(--lib-on-shu);
+  stroke-dasharray: 12;
+  stroke-dashoffset: 12;
+  transition: stroke-dashoffset calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-check:hover {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.lib-check[data-state] .lib-check-tick {
+  stroke-dashoffset: 0;
+}
+.lib-check[data-state='on'] {
+  color: var(--shu);
+}
+.lib-check[data-state='on'] .lib-check-ring {
+  fill: var(--shu);
+}
+.lib-check[data-state='implied'] {
+  color: rgba(var(--shu-rgb), 0.55);
+}
+.lib-check[data-state='implied'] .lib-check-ring {
+  fill: rgba(var(--shu-rgb), 0.45);
+}
+
+/* ---- 展开的区域：时段与空座 ---- */
+.lib-drawer {
+  overflow: hidden;
+}
+.lib-drawer-quiet {
+  padding: 0.25rem 0.875rem 0.875rem;
+}
+.lib-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.125rem 0.625rem 0.75rem;
+}
+.lib-segs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+}
+.lib-seats {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.25rem, 1fr));
+  gap: 0.375rem;
+  max-height: 12.5rem;
+  overflow-y: auto;
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.lib-seat {
+  width: 100%;
+  padding: 0.3rem 0;
+  border-radius: var(--r-sm, 0.5rem);
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-2);
+  /* 墨色薄底：各风格的 --surface-2 与座位区底色有的几乎一样 */
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  transition: color calc(0.25s * var(--speed, 1)) var(--ease), background-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.lib-seat:hover {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.lib-seat[data-on] {
+  color: var(--lib-on-shu);
+  background: var(--shu);
+}
+.lib-picker-acts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.875rem;
+}
+.lib-picker-acts .btn {
+  white-space: nowrap;
+}
+
+/* 并列信息：浅底小标签 */
+.lib-chips {
+  display: flex;
+  gap: 0.375rem;
+}
+.lib-chips .part {
+  padding: 0.1rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface);
+}
+.lib-tag {
+  flex: none;
+  padding: 0.08rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+.lib-tag[data-tone='soft'],
+.lib-tag[data-tone='hot'] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.lib-sub {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.875em;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+/* ---- 我的预约 / 订阅 ---- */
+.lib-side {
+  margin-top: 0.25rem;
+}
+.lib-bookings,
+.lib-watches,
+.lib-presets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lib-booking,
+.lib-watch,
+.lib-preset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--r-md);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-preset {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.lib-booking:hover,
+.lib-watch:hover,
+.lib-preset:hover {
+  background: var(--surface-2);
+}
+.lib-booking[data-done],
+.lib-watch[data-done] {
+  opacity: 0.5;
+}
+.lib-item-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 右栏分组：套餐、订阅 */
+.lib-group + .lib-group {
+  margin-top: 1rem;
+}
+.lib-group-head {
+  padding: 0.25rem 0.625rem 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+/* 订阅的余座：有空座时为绿 */
+.lib-free {
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-3);
+}
+.lib-free[data-on] {
+  color: var(--lib-free);
+}
+.lib-acts {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.lib-acts .act,
+.lib-booking .act {
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
+.lib-icon {
+  display: grid;
+  place-items: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-icon:hover {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.lib-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* 勾选后的操作条：左栏底部，已选范围、时段、存为套餐 / 订阅 / 自动预约 */
+.lib-bar-wrap {
+  flex: none;
+  overflow: hidden;
+}
+.lib-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 0.875rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.lib-scopes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  max-height: 4.5rem;
+  overflow-y: auto;
+}
+.lib-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.15rem 0.25rem 0.15rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.lib-scope button {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  transition: background-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.lib-scope button:hover {
+  background: rgba(var(--shu-rgb), 0.16);
+}
+.lib-scope svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.lib-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.lib-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-right: auto;
+}
+.lib-bar .lib-time.field,
+.lib-bar .lib-name-field.field {
+  min-height: 0;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  background: var(--surface);
+}
+.lib-bar .lib-time.field {
+  width: 6.5rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lib-dash {
+  color: var(--ink-3);
+}
+.lib-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.lib-bar .lib-name-field.field {
+  width: 11rem;
+}
+.lib-bar-row .btn,
+.lib-bar-row .act {
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  html:not([data-platform='android']) .tools-page:has(.lib) {
+    display: block;
+    height: auto;
+  }
+  html:not([data-platform='android']) .lib {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html:not([data-platform='android']) .lib-find {
+    height: 70vh;
+  }
+  html:not([data-platform='android']) .lib-side {
+    overflow: visible;
+    mask-image: none;
+  }
+}
+
+/* ---- 手机：顶部 找座 / 预约 切换，各占整页，整页滚动；没有订阅 ---- */
+.lib-switch {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+html[data-platform='android'] .tools-page:has(.lib) {
+  display: block;
+  height: auto;
+  min-height: 0;
+  padding-bottom: calc(var(--tab-h) + var(--sab) + 3.5rem);
+}
+html[data-platform='android'] .lib {
+  display: block;
+  margin-top: 0.75rem;
+}
+html[data-platform='android'] .lib[data-view='find'] .lib-mine,
+html[data-platform='android'] .lib[data-view='mine'] .lib-find {
+  display: none;
+}
+html[data-platform='android'] .lib :is(.lib-list, .lib-side) {
+  overflow: visible;
+  mask-image: none;
+}
+html[data-platform='android'] .lib-area {
+  padding-right: 0;
+}
+html[data-platform='android'] .lib-area-main {
+  grid-template-columns: minmax(0, 1fr) 6rem;
+  padding: 0.625rem 0.5rem;
+}
+html[data-platform='android'] .lib-seats {
+  grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+}
+html[data-platform='android'] .lib-seat {
+  padding: 0.45rem 0;
+}
