@@ -58,7 +58,7 @@ async function check(w: XkWatch): Promise<void> {
   const before = w.remaining ?? 0
   w.remaining = now?.remaining ?? null
   w.checkedAt = Date.now()
-  if (!now?.remaining) return
+  if (!now?.remaining || now.remaining <= 0) return
   if (!w.auto) {
     if (before === 0) notify('有余量', label(w))
     return

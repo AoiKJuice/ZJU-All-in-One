@@ -14,6 +14,8 @@ export interface XkContext {
 }
 
 export interface XkCategory {
+  /** 区分页签用：代码 + 名称（同一代码下可能有几个页签，如 xk_rdxkc 下的美育类、劳育类…），xk:courses 传它 */
+  key: string
   /** 页签代码 dl（如 xk_1） */
   id: string
   lx: string
@@ -58,8 +60,11 @@ export interface XkSection {
   exam: string
   /** 秋冬 / 秋 / 冬 / 春夏 / 春 / 夏 */
   semesterPart: string
+  /** 余量，最低为 0 */
   remaining: number | null
   capacity: number | null
+  /** 报满后超出容量的人数（教务的余量为负时） */
+  over?: number
   /** 待定（已填志愿、待筛选）人数 */
   pending: number | null
   /** 已在本人志愿中：selected 已选上 / pending 待筛选 */
@@ -120,8 +125,8 @@ export interface XkApi {
   /** 选课：当前学期、志愿数与学分、类别页签；选课未开放时报错 */
   'xk:context': () => Promise<XkContext>
   'xk:search': (keyword: string, onlyAvailable?: boolean) => Promise<XkCourse[]>
-  /** 某个类别页签下的全部课程 */
-  'xk:courses': (categoryId: string) => Promise<XkCourse[]>
+  /** 某个类别页签下的全部课程（传 XkCategory.key） */
+  'xk:courses': (categoryKey: string) => Promise<XkCourse[]>
   'xk:sections': (course: XkCourse) => Promise<XkSection[]>
   /** 本人已填的志愿（含已选上的） */
   'xk:selected': () => Promise<XkSection[]>

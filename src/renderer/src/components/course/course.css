@@ -63,8 +63,23 @@ html[data-style='glass'][data-theme='dark'] .xk {
   gap: 0.125rem;
   padding: 0.625rem 0.125rem 0.375rem;
 }
-.xk-tabs .choice {
+.xk-tabs .choice,
+.xk-subtabs .choice {
   white-space: nowrap;
+}
+/* 小类：比大类小一号、淡一些，放在浅底条里，与大类分开层次 */
+.xk-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  margin: 0 0.25rem 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.xk-subtabs .choice.small {
+  padding: 0.15rem 0.625rem;
+  font-size: 0.875rem;
 }
 .xk-list {
   margin-top: 0.25rem;

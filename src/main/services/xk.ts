@@ -72,7 +72,7 @@ function parseCategories(html: string): XkCategory[] {
     const parent = stack.at(-1) ?? {}
     const name = parent['kclbmc'] || parent['title'] || tag.replace(/<[^>]+>/g, '').trim()
     if (!categories.some((c) => c.id === call[1] && c.name === name)) {
-      categories.push({ id: call[1], lx: call[2], name, kcbs: parent['kcbs'] ?? '' })
+      categories.push({ key: `${call[1]}|${name}`, id: call[1], lx: call[2], name, kcbs: parent['kcbs'] ?? '' })
     }
   }
   return categories
@@ -109,9 +109,18 @@ const searchForm = (c: Context, keyword: string, onlyAvailable: boolean): Record
   'cxtjList[0].cxnr': keyword
 })
 
-const capacity = (v: unknown): { remaining: number | null; capacity: number | null } => {
-  const m = /^\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(text(v))
-  return m ? { remaining: Number(m[1]), capacity: Number(m[2]) } : { remaining: null, capacity: null }
+// rs 为"余量/容量"；报满后余量是负数（实测 "-22/216" 即已超出 22 人），余量记 0、超出的记到 over
+const capacity = (v: unknown): { remaining: number | null; capacity: number | null; over?: number } => {
+  const m = /^\s*(-?\d+)\s*\/\s*(\d+)\s*$/.exec(text(v))
+  if (!m) return { remaining: null, capacity: null }
+  const left = Number(m[1])
+  return { remaining: Math.max(0, left), capacity: Number(m[2]), ...(left < 0 ? { over: -left } : {}) }
+}
+
+// yxrs 为待定人数，实测写作 "0~0"（推测为第一志愿~全部志愿的待定人数），取较大的一段
+const pendingOf = (v: unknown): number | null => {
+  const nums = text(v).match(/\d+/g)
+  return nums ? Math.max(...nums.map(Number)) : null
 }
 
 const WEEKDAY: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 7, 天: 7 }
@@ -140,7 +149,6 @@ export function parseSlots(times: string[]): XkSlot[] {
 }
 
 function toSection(row: Row, course: { code: string; name: string }): XkSection {
-  const pending = Number(row['yxrs'])
   const times = lines(row['sksj'])
   const code = text(row['kcdm']) || course.code
   return {
@@ -149,11 +157,12 @@ function toSection(row: Row, course: { code: string; name: string }): XkSection 
     courseName: text(row['kcmc']) || course.name,
     teachers: lines(row['jsxm']),
     times,
-    places: lines(row['skdd']),
+    // skdd 每段上课时间一行，同一教室会重复
+    places: [...new Set(lines(row['skdd']))],
     exam: lines(row['kssj']).join(' '),
     semesterPart: text(row['xxq']),
     ...capacity(row['rs']),
-    pending: Number.isFinite(pending) && text(row['yxrs']) !== '' ? pending : null,
+    pending: pendingOf(row['yxrs']),
     table: text(row['tabname']),
     slots: parseSlots(times),
     ...(row['sxbj'] !== undefined && row['sxbj'] !== null
@@ -193,9 +202,10 @@ export async function getContext(): Promise<XkContext> {
   }
 }
 
-export async function listCourses(categoryId: string): Promise<XkCourse[]> {
+export async function listCourses(categoryKey: string): Promise<XkCourse[]> {
   const c = await loadContext()
-  const cat = c.categories.find((x) => x.id === categoryId)
+  // 同一代码下可能有几个页签（实测 xk_rdxkc 下有美育类、劳育类等），按 key 认；只给代码时取第一个
+  const cat = c.categories.find((x) => x.key === categoryKey) ?? c.categories.find((x) => x.id === categoryKey)
   if (!cat) throw new Error('没有这个类别')
   const rows = await post<Row[]>(await url('cxZzxkGhbKcList'), {
     dl: cat.id,

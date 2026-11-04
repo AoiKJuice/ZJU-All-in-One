@@ -5,11 +5,11 @@ import { parseSlots } from './xk'
 // 志愿规则照教务：普通课同一门课的几个教学班按 1/2/3 志愿排；通识按上课时间分组，同一时间可填不同课程
 
 const CATEGORIES: XkCategory[] = [
-  { id: 'xk_1', lx: 'bl', name: '本专业课程', kcbs: '' },
-  { id: 'xk_2', lx: 'zl', name: '通识选修课程', kcbs: '' },
-  { id: 'xk_4', lx: 'ty', name: '体育课程', kcbs: '' },
-  { id: 'xk_5', lx: 'wy', name: '外语与思政课程', kcbs: '' },
-  { id: 'xk_b', lx: 'qb', name: '全部课程', kcbs: '' }
+  { key: 'xk_1|本专业课程', id: 'xk_1', lx: 'bl', name: '本专业课程', kcbs: '' },
+  { key: 'xk_2|通识选修课程', id: 'xk_2', lx: 'zl', name: '通识选修课程', kcbs: '' },
+  { key: 'xk_4|体育课程', id: 'xk_4', lx: 'ty', name: '体育课程', kcbs: '' },
+  { key: 'xk_5|外语与思政课程', id: 'xk_5', lx: 'wy', name: '外语与思政课程', kcbs: '' },
+  { key: 'xk_b|全部课程', id: 'xk_b', lx: 'qb', name: '全部课程', kcbs: '' }
 ]
 
 type RawSection = [string[], string[], string[], string, number, number, number, string]
@@ -352,7 +352,10 @@ export const demoXk: Omit<XkHandlers, 'xk:watches' | 'xk:watch' | 'xk:unwatch'> 
     const total = [...new Set(chosen.map((s) => s.courseCode))].reduce((n, code) => n + credit(code), 9)
     return { xn: '2026-2027', xq: '1', maxChoices: MAX, credits: { total, regular: total, short: 0 }, categories: CATEGORIES }
   },
-  'xk:courses': async (categoryId) => (categoryId === 'xk_b' ? courses : courses.filter((c) => c.tab === categoryId)),
+  'xk:courses': async (key) => {
+    const id = key.split('|')[0]
+    return id === 'xk_b' ? courses : courses.filter((c) => c.tab === id)
+  },
   'xk:search': async (keyword, onlyAvailable) =>
     courses
       .filter((c) => c.name.includes(keyword) && (!onlyAvailable || sections.get(c.code)!.some((s) => s.remaining)))

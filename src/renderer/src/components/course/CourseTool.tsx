@@ -8,7 +8,7 @@ import { MOBILE } from '@renderer/lib/platform'
 import { dur } from '@renderer/lib/motion'
 import { TeacherSheet, errorText, useTeacher } from './TeacherSheet'
 import { XkTimetable } from './XkTimetable'
-import { clashesOf, groupChosen, groupFor, groupTitle, halfOf, isLead, parityLabel, slotLabel, type Clash, type PrefGroup } from './xkLogic'
+import { clashesOf, groupCategories, groupChosen, groupFor, groupTitle, halfOf, isLead, parityLabel, slotLabel, type Clash, type PrefGroup } from './xkLogic'
 import './course.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -71,6 +71,8 @@ export function CourseTool() {
   const context = ctx && 'data' in ctx ? ctx.data : null
   const max = context?.maxChoices ?? 3
   const groups = useMemo(() => groupChosen(mine), [mine])
+  const catGroups = useMemo(() => groupCategories(context?.categories ?? []), [context])
+  const activeGroup = catGroups.find((g) => g.items.some((x) => x.category.key === tab))
 
   const refreshChosen = useCallback(
     () =>
@@ -127,9 +129,10 @@ export function CourseTool() {
     setLists({})
     setSections({})
     void refreshContext().then((c) => {
-      if (c?.categories[0]) {
-        setTab(c.categories[0].id)
-        loadList(c.categories[0].id, () => window.zju['xk:courses'](c.categories[0].id))
+      const first = c && groupCategories(c.categories)[0]?.items[0]?.category
+      if (first) {
+        setTab(first.key)
+        loadList(first.key, () => window.zju['xk:courses'](first.key))
       }
     })
     void refreshChosen()
@@ -175,7 +178,8 @@ export function CourseTool() {
     // toggleCourse 只依赖当时的状态，这里只在搜索结果到达时跑一次
   }, [searchList])
 
-  const isGeneral = (c: XkCourse): boolean => /通识/.test(c.category) || !!context?.categories.find((x) => x.id === c.tab)?.name.includes('通识')
+  const isGeneral = (c: XkCourse): boolean =>
+    /通识/.test(c.category) || catGroups.some((g) => g.id === 'general' && g.items.some((x) => x.category.id === c.tab))
 
   // ---- 写操作：加入 / 移出 / 调整顺序 ----
   const add = async (s: XkSection, quiet = false): Promise<void> => {
@@ -238,10 +242,10 @@ export function CourseTool() {
   // 志愿里点一门课：找课那边搜出这门课并展开；通识的空位跳到通识类别
   const reveal = (s: XkSection): void => search(s.courseName, s.courseName)
   const revealGroup = (g: PrefGroup): void => {
-    const general = context?.categories.find((c) => c.name.includes('通识'))
+    const general = catGroups.find((x) => x.id === 'general')?.items[0]?.category
     if (g.byTime && general) {
       setView('find')
-      openTab(general.id)
+      openTab(general.key)
     } else reveal(g.items[0])
   }
 
@@ -274,10 +278,11 @@ export function CourseTool() {
             有余量
           </button>
         </form>
+        {/* 大类一行；选中的大类有几个小类时，小类在下一行 */}
         <div className="xk-tabs">
-          {context?.categories.map((c) => (
-            <Choice key={c.id} group="xk-tab" className="small" active={tab === c.id} onClick={() => openTab(c.id)}>
-              {c.name.replace(/课程$/, '')}
+          {catGroups.map((g) => (
+            <Choice key={g.id} group="xk-tab" className="small" active={activeGroup?.id === g.id} onClick={() => openTab(g.items[0].category.key)}>
+              {g.title}
             </Choice>
           ))}
           {context && (
@@ -291,6 +296,15 @@ export function CourseTool() {
             </Choice>
           )}
         </div>
+        {activeGroup && activeGroup.items.length > 1 && (
+          <div className="xk-subtabs">
+            {activeGroup.items.map((x) => (
+              <Choice key={x.category.key} group="xk-subtab" className="small" active={tab === x.category.key} onClick={() => openTab(x.category.key)}>
+                {x.label}
+              </Choice>
+            ))}
+          </div>
+        )}
         <div className="pane-scroll xk-list">
           {!ctx ? (
             <Quiet loading error={null} empty="无" />
@@ -589,7 +603,11 @@ function SectionCard(props: {
             <span style={{ width: `${used * 100}%` }} />
           </span>
         )}
-        {s.pending !== null && <span className="xk-cap-pending" data-hot={hot || undefined}>待定 {s.pending}</span>}
+        {s.over ? (
+          <span className="xk-cap-pending" data-hot>超出 {s.over}</span>
+        ) : (
+          !!s.pending && <span className="xk-cap-pending" data-hot={hot || undefined}>待定 {s.pending}</span>
+        )}
       </div>
       <div className="xk-sec-acts">
         {mine ? (
@@ -672,7 +690,7 @@ function PrefBlock(props: {
                       s.slots.map((t) => `${slotLabel(t)}${parityLabel(t) ? ` ${parityLabel(t)}` : ''}`).join('  '),
                       halfOf(s.semesterPart),
                       s.state !== 'selected' && s.remaining !== null && `余 ${s.remaining}`,
-                      s.state !== 'selected' && s.pending !== null && `待定 ${s.pending}`
+                      s.state !== 'selected' && !!s.pending && `待定 ${s.pending}`
                     ]}
                   />
                 </span>
