@@ -66,10 +66,10 @@ export function registerXkTools(
     }, async ({ keyword, only_available }) => json(await call('xk:search', keyword, only_available)))
 
     mcp.registerTool('list_category_courses', {
-      description: '选课：某个类别页签（get_course_selection_context 的 categories[].id，如本专业课程、通识选修、体育）下的全部课程',
-      inputSchema: { category_id: z.string() },
+      description: '选课：某个类别页签（get_course_selection_context 的 categories[].key，如本类（专业）选课、中华传统、体育课程）下的全部课程',
+      inputSchema: { category_key: z.string().describe('categories[].key') },
       annotations: read
-    }, async ({ category_id }) => json(await call('xk:courses', category_id)))
+    }, async ({ category_key }) => json(await call('xk:courses', category_key)))
 
     mcp.registerTool('get_course_sections', {
       description:
@@ -89,6 +89,12 @@ export function registerXkTools(
       inputSchema: { name: z.string().describe('教师姓名'), college: z.string().optional().describe('学院，同名时用来区分') },
       annotations: read
     }, async ({ name, college }) => json(await call('cls:teacher', name, college)))
+
+    mcp.registerTool('get_teacher_ratings', {
+      description: '查老师：一批教师的评分（只查本地缓存的索引，很快，适合给一门课的所有教学班排序）；键为 姓名|学院，查不到为 null',
+      inputSchema: { teachers: z.array(z.object({ name: z.string(), college: z.string().optional() })).min(1) },
+      annotations: read
+    }, async ({ teachers }) => json(await call('cls:ratings', teachers)))
 
     mcp.registerTool('get_teacher_comments', {
       description: '查老师上某位教师的学生评论（get_teacher_rating 返回的 id）',

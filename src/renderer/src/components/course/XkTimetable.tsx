@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { XkSection, XkSlot } from '@shared/xk'
 import { COURSE_COLORS, colorVar } from '@renderer/lib/courseColor'
 import { halfOf, halvesOverlap, isLead, sectionsOverlap, slotsOverlap } from './xkLogic'
+import { DAY_PART_NAMES } from './xkFilter'
 
 const DAYS = ['一', '二', '三', '四', '五', '六', '日']
 const BLOCKS: [number, number][] = [
@@ -31,21 +32,27 @@ interface Block {
 /**
  * 志愿课表：每组领头的志愿（已选上或第一志愿）为课名配色的实底块，其后志愿为同色虚线框；
  * 只上半学期的课占半格（秋 / 春在左，冬 / 夏在右）。悬停教学班时以主题色虚框预览，撞上别组领头志愿的那几格为斜纹；
- * 悬停某个志愿组时其余淡下去
+ * 悬停或点选某个志愿组时其余淡下去。点课程块选中这门课（下方列表只留它），点空白处按那天的上午 / 下午 / 晚上筛选找课
  */
 export function XkTimetable({
   chosen,
   preview,
   previewGroup,
   focus,
-  onPick
+  when,
+  onPick,
+  onCell
 }: {
   chosen: XkSection[]
   preview: XkSection | null
   /** 预览的教学班加入后所在的志愿组（同组互为备选，不算冲突） */
   previewGroup: string | null
+  /** 突出的志愿组（悬停或点选），其余淡下去 */
   focus: string | null
+  /** 找课的时间段条件，对应的那块底色高亮 */
+  when: { weekday: number; part: number } | null
   onPick: (s: XkSection) => void
+  onCell: (weekday: number, part: number) => void
 }) {
   const colors = xkColors(chosen)
   const leads = chosen.filter(isLead)
@@ -67,7 +74,7 @@ export function XkTimetable({
     )
   }
 
-  const weekend = blocks.some((b) => b.slot.weekday >= 6)
+  const weekend = blocks.some((b) => b.slot.weekday >= 6) || (when?.weekday ?? 0) >= 6
   const days = weekend ? 7 : 5
 
   const place = (slot: XkSlot, part: string): CSSProperties => {
@@ -89,8 +96,16 @@ export function XkTimetable({
         </span>
       ))}
       {DAYS.slice(0, days).flatMap((d, i) =>
-        BLOCKS.map(([a, b]) => (
-          <span key={`${d}${a}`} className="xk-tt-bg" style={{ gridRow: `${row(a)} / ${row(b) + 1}`, gridColumn: `${2 + i * 2} / span 2` }} />
+        BLOCKS.map(([a, b], part) => (
+          <button
+            key={`${d}${a}`}
+            className="xk-tt-bg"
+            data-on={(when?.weekday === i + 1 && when.part === part) || undefined}
+            style={{ gridRow: `${row(a)} / ${row(b) + 1}`, gridColumn: `${2 + i * 2} / span 2` }}
+            aria-label={`周${d}${DAY_PART_NAMES[part]}`}
+            tabIndex={-1}
+            onClick={() => onCell(i + 1, part)}
+          />
         ))
       )}
       {blocks
@@ -107,6 +122,7 @@ export function XkTimetable({
               style={{ ...place(b.slot, b.section.semesterPart), ['--cc' as string]: colorVar(colors.get(b.section.courseName)) }}
               title={[b.section.courseName, b.section.teachers.join(' '), b.section.places.join(' ')].filter(Boolean).join('\n')}
               tabIndex={-1}
+              data-focus={(focus !== null && b.kind !== 'preview' && (b.section.group ?? b.section.courseCode) === focus) || undefined}
               onClick={() => onPick(b.section)}
             >
               {b.kind === 'lead' && tall && <span>{b.section.courseName}</span>}

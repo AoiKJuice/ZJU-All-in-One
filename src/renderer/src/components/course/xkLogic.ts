@@ -1,4 +1,4 @@
-import type { XkSection, XkSlot } from '@shared/xk'
+import type { XkCategory, XkSection, XkSlot } from '@shared/xk'
 
 // 选课的志愿结构与冲突判断。
 // 志愿组：普通课同一门课的几个教学班为一组（1/2/3 志愿，最终最多选上一个）；通识按上课时间分组，同一时间的不同课程互为备选。
@@ -100,4 +100,44 @@ export const halfOf = (part: string): string | null => {
 export const groupTitle = (g: PrefGroup): string => {
   const slot = g.items[0]?.slots[0]
   return slot ? `通识 ${slotLabel(slot)} 节` : g.key
+}
+
+// 教务给的类别页签很多（实测 28 个，有重名、有原样的代码名 qbkc），按名称归成几个大类，界面先选大类再选小类
+const CATEGORY_GROUPS: { id: string; title: string; test: (c: XkCategory) => boolean }[] = [
+  { id: 'credential', title: '认定', test: (c) => c.id === 'xk_rdxkc' || /美育|劳育|创新创业|心理/.test(c.name) },
+  { id: 'major', title: '专业', test: (c) => /专业|本类/.test(c.name) },
+  { id: 'general', title: '通识', test: (c) => /通识|中华传统|世界文明|当代社会|科技创新|文艺审美|生命探索|博雅技艺/.test(c.name) },
+  { id: 'public', title: '公共', test: (c) => /思政|军体|外语|计算机|体育/.test(c.name) },
+  { id: 'all', title: '全部', test: (c) => /^全部/.test(c.name) }
+]
+// 判断按上面的先后（认定类的名字最具体），显示按这个顺序
+const GROUP_ORDER = ['major', 'general', 'public', 'credential', 'other', 'all']
+
+export interface CategoryGroup {
+  id: string
+  title: string
+  items: { category: XkCategory; label: string }[]
+}
+
+/** 小类的显示名：去掉「课程」「（专业）」这类与大类重复的字，代码名 qbkc 写作全部，重名的加序号 */
+const shortName = (name: string): string =>
+  name
+    .replace(/\\/g, ' / ')
+    .replace(/[（(]专业[）)]/g, '')
+    .replace(/课程$/, '')
+    .replace(/^qbkc$/i, '全部')
+    .trim() || name
+
+export function groupCategories(categories: XkCategory[]): CategoryGroup[] {
+  const groups = new Map<string, CategoryGroup>()
+  for (const category of categories) {
+    const g = CATEGORY_GROUPS.find((x) => x.test(category))
+    const id = g?.id ?? 'other'
+    if (!groups.has(id)) groups.set(id, { id, title: g?.title ?? '其他', items: [] })
+    const group = groups.get(id)!
+    const base = shortName(category.name)
+    const same = group.items.filter((x) => x.label === base || x.label.startsWith(`${base} `)).length
+    group.items.push({ category, label: same ? `${base} ${same + 1}` : base })
+  }
+  return GROUP_ORDER.flatMap((id) => (groups.has(id) ? [groups.get(id)!] : []))
 }

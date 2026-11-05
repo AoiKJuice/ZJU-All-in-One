@@ -14,6 +14,8 @@ export interface XkContext {
 }
 
 export interface XkCategory {
+  /** 区分页签用：代码 + 名称（同一代码下可能有几个页签，如 xk_rdxkc 下的美育类、劳育类…），xk:courses 传它 */
+  key: string
   /** 页签代码 dl（如 xk_1） */
   id: string
   lx: string
@@ -38,6 +40,11 @@ export interface XkCourse {
   credit: number | null
   category: string
   college: string
+  /** 选课页显示的课程代码（如 CS1030M）；code 是教务内部代码 */
+  displayCode?: string
+  /** 课程性质（必修 / 选修…） */
+  nature?: string
+  semesterPart?: string
   /** 课程池号，展开教学班时回传 */
   pool: string
   /** 所属页签 dl；xk_9 为搜索结果 */
@@ -58,8 +65,16 @@ export interface XkSection {
   exam: string
   /** 秋冬 / 秋 / 冬 / 春夏 / 春 / 夏 */
   semesterPart: string
+  /** 余量，最低为 0 */
   remaining: number | null
   capacity: number | null
+  /** 报满后超出容量的人数（教务的余量为负时） */
+  over?: number
+  /** 教学方式、周学时、面向对象、教材（教学班接口原样给的，可能为空） */
+  mode?: string
+  weeklyHours?: string
+  audience?: string
+  textbook?: string
   /** 待定（已填志愿、待筛选）人数 */
   pending: number | null
   /** 已在本人志愿中：selected 已选上 / pending 待筛选 */
@@ -120,8 +135,8 @@ export interface XkApi {
   /** 选课：当前学期、志愿数与学分、类别页签；选课未开放时报错 */
   'xk:context': () => Promise<XkContext>
   'xk:search': (keyword: string, onlyAvailable?: boolean) => Promise<XkCourse[]>
-  /** 某个类别页签下的全部课程 */
-  'xk:courses': (categoryId: string) => Promise<XkCourse[]>
+  /** 某个类别页签下的全部课程（传 XkCategory.key） */
+  'xk:courses': (categoryKey: string) => Promise<XkCourse[]>
   'xk:sections': (course: XkCourse) => Promise<XkSection[]>
   /** 本人已填的志愿（含已选上的） */
   'xk:selected': () => Promise<XkSection[]>
@@ -137,6 +152,8 @@ export interface XkApi {
   /** 查老师：按姓名（可带学院）找教师评分；评论 */
   'cls:teacher': (name: string, college?: string) => Promise<ClsTeacher | null>
   'cls:comments': (id: number, sort: 'rate' | 'time') => Promise<ClsComment[]>
+  /** 一批教师的评分（只查本地缓存的索引，不取详情页），键为 姓名|学院；查不到为 null */
+  'cls:ratings': (teachers: { name: string; college?: string }[]) => Promise<Record<string, number | null>>
 }
 
 export type XkChannel = keyof XkApi
@@ -154,7 +171,8 @@ export const XK_CHANNELS = [
   'xk:watch',
   'xk:unwatch',
   'cls:teacher',
-  'cls:comments'
+  'cls:comments',
+  'cls:ratings'
 ] as const satisfies readonly XkChannel[]
 
 /** 去掉主进程 handler 的 win 参数后的通道实现，桌面端与安卓端共用 */

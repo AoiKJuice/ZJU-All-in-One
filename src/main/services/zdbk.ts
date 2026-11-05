@@ -1,5 +1,6 @@
 import type { CourseSession, DataResult, Exam, UserProfile } from '@shared/types'
 import { ensureCas, zjuFetch, type ZjuResponse } from '../http'
+import { loadCredentials } from '../auth/password'
 
 const BASE = 'https://zdbk.zju.edu.cn/jwglxt'
 // 推测：所给参考摘录未覆盖 SSO 地址。
@@ -139,10 +140,21 @@ export async function page(path: string): Promise<string> {
 
 let xh: string | undefined
 
-/** 功能模块 URL 要带 su=<学号>：从课表接口的个人信息取一次 */
+/**
+ * 功能模块 URL 要带 su=<学号>，取一次即可。先看课表接口的个人信息；选课排课期间课表返回里没有 xsxx（实测），
+ * 再用保存的统一身份认证账号（学生即学号，auth:state 的 account 同样以它兜底），最后试教务首页的隐藏域 sessionUserKey（推测）
+ */
 export async function studentId(): Promise<string> {
-  xh ??= (await loadSchedule())?.xsxx.XH
-  if (!xh) throw new Error('教务个人信息为空')
+  xh ??= (await loadSchedule().catch(() => null))?.xsxx?.XH
+  if (!xh) {
+    const account = (await loadCredentials())?.username
+    if (account && /^\w+$/.test(account)) xh = account
+  }
+  if (!xh) {
+    const input = /<input[^>]*sessionUserKey[^>]*>/i.exec(await page('/xtgl/index_initMenu.html'))?.[0] ?? ''
+    xh = /value=["']([^"']+)["']/.exec(input)?.[1]
+  }
+  if (!xh) throw new Error('取不到学号')
   return xh
 }
 

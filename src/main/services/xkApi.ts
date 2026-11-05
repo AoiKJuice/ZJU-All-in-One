@@ -1,6 +1,6 @@
 import type { XkHandlers } from '@shared/xk'
 import * as xk from './xk'
-import { findTeacher, getComments } from './chalaoshi'
+import { findTeacher, getComments, ratingsOf } from './chalaoshi'
 
 // 选课与查老师的通道实现（不含订阅：订阅只在桌面端，见 main/xkwatch.ts）。桌面 ipc.ts 与安卓 bridge.ts 共用
 
@@ -16,7 +16,8 @@ export const xkHandlers: XkCoreHandlers = {
   'xk:drop': (sectionId) => xk.dropSection(sectionId),
   'xk:reorder': (sectionIds) => xk.reorderSections(sectionIds),
   'cls:teacher': (name, college) => findTeacher(name, college),
-  'cls:comments': (id, sort) => getComments(id, sort)
+  'cls:comments': (id, sort) => getComments(id, sort),
+  'cls:ratings': (list) => ratingsOf(list)
 }
 
 export const resetXk = (): void => xk.reset()
