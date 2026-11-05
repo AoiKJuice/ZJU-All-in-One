@@ -48,6 +48,11 @@ export async function ensureCas(): Promise<void> {
   throw new Error('未登录')
 }
 
+/** cookie 还在、服务器端却已失效时（如问卷窗口被弹回登录页）强制用保存的账号重登 */
+export async function refreshCas(): Promise<boolean> {
+  return !!onExpired && (await onExpired())
+}
+
 function send(
   url: string,
   init: ZjuFetchInit

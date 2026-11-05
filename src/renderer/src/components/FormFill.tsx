@@ -1,25 +1,22 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { FormField, FormProfile, FormSession, FormStatus } from '@shared/forms'
 import { useApp } from '@renderer/store'
-import { AutoHeight, Choice, Joined, Reveal, SectionHead } from '@renderer/components/Type'
+import { Choice, Reveal, SectionHead } from '@renderer/components/Type'
+import { useForms } from './formsStore'
 import './forms.css'
 
-const LABEL: Record<FormField, string> = {
+const LABEL: Partial<Record<FormField, string>> = {
   studentId: '学号',
   name: '姓名',
-  gender: '性别',
-  className: '班级',
-  major: '专业',
   college: '学院',
+  major: '专业',
+  className: '班级',
   grade: '年级',
-  campus: '校区',
   phone: '手机',
   email: '邮箱',
   qq: 'QQ',
   wechat: '微信',
-  dorm: '宿舍',
-  majorClass: '专业班级',
-  collegeMajor: '学院专业'
+  dorm: '宿舍'
 }
 
 // 文本项按两列排；性别、校区是选项，各占一整行
@@ -42,8 +39,8 @@ const CAMPUSES = ['紫金港', '玉泉', '西溪', '华家池', '之江', '海�
 const STATUS: Record<FormStatus, string> = {
   waiting: '等待开放',
   filling: '填写中',
-  filled: '已填好',
-  attention: '待补填',
+  asking: '待填写',
+  submitting: '提交中',
   verify: '需验证',
   login: '需登录',
   submitted: '已提交',
@@ -62,9 +59,10 @@ function countdown(ms: number): string {
   return days > 0 ? `${days} 天 ${clock}` : clock
 }
 
-const clock = (iso: string): string => {
+/** 今天的写时刻，别的日子写月日 */
+const when = (iso: string): string => {
   const d = new Date(iso)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return d.toDateString() === new Date().toDateString() ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getMonth() + 1}-${d.getDate()}`
 }
 
 /** datetime-local 的值（本地时刻）；默认给下一个整点 */
@@ -73,36 +71,29 @@ function nextHour(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00:00`
 }
 
-/** 工具「问卷填写」：左边打开问卷与本次的记录（状态、倒计时、填了哪些、哪些没认出），右边是填写用的个人信息 */
+/** 工具「问卷填写」：左边订阅问卷与订阅列表（开放倒计时、状态），右边是填写用的个人信息。开放后的补填、确认与答卷备份在全局弹窗 FormPrompt 里 */
 export function FormFill() {
   const notify = useApp((s) => s.notify)
+  const sessions = useForms((s) => s.sessions)
+  const setSessions = useForms((s) => s.setSessions)
+  const show = useForms((s) => s.show)
   const [profile, setProfile] = useState<FormProfile | null>(null)
   const [dirty, setDirty] = useState(false)
   const [url, setUrl] = useState('')
   const [timed, setTimed] = useState(false)
   const [at, setAt] = useState(nextHour)
-  const [autoSubmit, setAutoSubmit] = useState(false)
-  const [sessions, setSessions] = useState<FormSession[]>([])
-  const [open, setOpen] = useState<string | null>(null)
+  const [autoSubmit, setAutoSubmit] = useState(true)
+  const [optional, setOptional] = useState(true)
   const [now, setNow] = useState(Date.now)
 
   useEffect(() => {
     void window.zju['forms:profile']().then(setProfile, (e) => notify(errorText(e)))
   }, [notify])
 
-  // 窗口里的填写进度在主进程，开着工具页时每秒取一次；倒计时按秒走
+  // 倒计时按秒走（记录本身由 FormPrompt 每秒取）
   useEffect(() => {
-    let alive = true
-    const tick = (): void => {
-      setNow(Date.now())
-      void window.zju['forms:sessions']().then((list) => alive && setSessions(list), () => {})
-    }
-    tick()
-    const timer = setInterval(tick, 1000)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
   }, [])
 
   const set = (key: keyof FormProfile, value: string): void => {
@@ -116,30 +107,38 @@ export function FormFill() {
     setDirty(false)
   }
 
-  // 打开前先存一遍资料（首次预填的还没落盘），保证窗口里按眼前这份填
-  const submit = (): void => {
+  const refresh = (): Promise<void> => window.zju['forms:sessions']().then(setSessions)
+
+  // 订阅前先存一遍资料（首次预填的还没落盘），保证按眼前这份填
+  const subscribe = (): void => {
     if (!url.trim() || !profile) return
+    if (!Object.values(profile).some(Boolean)) return notify('先填个人信息')
     save()
-      .then(() => window.zju['forms:open'](url.trim(), { autoSubmit, ...(timed ? { at: new Date(at).toISOString() } : {}) }))
-      .then((session) => {
-        setSessions((list) => [session, ...list.filter((s) => s.id !== session.id)])
-        setOpen(session.id)
+      .then(() => window.zju['forms:open'](url.trim(), { autoSubmit, optional, ...(timed ? { at: new Date(at).toISOString() } : {}) }))
+      .then(() => {
         setUrl('')
+        return refresh()
       })
       .catch((err) => notify(errorText(err)))
   }
 
   const act = (run: () => Promise<unknown>): void => {
     run()
-      .then(() => window.zju['forms:sessions']().then(setSessions))
+      .then(refresh)
       .catch((err) => notify(errorText(err)))
+  }
+
+  // 点一条：待填写的弹出填写，已提交的看答卷备份，需验证 / 需登录的显示问卷窗口
+  const open = (s: FormSession): void => {
+    if (s.status === 'asking' || s.status === 'submitted') show(s.id)
+    else if (s.status === 'verify' || s.status === 'login') act(() => window.zju['forms:focus'](s.id))
   }
 
   return (
     <div className="forms-grid">
       <div className="forms-col">
         <Reveal i={1} flat className="panel forms-open">
-          <SectionHead title="打开问卷" />
+          <SectionHead title="订阅问卷" />
           <div>
             <input
               className="field forms-input forms-url"
@@ -147,7 +146,7 @@ export function FormFill() {
               value={url}
               spellCheck={false}
               onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submit()}
+              onKeyDown={(e) => e.key === 'Enter' && subscribe()}
             />
             <ul className="rows">
               <OptionRow label="开放">
@@ -160,39 +159,38 @@ export function FormFill() {
                 {timed && <input className="field forms-input forms-at" type="datetime-local" step={1} value={at} onChange={(e) => setAt(e.target.value)} />}
               </OptionRow>
               <OptionRow label="提交">
-                <Choice group="forms-submit" className="opt" active={!autoSubmit} onClick={() => setAutoSubmit(false)}>
-                  我来提交
-                </Choice>
                 <Choice group="forms-submit" className="opt" active={autoSubmit} onClick={() => setAutoSubmit(true)}>
                   自动提交
+                </Choice>
+                <Choice group="forms-submit" className="opt" active={!autoSubmit} onClick={() => setAutoSubmit(false)}>
+                  检查后提交
+                </Choice>
+              </OptionRow>
+              <OptionRow label="选填题">
+                <Choice group="forms-optional" className="opt" active={optional} onClick={() => setOptional(true)}>
+                  展示
+                </Choice>
+                <Choice group="forms-optional" className="opt" active={!optional} onClick={() => setOptional(false)}>
+                  不展示
                 </Choice>
               </OptionRow>
             </ul>
             <div className="forms-go">
-              <button className="btn btn-solid" disabled={!url.trim() || !profile} onClick={submit}>
-                打开
+              <button className="btn btn-solid" disabled={!url.trim() || !profile} onClick={subscribe}>
+                订阅
               </button>
             </div>
           </div>
         </Reveal>
 
         <Reveal i={2} flat className="panel forms-records">
-          <SectionHead title="记录" />
+          <SectionHead title="订阅" />
           {sessions.length === 0 ? (
             <p className="quiet forms-quiet">无</p>
           ) : (
             <ul className="rows">
               {sessions.map((s) => (
-                <Record
-                  key={s.id}
-                  s={s}
-                  now={now}
-                  open={open === s.id}
-                  onToggle={() => setOpen(open === s.id ? null : s.id)}
-                  onFocus={() => act(() => window.zju['forms:focus'](s.id))}
-                  onRefill={() => act(() => save().then(() => window.zju['forms:refill'](s.id)))}
-                  onClose={() => act(() => window.zju['forms:close'](s.id))}
-                />
+                <Record key={s.id} s={s} now={now} onOpen={() => open(s)} onRemove={() => act(() => window.zju['forms:close'](s.id))} />
               ))}
             </ul>
           )}
@@ -252,89 +250,41 @@ function OptionRow({ label, children }: { label: string; children: ReactNode }) 
   )
 }
 
-/** 一条记录：时刻（定时的为倒计时）、问卷标题、状态；点开看填了哪些、哪些没认出，以及窗口操作 */
-function Record({
-  s,
-  now,
-  open,
-  onToggle,
-  onFocus,
-  onRefill,
-  onClose
-}: {
-  s: FormSession
-  now: number
-  open: boolean
-  onToggle: () => void
-  onFocus: () => void
-  onRefill: () => void
-  onClose: () => void
-}) {
+/** 一条订阅：开放剩余时间（开放后为时刻）、问卷标题、状态；右侧取消订阅 / 删除备份 */
+function Record({ s, now, onOpen, onRemove }: { s: FormSession; now: number; onOpen: () => void; onRemove: () => void }) {
   const left = s.at ? Date.parse(s.at) - (now + s.offset) : 0
   const counting = s.status === 'waiting' && left > 0
-  const alive = s.status !== 'closed'
-  const fields = [...new Set(s.filled.map((f) => f.field))]
+  const clickable = s.status === 'asking' || s.status === 'submitted' || s.status === 'verify' || s.status === 'login'
+  const hot = s.status === 'asking' || s.status === 'verify' || s.status === 'login' || s.status === 'error'
+  const key = (e: KeyboardEvent): void => {
+    if (clickable && (e.key === 'Enter' || e.key === ' ')) onOpen()
+  }
 
   return (
-    <li className="forms-record" data-open={open || undefined} data-closed={!alive || undefined}>
-      <button className="row forms-row" onClick={onToggle}>
-        <span className="row-time" data-hot={counting || undefined}>
-          {counting ? countdown(left) : clock(s.at && s.status === 'waiting' ? s.at : s.openedAt)}
-        </span>
+    <li className="row forms-row" role={clickable ? 'button' : undefined} tabIndex={clickable ? 0 : undefined} data-click={clickable || undefined} data-done={s.status === 'closed' || undefined} onClick={clickable ? onOpen : undefined} onKeyDown={key}>
+      <span className="row-time" data-hot={counting || undefined}>
+        {counting ? countdown(left) : when(s.submittedAt ?? s.openedAt)}
+      </span>
+      <span className="forms-row-main">
         <span className="row-title">{s.title}</span>
-        <span className="forms-status" data-s={s.status}>
-          {s.status === 'waiting' && !counting ? '未开放' : STATUS[s.status]}
-        </span>
+        {s.status === 'error' && s.message && <span className="forms-row-note">{s.message}</span>}
+      </span>
+      <span className="forms-status" data-s={s.status} data-hot={hot || undefined}>
+        {s.status === 'waiting' && !counting ? '未开放' : STATUS[s.status]}
+      </span>
+      <button
+        className="forms-x"
+        aria-label={s.status === 'submitted' ? '删除备份' : '取消订阅'}
+        title={s.status === 'submitted' ? '删除备份' : '取消订阅'}
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
       </button>
-      <AutoHeight>
-        {open && (
-          <div className="forms-detail">
-            {s.at && (
-              <p className="forms-meta">
-                <Joined parts={[`${new Date(s.at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} 开放`, s.autoSubmit && '自动提交']} />
-              </p>
-            )}
-            {fields.length > 0 && (
-              <div className="forms-line">
-                <span className="forms-label">已填</span>
-                <span className="forms-tags">
-                  {fields.map((f) => (
-                    <span key={f} className="forms-tag" title={s.filled.filter((x) => x.field === f).map((x) => x.title).join('\n')}>
-                      {LABEL[f]}
-                    </span>
-                  ))}
-                </span>
-              </div>
-            )}
-            {s.missed.length > 0 && (
-              <div className="forms-line">
-                <span className="forms-label">未认出</span>
-                <ul className="forms-missed">
-                  {s.missed.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {s.message && <p className="forms-message">{s.message}</p>}
-            <div className="forms-actions">
-              {alive && (
-                <button className="btn btn-solid" onClick={onFocus}>
-                  前往窗口
-                </button>
-              )}
-              {alive && s.status !== 'waiting' && s.status !== 'submitted' && (
-                <button className="btn" onClick={onRefill}>
-                  重新填写
-                </button>
-              )}
-              <button className="btn" onClick={onClose}>
-                {alive ? '关闭窗口' : '移除'}
-              </button>
-            </div>
-          </div>
-        )}
-      </AutoHeight>
     </li>
   )
 }

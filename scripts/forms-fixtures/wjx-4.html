@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>讲座报名与反馈</title>
+<!-- 问卷星手机版的量表（scale-rating 里的 a.rate-off，文字在 title）、矩阵量表（表格每行一组 a.rate-off，行标题在首格）、
+     原生单选的矩阵（每行一个 name，格子里只有圆圈，列名在表头）、只读日期框（verify="日期"）与 verify="手机"。内容虚构 -->
+<style>
+  body { margin:0; padding:20px 12px 60px; background:#f0f2f5; font-family:"Microsoft YaHei",sans-serif; color:#333; font-size:14px; }
+  .form-wrap { max-width:760px; margin:0 auto; background:#fff; border-radius:6px; padding:24px 28px 44px; }
+  .field { padding:14px 0 12px; border-bottom:1px dashed #e8e8e8; }
+  .field-label { display:flex; gap:4px; font-size:15px; margin-bottom:10px; }
+  .req { color:#e60012; }
+  input.ui-input-text { width:100%; border:1px solid #d9d9d9; border-radius:4px; padding:8px 10px; font-size:14px; }
+  .scale-rating ul { display:flex; gap:8px; list-style:none; padding:0; margin:0; }
+  .scale-rating li { display:block; }
+  a.rate-off, a.rate-on { display:block; width:28px; height:28px; border:1px solid #bbb; border-radius:50%; cursor:pointer; }
+  a.rate-on { background:#1e88e5; border-color:#1e88e5; }
+  table { border-collapse:collapse; }
+  td, th { padding:6px 10px; text-align:center; }
+  .errorMessage { color:#e60012; font-size:13px; margin-top:8px; }
+  .submitbtn { display:inline-block; margin-top:28px; padding:11px 46px; background:#1e88e5; color:#fff; border-radius:4px; cursor:pointer; }
+  .submitted { max-width:760px; margin:80px auto; padding:60px 20px; background:#fff; text-align:center; font-size:20px; }
+</style>
+</head>
+<body>
+<div class="form-wrap" id="form">
+  <div class="field ui-field-contain" id="div1" topic="1" type="1" req="1" data-expect="name">
+    <div class="field-label"><div class="topicnumber">1.</div><div class="topichtml">姓名</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q1" name="q1" class="ui-input-text" verify="" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div2" topic="2" type="1" req="1" data-expect="studentId">
+    <div class="field-label"><div class="topicnumber">2.</div><div class="topichtml">学号</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q2" name="q2" class="ui-input-text" verify="" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div3" topic="3" type="1" req="1" data-expect="phone">
+    <div class="field-label"><div class="topicnumber">3.</div><div class="topichtml">联系电话</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q3" name="q3" class="ui-input-text" verify="手机" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div4" topic="4" type="1" req="1" data-expect="missed">
+    <div class="field-label"><div class="topicnumber">4.</div><div class="topichtml">希望参加的日期</div><span class="req">*</span></div>
+    <div class="ui-input-text"><input type="text" id="q4" name="q4" class="ui-input-text" readonly="readonly" verify="日期" /></div>
+  </div>
+
+  <div class="field ui-field-contain" id="div5" topic="5" type="5" req="1" data-expect="missed">
+    <div class="field-label"><div class="topicnumber">5.</div><div class="topichtml">对上一期讲座的满意度</div><span class="req">*</span></div>
+    <div class="scale-div"><div class="scale-rating"><ul tp="d">
+      <li class="td"><a val="1" title="很不满意" class="rate-off rate-offlarge"></a></li>
+      <li class="td"><a val="2" title="不满意" class="rate-off rate-offlarge"></a></li>
+      <li class="td"><a val="3" title="一般" class="rate-off rate-offlarge"></a></li>
+      <li class="td"><a val="4" title="满意" class="rate-off rate-offlarge"></a></li>
+      <li class="td"><a val="5" title="很满意" class="rate-off rate-offlarge"></a></li>
+    </ul></div></div>
+    <input type="hidden" id="q5" name="q5" />
+  </div>
+
+  <div class="field ui-field-contain" id="div6" topic="6" type="6" req="1" data-expect="missed">
+    <div class="field-label"><div class="topicnumber">6.</div><div class="topichtml">请评价以下方面</div><span class="req">*</span></div>
+    <div class="matrix-rating"><table class="matrixtable" id="divRefTab6"><tbody>
+      <tr id="drv6_1" tp="d"><th class="rowtitle">讲座内容</th>
+        <td><a dval="1" title="很差" class="rate-off"></a></td><td><a dval="2" title="一般" class="rate-off"></a></td><td><a dval="3" title="很好" class="rate-off"></a></td></tr>
+      <tr id="drv6_2" tp="d"><th class="rowtitle">主讲人表达</th>
+        <td><a dval="1" title="很差" class="rate-off"></a></td><td><a dval="2" title="一般" class="rate-off"></a></td><td><a dval="3" title="很好" class="rate-off"></a></td></tr>
+    </tbody></table></div>
+    <input type="hidden" id="q6" name="q6" />
+  </div>
+
+  <div class="field ui-field-contain" id="div7" topic="7" type="6" req="1" data-expect="missed">
+    <div class="field-label"><div class="topicnumber">7.</div><div class="topichtml">现场需要</div><span class="req">*</span></div>
+    <table><tbody>
+      <tr><td></td><td>需要</td><td>不需要</td></tr>
+      <tr><td>纸质证书</td><td><input type="radio" name="q7_1" value="1" /></td><td><input type="radio" name="q7_1" value="2" /></td></tr>
+      <tr><td>午餐</td><td><input type="radio" name="q7_2" value="1" /></td><td><input type="radio" name="q7_2" value="2" /></td></tr>
+    </tbody></table>
+  </div>
+
+  <div style="text-align:center"><div id="ctlNext" class="submitbtn">提交</div></div>
+</div>
+<script>
+  // 量表、矩阵量表：点 a 只亮这一格，值写进隐藏框
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest && ev.target.closest('a.rate-off, a.rate-on')
+    if (!a) return
+    var group = a.closest('tr') || a.closest('ul')
+    group.querySelectorAll('a').forEach(function (x) { x.className = x === a ? 'rate-on' : 'rate-off' })
+    var field = a.closest('.field')
+    var hidden = field.querySelector('input[type=hidden]')
+    hidden.value = [].map.call(field.querySelectorAll('tr[tp], ul[tp]'), function (row) {
+      var on = row.querySelector('a.rate-on')
+      return on ? on.getAttribute('val') || on.getAttribute('dval') : ''
+    }).join(',')
+  })
+  function error(field, text) {
+    var e = field.querySelector('.errorMessage') || field.appendChild(document.createElement('div'))
+    e.className = 'errorMessage'
+    e.textContent = text
+  }
+  document.getElementById('ctlNext').addEventListener('click', function () {
+    var ok = true
+    document.querySelectorAll('.errorMessage').forEach(function (e) { e.remove() })
+    ;['q1', 'q2'].forEach(function (id) { if (!document.getElementById(id).value.trim()) { ok = false; error(document.getElementById(id).closest('.field'), '请填写此项') } })
+    if (!/^1\d{10}$/.test(document.getElementById('q3').value)) { ok = false; error(document.getElementById('div3'), '请输入正确的手机号') }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(document.getElementById('q4').value)) { ok = false; error(document.getElementById('div4'), '请选择日期') }
+    if (!/^\d$/.test(document.getElementById('q5').value)) { ok = false; error(document.getElementById('div5'), '请选择') }
+    if (!/^\d,\d$/.test(document.getElementById('q6').value)) { ok = false; error(document.getElementById('div6'), '请完整作答') }
+    if (!document.querySelector('[name=q7_1]:checked') || !document.querySelector('[name=q7_2]:checked')) { ok = false; error(document.getElementById('div7'), '请完整作答') }
+    if (!ok) return
+    window.__submitted = true
+    document.body.innerHTML = '<div class="submitted">提交成功，感谢您的参与！</div>'
+  })
+</script>
+</body>
+</html>

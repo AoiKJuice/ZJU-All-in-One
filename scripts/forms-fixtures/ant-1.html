@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>志愿活动报名</title>
+<!-- Ant Design 结构（form.zju.edu.cn 一类）：标题在 form-item 外层（comBox）、按钮式单选、可搜索的下拉（里面的搜索框不是填空）、
+     日期选择器（回车或失焦才认输入）、星级评分（点亮到所选那颗）、每行一个 radiogroup 的矩阵、单个同意勾选框。内容虚构 -->
+<style>
+  body { margin:0; padding:24px; background:#f5f5f5; font-family:sans-serif; font-size:14px; }
+  .wrap { max-width:720px; margin:0 auto; background:#fff; padding:24px; border-radius:8px; }
+  .comBox, .ant-form-item { margin-bottom:18px; }
+  .comBoxName, .ant-form-item-label { margin-bottom:6px; font-weight:600; }
+  .ant-form-item-required::before, .red { color:#f5222d; content:'*'; margin-right:4px; }
+  .ant-input, .ant-picker input { width:100%; padding:6px 10px; border:1px solid #d9d9d9; border-radius:6px; }
+  .ant-radio-button-wrapper { display:inline-block; padding:4px 14px; border:1px solid #d9d9d9; cursor:pointer; }
+  .ant-radio-button-wrapper-checked { border-color:#1677ff; color:#1677ff; }
+  .ant-radio-button input { position:absolute; opacity:0; width:0; height:0; }
+  .ant-select { position:relative; border:1px solid #d9d9d9; border-radius:6px; padding:6px 10px; }
+  .ant-select-selection-search-input { border:0; outline:0; width:100%; position:absolute; left:10px; top:6px; background:transparent; }
+  .ant-select-dropdown { position:absolute; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,.15); padding:4px 0; }
+  .ant-select-item-option { padding:6px 12px; cursor:pointer; }
+  .ant-rate { display:flex; gap:6px; list-style:none; padding:0; margin:0; }
+  .ant-rate-star div[role=radio] { width:22px; height:22px; background:#eee; border-radius:4px; cursor:pointer; }
+  .ant-rate-star-full div[role=radio] { background:#fadb14; }
+  .mrow { display:flex; gap:12px; align-items:center; margin:4px 0; }
+  [role=radio].opt { padding:2px 10px; border:1px solid #ddd; border-radius:12px; cursor:pointer; }
+  [role=radio].opt[aria-checked=true] { border-color:#1677ff; color:#1677ff; }
+  .ant-form-item-explain-error { color:#f5222d; font-size:12px; }
+  .ant-btn { padding:6px 30px; background:#1677ff; color:#fff; border:0; border-radius:6px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="wrap" id="form">
+  <div class="comBox" data-expect="studentId">
+    <div class="comBoxName"><span class="red"></span>学号*</div>
+    <div class="ant-form-item"><div class="ant-form-item-control"><input class="ant-input" id="f1" /></div></div>
+  </div>
+
+  <div class="ant-form-item" data-expect="name">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">姓名</label></div>
+    <div class="ant-form-item-control"><input class="ant-input" id="f2" /></div>
+  </div>
+
+  <div class="ant-form-item" data-expect="gender">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">性别</label></div>
+    <div class="ant-form-item-control"><div class="ant-radio-group ant-radio-group-outline" id="f3">
+      <label class="ant-radio-button-wrapper"><span class="ant-radio-button"><input type="radio" class="ant-radio-button-input" value="男" /><span class="ant-radio-button-inner"></span></span><span>男</span></label>
+      <label class="ant-radio-button-wrapper"><span class="ant-radio-button"><input type="radio" class="ant-radio-button-input" value="女" /><span class="ant-radio-button-inner"></span></span><span>女</span></label>
+    </div></div>
+  </div>
+
+  <div class="ant-form-item" data-expect="campus">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">所在校区</label></div>
+    <div class="ant-form-item-control">
+      <div class="ant-select ant-select-show-search" id="f4">
+        <div class="ant-select-selector"><span class="ant-select-selection-search"><input type="search" role="combobox" class="ant-select-selection-search-input" autocomplete="off" /></span><span class="ant-select-selection-placeholder">请选择</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ant-form-item" data-expect="phone">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">手机号</label></div>
+    <div class="ant-form-item-control"><input class="ant-input" id="f5" /></div>
+  </div>
+
+  <div class="ant-form-item" data-expect="missed">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">可参加日期</label></div>
+    <div class="ant-form-item-control"><div class="ant-picker" id="f6"><div class="ant-picker-input"><input placeholder="请选择日期" autocomplete="off" /></div></div></div>
+  </div>
+
+  <div class="ant-form-item" data-expect="missed">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">推荐指数</label></div>
+    <div class="ant-form-item-control"><ul class="ant-rate" role="radiogroup" id="f7"></ul></div>
+  </div>
+
+  <div class="ant-form-item" data-expect="missed">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">可承担的工作</label></div>
+    <div class="ant-form-item-control" id="f8">
+      <div class="mrow"><span class="row-title">签到引导</span><div role="radiogroup"><span role="radio" class="opt" aria-checked="false">可以</span><span role="radio" class="opt" aria-checked="false">不可以</span></div></div>
+      <div class="mrow"><span class="row-title">物资搬运</span><div role="radiogroup"><span role="radio" class="opt" aria-checked="false">可以</span><span role="radio" class="opt" aria-checked="false">不可以</span></div></div>
+    </div>
+  </div>
+
+  <div class="ant-form-item" data-expect="missed">
+    <div class="ant-form-item-label"><label class="ant-form-item-required">活动须知</label></div>
+    <div class="ant-form-item-control"><label class="ant-checkbox-wrapper"><span class="ant-checkbox"><input type="checkbox" class="ant-checkbox-input" id="f9" /></span><span>我已阅读并同意活动须知</span></label></div>
+  </div>
+
+  <button type="button" class="ant-btn ant-btn-primary" id="submit"><span>提 交</span></button>
+</div>
+<script>
+  // 按钮式单选、勾选框：change 时更新外层类名
+  document.addEventListener('change', function (e) {
+    var t = e.target
+    if (t.type === 'radio') t.closest('.ant-radio-group').querySelectorAll('input').forEach(function (i) { i.closest('label').classList.toggle('ant-radio-button-wrapper-checked', i === t) ; if (i !== t) i.checked = false })
+  })
+  // 可搜索下拉：按下展开（选项层挂在 body 上），点选项写到 selection-item
+  var select = document.getElementById('f4')
+  select.querySelector('.ant-select-selector').addEventListener('mousedown', function () {
+    if (document.querySelector('.ant-select-dropdown')) return
+    var r = select.getBoundingClientRect()
+    var drop = document.createElement('div')
+    drop.className = 'ant-select-dropdown'
+    drop.style.left = r.left + 'px'
+    drop.style.top = r.bottom + window.scrollY + 'px'
+    ;['紫金港', '玉泉', '西溪', '华家池'].forEach(function (name) {
+      var item = document.createElement('div')
+      item.className = 'ant-select-item ant-select-item-option'
+      item.title = name
+      item.innerHTML = '<div class="ant-select-item-option-content">' + name + '</div>'
+      item.addEventListener('click', function () {
+        var placeholder = select.querySelector('.ant-select-selection-placeholder, .ant-select-selection-item')
+        placeholder.className = 'ant-select-selection-item'
+        placeholder.textContent = name
+        drop.remove()
+      })
+      drop.appendChild(item)
+    })
+    document.body.appendChild(drop)
+  })
+  document.body.addEventListener('mousedown', function (e) { if (e.target === document.body) { var d = document.querySelector('.ant-select-dropdown'); if (d) d.remove() } })
+  // 日期选择器：输入只是草稿，回车或失焦时格式对才认，否则恢复原值
+  var picker = document.getElementById('f6')
+  var pickerInput = picker.querySelector('input')
+  picker.dataset.value = ''
+  function commit() {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(pickerInput.value)) picker.dataset.value = pickerInput.value
+    else pickerInput.value = picker.dataset.value
+  }
+  pickerInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') commit() })
+  pickerInput.addEventListener('focusout', commit)
+  // 星级：点第 n 颗，前 n 颗都亮、aria-checked 都为 true（同 rc-rate）
+  var rate = document.getElementById('f7')
+  rate.dataset.value = '0'
+  for (var i = 1; i <= 5; i++) {
+    var li = document.createElement('li')
+    li.className = 'ant-rate-star ant-rate-star-zero'
+    li.innerHTML = '<div role="radio" aria-checked="false" aria-posinset="' + i + '" aria-setsize="5" tabindex="0"><div class="ant-rate-star-first"><span class="anticon"><svg width="1em" height="1em"></svg></span></div></div>'
+    rate.appendChild(li)
+  }
+  rate.addEventListener('click', function (e) {
+    var star = e.target.closest('[role=radio]')
+    if (!star) return
+    var v = +star.getAttribute('aria-posinset')
+    rate.dataset.value = String(v)
+    rate.querySelectorAll('li').forEach(function (li, i) {
+      li.className = 'ant-rate-star ' + (i < v ? 'ant-rate-star-full' : 'ant-rate-star-zero')
+      li.firstChild.setAttribute('aria-checked', String(i < v))
+    })
+  })
+  // 矩阵：每行一个 radiogroup
+  document.getElementById('f8').addEventListener('click', function (e) {
+    var opt = e.target.closest('[role=radio]')
+    if (!opt) return
+    opt.parentElement.querySelectorAll('[role=radio]').forEach(function (o) { o.setAttribute('aria-checked', String(o === opt)) })
+  })
+  document.getElementById('submit').addEventListener('click', function () {
+    document.querySelectorAll('.ant-form-item-explain-error').forEach(function (e) { e.remove() })
+    var bad = []
+    if (!document.getElementById('f1').value.trim()) bad.push('f1')
+    if (!document.getElementById('f2').value.trim()) bad.push('f2')
+    if (!document.querySelector('#f3 input:checked')) bad.push('f3')
+    if (!document.querySelector('#f4 .ant-select-selection-item')) bad.push('f4')
+    if (document.querySelector('#f4 input').value) bad.push('f4')
+    if (!/^1\d{10}$/.test(document.getElementById('f5').value)) bad.push('f5')
+    if (!picker.dataset.value) bad.push('f6')
+    if (rate.dataset.value === '0') bad.push('f7')
+    document.querySelectorAll('#f8 [role=radiogroup]').forEach(function (g) { if (!g.querySelector('[aria-checked=true]')) bad.push('f8') })
+    if (!document.getElementById('f9').checked) bad.push('f9')
+    bad.forEach(function (id) {
+      var e = document.createElement('div')
+      e.className = 'ant-form-item-explain-error'
+      e.textContent = '请完成此项'
+      document.getElementById(id).closest('.ant-form-item').appendChild(e)
+    })
+    if (bad.length) return
+    window.__submitted = true
+    document.body.innerHTML = '<div class="wrap">提交成功</div>'
+  })
+</script>
+</body>
+</html>

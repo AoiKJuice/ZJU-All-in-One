@@ -13,10 +13,12 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { Toast } from './components/Toast'
 import { LoginPanel } from './components/LoginPanel'
 import { AgentConfirm } from './components/AgentConfirm'
+import { FormPrompt } from './components/FormPrompt'
 import { FilePreview } from './components/FilePreview'
 import { Logo } from './components/Logo'
 import { LiquidGlass } from './components/LiquidGlass'
 import { dur } from '@renderer/lib/motion'
+import { MOBILE } from '@renderer/lib/platform'
 
 const PAGES: Record<PageId, ComponentType> = {
   home: Home,
@@ -98,6 +100,7 @@ export function App() {
       </ErrorBoundary>
       <LoginPanel />
       <AgentConfirm />
+      {!MOBILE && <FormPrompt />}
       <FilePreview />
       <Toast />
       {style === 'glass' && <LiquidGlass />}

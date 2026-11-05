@@ -20,17 +20,41 @@ export interface FormProfile {
 export type FormField = keyof FormProfile | 'majorClass' | 'collegeMajor'
 
 export interface FormOpenOptions {
-  /** 开放时刻（ISO）；到点按问卷站时钟刷新再填。缺省为立即 */
+  /** 开放时刻（ISO）；到点按问卷站时钟刷新再填。缺省为立即（页面写着开放时刻时按页面的） */
   at?: string
-  /** 全部认出后自动提交（有认不出的必填题时一律不交） */
+  /** true：全部填上就直接提交，有没填上的题先在应用里问；false：开放后在应用里列出全部题目，用户确认后提交 */
   autoSubmit: boolean
+  /** 选填题是否在应用里列出来问；不列时只问必填题，选填的没填上也照样提交 */
+  optional: boolean
+}
+
+/** 单选、下拉都按 radio 给选项；other 为应用里填不了的题（上传、日期、签名等），要到网页里填 */
+export type FormQuestionKind = 'text' | 'textarea' | 'radio' | 'checkbox' | 'other'
+
+/** 文字，或多选的选项文字 */
+export type FormAnswer = string | string[]
+
+export interface FormQuestion {
+  /** 题目键（标题规范化，同名加序号），答案按它对回页面 */
+  key: string
+  title: string
+  kind: FormQuestionKind
+  /** 填空题的原生输入类型（日期、时间、手机号、数字……），应用里用同样的输入框 */
+  input?: 'date' | 'time' | 'datetime-local' | 'month' | 'tel' | 'email' | 'number'
+  required: boolean
+  options: string[]
+  /** 页面上现在的值（已按资料填好的也在这里） */
+  value: FormAnswer
+  /** 认出的本人信息字段 */
+  field: FormField | null
+  filled: boolean
 }
 
 /**
- * waiting 等待开放；filling 填写中；filled 已填好待用户提交；attention 有必填题没认出；
- * verify 出现验证码；login 需要扫码 / 登录；submitted 已提交；closed 窗口已关；error 打不开
+ * waiting 等待开放；filling 打开中 / 填写中；asking 等用户在应用里补填或确认；submitting 已点提交、等页面结果；
+ * verify 出现验证码（窗口会显示出来）；login 需要扫码 / 登录（同上）；submitted 已提交；closed 窗口没了；error 打不开
  */
-export type FormStatus = 'waiting' | 'filling' | 'filled' | 'attention' | 'verify' | 'login' | 'submitted' | 'closed' | 'error'
+export type FormStatus = 'waiting' | 'filling' | 'asking' | 'submitting' | 'verify' | 'login' | 'submitted' | 'closed' | 'error'
 
 export interface FormSession {
   id: string
@@ -38,34 +62,38 @@ export interface FormSession {
   /** 问卷标题（页面标题），取到之前为域名 */
   title: string
   status: FormStatus
-  /** 开放时刻（ISO），立即打开为 null */
+  /** 开放时刻（ISO）；立即订阅、页面也没写时为 null */
   at: string | null
   /** 问卷站时钟减本机时钟（毫秒），倒计时按它校准 */
   offset: number
   autoSubmit: boolean
-  /** 打开时刻（ISO） */
+  optional: boolean
+  /** 订阅时刻（ISO） */
   openedAt: string
-  /** 已填的题：题目与所填的字段 */
-  filled: { title: string; field: FormField }[]
-  /** 没认出的必填题 */
-  missed: string[]
+  /** asking 时要问的题：自动提交只有没填上的，检查后提交为当前页全部；不列选填题时只有必填的 */
+  questions: FormQuestion[]
+  /** 每问一次加一，界面据此判断「稍后再填」收起的是不是这一次 */
+  round: number
   /** 页面弹出的提示（如作答时间太短、提交被拒）、出错原因 */
   message: string | null
+  submittedAt: string | null
+  /** 提交时的答卷备份（多页问卷各页合在一起） */
+  backup: { title: string; value: string }[]
 }
 
 export interface FormsApi {
-  /** 本人信息；首次使用时用教务的姓名学号预填 */
+  /** 本人信息；学号姓名空着时用教务（取不到时用登录账号）预填 */
   'forms:profile': () => Promise<FormProfile>
   'forms:saveProfile': (profile: FormProfile) => Promise<FormProfile>
-  /** 开窗加载问卷并填写，立即返回这次的记录 */
+  /** 订阅：后台开窗（不显示）加载问卷，开放后填写，立即返回这次的记录 */
   'forms:open': (url: string, options: FormOpenOptions) => Promise<FormSession>
-  /** 本次运行打开过的问卷，新的在前 */
+  /** 进行中的订阅在前，已提交的（带答卷备份，存本机）在后 */
   'forms:sessions': () => Promise<FormSession[]>
-  /** 把问卷窗口提到前面 */
+  /** 用户在应用里填的答案：填进页面后提交（多页问卷翻到下一页）；必填题仍空着时不交，返回的记录里继续问 */
+  'forms:answer': (id: string, answers: Record<string, FormAnswer>) => Promise<FormSession>
+  /** 显示问卷窗口（应用里填不了的题）；已提交的在浏览器里打开问卷 */
   'forms:focus': (id: string) => Promise<void>
-  /** 按当前保存的信息重新填一遍（改了信息之后用） */
-  'forms:refill': (id: string) => Promise<FormSession>
-  /** 关窗（定时的同时取消）；窗口已关时从记录里移除 */
+  /** 取消订阅并关掉窗口；已提交的删掉备份 */
   'forms:close': (id: string) => Promise<void>
 }
 
@@ -74,7 +102,7 @@ export const FORMS_CHANNELS = [
   'forms:saveProfile',
   'forms:open',
   'forms:sessions',
+  'forms:answer',
   'forms:focus',
-  'forms:refill',
   'forms:close'
 ] as const satisfies readonly (keyof FormsApi)[]

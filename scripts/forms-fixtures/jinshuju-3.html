@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>读书会报名</title>
+<!-- 金数据新版（jsjform.com，Next.js）：类名带构建哈希，题目块 .j-field-field_N；设了开始时间时先显示倒计时，到点在原页面换出题目（不刷新）。内容虚构 -->
+<style>
+  body { margin: 0; padding: 24px 16px; background: #f4f1ec; font: 15px/1.6 system-ui, sans-serif; color: #222; }
+  .VzW0pa_content { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 28px 32px; }
+  .SUWzNG_root { margin: 0 0 22px; }
+  .CmWV_W_label { font-weight: 600; margin-bottom: 8px; }
+  .SUWzNG_required::after { content: ' *'; color: #e5484d; }
+  .SUWzNG_notes { color: #888; font-size: 13px; margin: -4px 0 8px; }
+  .LC-OAW_wrapper { border: 1px solid #ddd; border-radius: 10px; padding: 6px 12px; }
+  .LC-OAW_wrapper input { width: 100%; border: 0; outline: 0; font: inherit; }
+  .LC-OAW_hidden { display: none; }
+  .iscsJW_item { display: flex; gap: 8px; align-items: center; border: 1px solid #ddd; border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; cursor: pointer; }
+  .w9L4Vq_root { margin-top: 12px; padding: 10px 28px; border: 0; border-radius: 999px; background: #2f6fed; color: #fff; font: inherit; }
+  .clock { text-align: center; padding: 60px 0; color: #555; }
+  .has-error .LC-OAW_wrapper { border-color: #e5484d; }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="clock">
+    <h1>读书会报名</h1>
+    <p>表单尚未开始，距离开始还有 <b id="left">00:00:02</b></p>
+  </div>
+</main>
+<template id="form-tpl">
+  <form id="published-form-demo" class="VzW0pa_content" novalidate>
+    <h1>读书会报名</h1>
+    <p>欢迎报名参加我们的活动，请如实填写报名所需信息，便于我们后续联系与安排。</p>
+    <div class="VzW0pa_page">
+      <div class="VzW0pa_fields">
+        <div class="SUWzNG_root j-field-field_1" data-expect="name">
+          <div class="CmWV_W_label SUWzNG_label SUWzNG_required">姓名</div>
+          <div class="SUWzNG_inputs"><div class="LC-OAW_wrapper LC-OAW_outlined"><div class="LC-OAW_inner"><div class="LC-OAW_prefix"></div><div class="LC-OAW_inputOuter"><input data-1p-ignore="true" type="text" name="field_1" value="" /></div><div class="LC-OAW_suffix"><button type="button" class="blzFgW_clear LC-OAW_hidden" aria-label="clear" role="clear"></button></div></div></div></div>
+        </div>
+        <div class="SUWzNG_root j-field-field_4" data-expect="studentId">
+          <div class="CmWV_W_label SUWzNG_label SUWzNG_required"><p>学号</p></div>
+          <div class="hypIXG_root"><div><div class="rrgdba_root SUWzNG_notes"><p>你的学号</p></div></div></div>
+          <div class="SUWzNG_inputs"><div class="LC-OAW_wrapper LC-OAW_outlined"><div class="LC-OAW_inner"><div class="LC-OAW_inputOuter"><input type="number" data-1p-ignore="true" name="field_4" value="" /></div></div></div></div>
+        </div>
+        <div class="SUWzNG_root j-field-field_5" data-expect="major">
+          <div class="CmWV_W_label SUWzNG_label"><p>专业或大类</p></div>
+          <div class="SUWzNG_inputs"><div class="LC-OAW_wrapper LC-OAW_outlined"><div class="LC-OAW_inner"><div class="LC-OAW_inputOuter"><input data-1p-ignore="true" type="text" name="field_5" value="" /></div></div></div></div>
+        </div>
+        <div class="SUWzNG_root j-field-field_6" data-expect="none">
+          <div class="CmWV_W_label SUWzNG_label"><p>参与时间</p></div>
+          <div class="SUWzNG_inputs"><div class="vUjLJW_root">
+            <label class="yx3BBG_root iscsJW_item"><span class="yx3BBG_inputOuter"><input class="yx3BBG_input" type="checkbox" name="field_6" value="a" /></span><div class="choiceContent">周三晚 19 点</div></label>
+            <label class="yx3BBG_root iscsJW_item"><span class="yx3BBG_inputOuter"><input class="yx3BBG_input" type="checkbox" name="field_6" value="b" /></span><div class="choiceContent">周三晚 21 点</div></label>
+            <label class="yx3BBG_root iscsJW_item"><span class="yx3BBG_inputOuter"><input class="yx3BBG_input" type="checkbox" name="field_6" value="c" /></span><div class="choiceContent">周四晚 19 点</div></label>
+          </div></div>
+        </div>
+        <div class="SUWzNG_root j-field-field_2" data-expect="phone">
+          <div class="CmWV_W_label SUWzNG_label SUWzNG_required">联系方式</div>
+          <div class="SUWzNG_inputs"><div class="NbwetG_mobileInputWrapper"><div class="NbwetG_inputContainer"><div class="LC-OAW_wrapper LC-OAW_outlined NbwetG_mobileInput"><div class="LC-OAW_inner"><div class="LC-OAW_inputOuter"><input data-1p-ignore="true" type="tel" aria-haspopup="dialog" name="field_2" value="" /></div></div></div></div></div></div>
+        </div>
+      </div>
+    </div>
+    <button type="submit" data-type="primary" class="w9L4Vq_root" form="published-form-demo"><span role="text">立即报名</span></button>
+  </form>
+</template>
+<script>
+(function () {
+  window.__submitted = false
+  var values = {}
+  // 受控输入：值只从 input 事件进状态
+  document.addEventListener('input', function (e) {
+    if (e.target.name) values[e.target.name] = e.target.value
+    var root = e.target.closest('.SUWzNG_root')
+    if (root) root.classList.remove('has-error')
+  })
+  var left = 2
+  var timer = setInterval(function () {
+    left--
+    document.getElementById('left').textContent = '00:00:0' + left
+    if (left > 0) return
+    clearInterval(timer)
+    // 到点：在原页面换出题目（不刷新，与 Next.js 客户端切换相同）
+    var app = document.getElementById('app')
+    app.innerHTML = ''
+    app.appendChild(document.getElementById('form-tpl').content.cloneNode(true))
+    // 水合：受控输入框按初始状态重渲染，已写进去的值被清空，不派发事件、不改 DOM（真实页面到点刷新后实测如此）
+    setTimeout(function () {
+      document.querySelectorAll('#app input').forEach(function (el) { if (el.type !== 'checkbox') el.value = '' })
+      values = {}
+    }, 600)
+    document.getElementById('published-form-demo').addEventListener('submit', function (e) {
+      e.preventDefault()
+      var bad = false
+      ;['field_1', 'field_4', 'field_2'].forEach(function (name) {
+        if (!values[name]) {
+          bad = true
+          document.querySelector('.j-field-' + name).classList.add('has-error')
+        }
+      })
+      if (bad) return
+      window.__submitted = true
+      app.innerHTML = '<div class="clock"><h1>提交成功</h1><p>感谢您的参与</p></div>'
+    })
+  }, 1000)
+})()
+</script>
+</body>
+</html>
