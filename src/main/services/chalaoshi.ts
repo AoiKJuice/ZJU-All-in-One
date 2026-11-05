@@ -11,7 +11,8 @@ import { readConfig, writeConfig } from '../secure'
 
 const SITE = 'https://chalaoshi.de'
 const API = 'https://api.chalaoshi.de'
-const INDEX_FILE = 'chalaoshi-index.json'
+// v2 起索引带评分（rate，"9.4" 或 "N/A"）
+const INDEX_FILE = 'chalaoshi-index-v2.json'
 const INDEX_TTL = 7 * 24 * 3600_000
 
 interface IndexTeacher {
@@ -19,6 +20,8 @@ interface IndexTeacher {
   name: string
   xy: number
   hot: number
+  /** 评分，无评分为 null */
+  rate: number | null
 }
 
 interface Index {
@@ -40,11 +43,12 @@ function loadIndex(): Promise<Index> {
   index ??= (async () => {
     const cached = readConfig<Index>(INDEX_FILE)
     if (cached?.at && Date.now() - cached.at < INDEX_TTL) return cached
-    const raw = JSON.parse(await get(`${SITE}/static/json/search.json`)) as { colleges: Index['colleges']; teachers: IndexTeacher[] }
+    type Raw = Omit<IndexTeacher, 'rate'> & { rate: string }
+    const raw = JSON.parse(await get(`${SITE}/static/json/search.json`)) as { colleges: Index['colleges']; teachers: Raw[] }
     const fresh: Index = {
       at: Date.now(),
       colleges: raw.colleges.map(({ id, name }) => ({ id, name })),
-      teachers: raw.teachers.map(({ id, name, xy, hot }) => ({ id, name, xy, hot }))
+      teachers: raw.teachers.map(({ id, name, xy, hot, rate }) => ({ id, name, xy, hot, rate: parseFloat(rate) || null }))
     }
     await writeConfig(INDEX_FILE, fresh)
     return fresh
@@ -88,19 +92,30 @@ function parseTeacher(id: number, html: string): ClsTeacher {
   }
 }
 
-/** 按姓名找教师；同名时优先学院名相近的，再按热度 */
-export async function findTeacher(name: string, college?: string): Promise<ClsTeacher | null> {
-  const { teachers, colleges } = await loadIndex()
-  const collegeName = new Map(colleges.map((c) => [c.id, c.name]))
+/** 同名时优先学院名相近的，再按热度 */
+function pickTeacher({ teachers, colleges }: Index, name: string, college?: string): IndexTeacher | undefined {
   const same = teachers.filter((t) => t.name === name.trim())
-  if (!same.length) return null
+  if (!same.length) return undefined
+  const collegeName = new Map(colleges.map((c) => [c.id, c.name]))
   const near = college
     ? same.filter((t) => {
         const c = collegeName.get(t.xy)
         return !!c && (c.includes(college) || college.includes(c))
       })
     : []
-  const pick = (near.length ? near : same).sort((a, b) => b.hot - a.hot)[0]
+  return [...(near.length ? near : same)].sort((a, b) => b.hot - a.hot)[0]
+}
+
+/** 一批教师的评分，只查索引；键为 姓名|学院 */
+export async function ratingsOf(list: { name: string; college?: string }[]): Promise<Record<string, number | null>> {
+  const idx = await loadIndex()
+  return Object.fromEntries(list.map((t) => [`${t.name}|${t.college ?? ''}`, pickTeacher(idx, t.name, t.college)?.rate ?? null]))
+}
+
+/** 按姓名找教师，取详情页 */
+export async function findTeacher(name: string, college?: string): Promise<ClsTeacher | null> {
+  const pick = pickTeacher(await loadIndex(), name, college)
+  if (!pick) return null
   if (!details.has(pick.id)) {
     details.set(
       pick.id,

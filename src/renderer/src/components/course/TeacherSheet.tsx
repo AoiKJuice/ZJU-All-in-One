@@ -27,15 +27,26 @@ export function useTeacher(name: string, college: string): ClsTeacher | null | u
   return value?.key === key ? value.t : undefined
 }
 
+// 侧页可以叠开（课程详情里点老师），Esc 只收起最上面的一层
+const stack: symbol[] = []
+
 /** 选课自己的侧页（右侧滑出）：Esc、点遮罩、「关闭」都能收起，安卓返回键经 Esc 收起 */
 export function XkSheet({ open, onClose, actions, children }: { open: boolean; onClose: () => void; actions?: ReactNode; children: ReactNode }) {
   useEffect(() => {
     if (!open) return
+    const me = Symbol()
+    stack.push(me)
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && stack.at(-1) === me && !e.defaultPrevented) {
+        e.preventDefault()
+        onClose()
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      stack.splice(stack.indexOf(me), 1)
+    }
   }, [open, onClose])
 
   return (

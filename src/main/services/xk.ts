@@ -160,8 +160,13 @@ function toSection(row: Row, course: { code: string; name: string }): XkSection 
     // skdd 每段上课时间一行，同一教室会重复
     places: [...new Set(lines(row['skdd']))],
     exam: lines(row['kssj']).join(' '),
-    semesterPart: text(row['xxq']),
+    semesterPart: text(row['xxq'] ?? row['t_xxq']),
     ...capacity(row['rs']),
+    // 以下几项实测有字段、值未核对：jxfs 教学方式、zxs 周学时、mxdx 面向对象、jcmc 教材
+    mode: lines(row['jxfs']).join(' '),
+    weeklyHours: lines(row['zxs']).join(' '),
+    audience: lines(row['mxdx']).join(' '),
+    textbook: lines(row['jcmc']).join(' '),
     pending: pendingOf(row['yxrs']),
     table: text(row['tabname']),
     slots: parseSlots(times),
@@ -182,6 +187,10 @@ const toCourse = (row: Row, tab: string, keyword: string): XkCourse => ({
   credit: Number(text(row['kcxx']).split('~')[1]) || Number(row['xf']) || null,
   category: text(row['kclb']),
   college: text(row['kkxy']),
+  // 实测：xskcdm 是选课页显示的课程代码（如 CS1030M），kcxz 课程性质，xxq 学期段
+  displayCode: text(row['xskcdm']),
+  nature: text(row['kcxz']),
+  semesterPart: text(row['xxq']),
   pool: text(row['xkkh']),
   tab,
   keyword
@@ -202,12 +211,28 @@ export async function getContext(): Promise<XkContext> {
   }
 }
 
+// 列表接口按 kspage / jspage（起止行号）分页，实测一页给 200 行就截断（全部课程不止 200 门），逐页取完；
+// 服务端不认分页时会重复返回同样的行，遇到见过的行就停
+async function allPages(fetch: (from: number, to: number) => Promise<Row[]>): Promise<Row[]> {
+  const out: Row[] = []
+  const seen = new Set<string>()
+  for (let from = 1; from <= PAGE * 30; from += PAGE) {
+    const rows = await fetch(from, from + PAGE - 1)
+    const fresh = rows.filter((r) => !seen.has(text(r['xkkh'])))
+    for (const r of fresh) seen.add(text(r['xkkh']))
+    out.push(...fresh)
+    if (rows.length < PAGE || fresh.length === 0) break
+  }
+  return out
+}
+
 export async function listCourses(categoryKey: string): Promise<XkCourse[]> {
   const c = await loadContext()
   // 同一代码下可能有几个页签（实测 xk_rdxkc 下有美育类、劳育类等），按 key 认；只给代码时取第一个
   const cat = c.categories.find((x) => x.key === categoryKey) ?? c.categories.find((x) => x.id === categoryKey)
   if (!cat) throw new Error('没有这个类别')
-  const rows = await post<Row[]>(await url('cxZzxkGhbKcList'), {
+  const path = await url('cxZzxkGhbKcList')
+  const rows = await allPages((from, to) => post<Row[]>(path, {
     dl: cat.id,
     lx: cat.lx,
     xkmc: cat.id === 'Z' ? '竺可桢学院课程' : cat.name,
@@ -218,19 +243,20 @@ export async function listCourses(categoryKey: string): Promise<XkCourse[]> {
     zydm: c.zydm,
     jxjhh: cat.id === 'xk_6' ? `${c.xn.slice(0, 4)}cx01` : c.nj + c.zydm,
     xnxq: `(${c.xn}-${c.xq})-`,
-    kspage: '1',
-    jspage: String(PAGE)
-  })
+    kspage: String(from),
+    jspage: String(to)
+  }))
   return rows.map((row) => toCourse(row, cat.id, ''))
 }
 
 export async function searchCourses(keyword: string, onlyAvailable = false): Promise<XkCourse[]> {
   const c = await loadContext()
-  const rows = await post<Row[]>(await url('cxZzxkGhbDdkcList'), {
+  const path = await url('cxZzxkGhbDdkcList')
+  const rows = await allPages((from, to) => post<Row[]>(path, {
     ...searchForm(c, keyword, onlyAvailable),
-    kspage: '1',
-    jspage: String(PAGE)
-  })
+    kspage: String(from),
+    jspage: String(to)
+  }))
   return rows.map((row) => toCourse(row, SEARCH_TAB, keyword))
 }
 

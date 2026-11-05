@@ -299,8 +299,20 @@ const COMMENTS: [string, number, string][] = [["老师讲课节奏偏快，但�
 const MAX = 3
 const TERM = '(2026-2027-1)'
 
-const courses: XkCourse[] = RAW.map(([code, name, credit, category, college, tab]) => ({
-  code, name, credit, category, college, pool: `${TERM}-${code}`, tab, keyword: ''
+// 显示代码、课程性质按类别编出来
+const PREFIX: Record<string, string> = { xk_1: 'CS', xk_2: 'GE', xk_4: 'PE', xk_5: 'LA' }
+const courses: XkCourse[] = RAW.map(([code, name, credit, category, college, tab], i) => ({
+  code,
+  name,
+  credit,
+  category,
+  college,
+  displayCode: `${PREFIX[tab] ?? 'XX'}${String(1001 + i * 7)}${tab === 'xk_1' ? 'M' : ''}`,
+  nature: /必修|外语|思政|体育/.test(category) ? '必修' : '选修',
+  semesterPart: '秋冬',
+  pool: `${TERM}-${code}`,
+  tab,
+  keyword: ''
 }))
 
 const sections = new Map<string, XkSection[]>(
@@ -318,6 +330,10 @@ const sections = new Map<string, XkSection[]>(
       remaining,
       capacity,
       pending,
+      mode: tab === 'xk_4' ? '实践' : '讲授',
+      weeklyHours: String(times.reduce((n, t) => n + (t.match(/\d+/g)?.length ?? 0), 0)),
+      audience: tab === 'xk_1' ? '2024 级计算机类' : '',
+      textbook: tab === 'xk_1' ? `${name}（第 3 版）` : '',
       table: tab === 'xk_4' ? 'tykjxrwb' : 'xkrw2006view',
       slots: parseSlots(times)
     }))
@@ -403,6 +419,7 @@ export const demoXk: Omit<XkHandlers, 'xk:watches' | 'xk:watch' | 'xk:unwatch'> 
     }
     return teacher
   },
+  'cls:ratings': async (list) => Object.fromEntries(list.map((t) => [`${t.name}|${t.college ?? ''}`, RATINGS[t.name]?.[0] ?? null])),
   // 每位教师取六条，按 id 错开；最新按日期排
   'cls:comments': async (id, sort) => {
     const list: ClsComment[] = Array.from({ length: 6 }, (_, k) => {

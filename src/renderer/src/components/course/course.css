@@ -30,57 +30,279 @@ html[data-style='glass'][data-theme='dark'] .xk {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: clamp(1.25rem, 2.5vw, 2rem);
+  grid-template-columns: minmax(0, var(--xk-l, 1.1fr)) 1.25rem minmax(0, var(--xk-r, 1fr));
   margin-top: clamp(1rem, 3vh, 1.75rem);
 }
+.xk-right {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, var(--xk-t, 1fr)) 1.25rem minmax(0, var(--xk-b, 1fr));
+}
 .xk-find,
-.xk-mine {
+.xk-mine,
+.xk-tt-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
+.xk-tt-panel {
+  padding: 0.75rem 0.625rem 0.625rem;
+}
 
-/* ---- 找课 ---- */
+/* 面板之间：看不见的空隙，悬停或拖动时中间出现一道短把手 */
+.xk-split {
+  position: relative;
+  z-index: 2;
+  touch-action: none;
+}
+.xk-split[data-axis='x'] {
+  cursor: col-resize;
+}
+.xk-split[data-axis='y'] {
+  cursor: row-resize;
+}
+.xk-split::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 999px;
+  background: var(--ink-3);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.xk-split[data-axis='x']::after {
+  width: 0.25rem;
+  height: 2.75rem;
+}
+.xk-split[data-axis='y']::after {
+  width: 2.75rem;
+  height: 0.25rem;
+}
+.xk-split:hover::after {
+  opacity: 0.45;
+}
+.xk-split[data-drag]::after {
+  opacity: 1;
+  background: var(--shu);
+}
+.xk:has(.xk-split[data-drag]) {
+  user-select: none;
+}
+
+/* ---- 找课：搜索框，下面一排筛选控件（浅底胶囊：条件名 + 当前值 + 下拉箭头；开关打开后主题色） ---- */
+.xk-filter {
+  position: relative;
+  padding: 0 0.25rem 0.625rem;
+}
 .xk-search {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  padding: 0 0.875rem 0 0.25rem;
+  gap: 0.5rem;
+  padding: 0 0.5rem 0 0.875rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  transition: box-shadow calc(0.3s * var(--speed, 1)) var(--ease);
 }
-.xk-search .xk-field {
+.xk-search:focus-within {
+  box-shadow: 0 0 0 1.5px rgba(var(--shu-rgb), 0.5);
+}
+.xk-search > svg {
+  flex: none;
+  width: 1.0625rem;
+  height: 1.0625rem;
+}
+.xk-search-input {
   flex: 1;
   min-width: 0;
-  min-height: 0;
-  resize: none;
-  padding: 0.55rem 1.125rem;
-  border-radius: 999px;
+  padding: 0.55rem 0;
+  font: inherit;
   font-size: 0.9375rem;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: none;
 }
-.xk-tabs {
+.xk-search-input::placeholder {
+  color: var(--ink-3);
+}
+.xk-search-clear {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.xk-search-clear:hover {
+  color: var(--shu);
+}
+.xk-search-clear svg {
+  width: 1rem;
+  height: 1rem;
+}
+.xk-ctls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.125rem;
-  padding: 0.625rem 0.125rem 0.375rem;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
 }
-.xk-tabs .choice,
-.xk-subtabs .choice {
+.xk-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
   white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
-/* 小类：比大类小一号、淡一些，放在浅底条里，与大类分开层次 */
-.xk-subtabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.125rem;
-  margin: 0 0.25rem 0.25rem;
-  padding: 0.25rem;
+.xk-ctl:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--ink));
+}
+.xk-ctl[data-on] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.xk-ctl[data-on]:hover {
+  background: rgba(var(--shu-rgb), 0.18);
+}
+.xk-ctl-label {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+.xk-ctl[data-on] .xk-ctl-label {
+  color: inherit;
+  opacity: 0.7;
+}
+.xk-ctl-value {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xk-ctl-chevron {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  margin-right: -0.2rem;
+  opacity: 0.7;
+  transition: transform calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.xk-ctl[data-open] .xk-ctl-chevron {
+  transform: rotate(180deg);
+}
+/* 教学班还在取：筛选栏下沿一道细的流动线 */
+.xk-progress {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.125rem;
+  height: 2px;
+  border-radius: 999px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.xk-progress[data-on] {
+  opacity: 1;
+}
+.xk-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 30%;
+  border-radius: inherit;
+  background: rgba(var(--shu-rgb), 0.6);
+  animation: xk-flow calc(1.2s * var(--speed, 1)) linear infinite;
+}
+@keyframes xk-flow {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/* 下拉面板 */
+.xk-pop {
+  position: fixed;
+  z-index: 80;
+  min-width: 9rem;
+  max-height: min(70vh, 32rem);
+  overflow-y: auto;
+  padding: 0.375rem;
   border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+.xk-pop[data-wide] {
+  width: min(34rem, calc(100vw - 2rem));
+  padding: 0.5rem 0.625rem;
+}
+.xk-opts {
+  display: flex;
+  flex-direction: column;
+}
+.xk-opt {
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--ink-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.xk-opt:hover {
+  color: var(--ink);
   background: var(--surface-2);
 }
-.xk-subtabs .choice.small {
-  padding: 0.15rem 0.625rem;
-  font-size: 0.875rem;
+.xk-opt[data-active] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
 }
+.xk-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.xk-cat-row {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+.xk-cat-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.xk-cat-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem 0.25rem;
+}
+.xk-cat-items .xk-opt {
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+}
+.xk-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
 .xk-list {
   margin-top: 0.25rem;
 }
@@ -97,37 +319,136 @@ html[data-style='glass'][data-theme='dark'] .xk {
   background: var(--surface-2);
 }
 .xk-courses > li + li {
-  margin-top: 0.125rem;
+  margin-top: 0.0625rem;
 }
 .xk-course {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 0.875rem;
-  width: 100%;
-  padding: 0.625rem 0.75rem;
+  gap: 0.625rem;
+  padding-right: 0.25rem;
   border-radius: var(--r-md);
-  text-align: left;
-  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), color calc(0.3s * var(--speed, 1)) var(--ease);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .xk-courses > li:not([data-open]) > .xk-course:hover {
   background: var(--surface-2);
 }
-.xk-course:hover .row-title {
+.xk-course-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+  padding: 0.375rem 0 0.375rem 0.625rem;
+  text-align: left;
+}
+.xk-course-main:hover .row-title {
   color: var(--shu);
 }
+.xk-course-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem 0.5rem;
+}
 .xk-course .row-title {
-  display: block;
-  font-size: 1.0625rem;
+  font-size: 1rem;
+  line-height: 1.45;
   transition: color calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.xk-code {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-3);
 }
 .xk-course-sub {
   display: flex;
-  flex-wrap: wrap;
-  column-gap: 0.875em;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  min-width: 0;
+  white-space: nowrap;
+  column-gap: 0.75em;
   font-size: 0.8125rem;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+}
+.xk-course-sub > .part {
+  flex: none;
+}
+.xk-course-teachers {
+  display: flex;
+  flex: 1;
+  min-width: 3rem;
+  gap: 0 0.75rem;
+  margin-left: 0.25em;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+}
+.xk-mini-teacher {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+  flex: none;
+  font-size: 0.8125rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-2);
+}
+.xk-mini-teacher em,
+.xk-teacher em {
+  padding: 0 0.4em;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+.xk-courses > li[data-open] .xk-mini-teacher em,
+.xk-course:hover .xk-mini-teacher em {
+  background: var(--surface);
+}
+.xk-mini-teacher em[data-high],
+.xk-teacher em[data-high] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.xk-course-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+}
+.xk-course-stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+.xk-course-stats small {
+  margin-right: 0.25em;
+  font-size: 0.6875rem;
   letter-spacing: 0.04em;
   color: var(--ink-3);
+}
+.xk-course-stats [data-zero] {
+  color: var(--ink-3);
+}
+.xk-course-stats [data-hot] {
+  color: var(--shu);
+}
+.xk-detail.act {
+  font-size: 0.75rem;
+}
+.xk-course-chev {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  padding: 0 0.125rem;
 }
 .xk-chevron {
   width: 1.125rem;
@@ -137,6 +458,9 @@ html[data-style='glass'][data-theme='dark'] .xk {
 }
 .xk-courses > li[data-open] .xk-chevron {
   transform: rotate(180deg);
+}
+.xk-sentinel {
+  height: 1px;
 }
 .xk-plan-row.row {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -153,72 +477,63 @@ html[data-style='glass'][data-theme='dark'] .xk {
 .xk-sections {
   list-style: none;
   margin: 0;
-  padding: 0 0.375rem 0.375rem;
+  padding: 0 0.25rem 0.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.25rem;
 }
 .xk-sec {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 6.25rem auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: 'main cap acts';
   align-items: center;
-  gap: 1.125rem;
-  padding: 0.75rem 0.875rem 0.75rem 1rem;
+  gap: 0.25rem 0.875rem;
+  padding: 0.4375rem 0.5rem 0.4375rem 0.75rem;
   border-radius: var(--r-md);
   background: var(--surface);
-  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .xk-sec[data-mine] {
   background: color-mix(in srgb, var(--surface) 86%, rgba(var(--shu-rgb), 0.5));
 }
 .xk-sec-main {
+  grid-area: main;
   min-width: 0;
 }
 .xk-sec-who {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 1rem;
+  gap: 0.125rem 0.75rem;
 }
 .xk-teacher {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.4em;
-  font-size: 1.0625rem;
+  gap: 0.3em;
+  font-size: 0.9375rem;
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-align: left;
   transition: color calc(0.3s * var(--speed, 1)) var(--ease);
 }
 button.xk-teacher:hover {
   color: var(--shu);
 }
-.xk-teacher em {
-  padding: 0 0.45em;
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  font-style: normal;
+.xk-teacher-gpa {
+  font-size: 0.75rem;
   font-weight: 400;
-  letter-spacing: 0.02em;
-  font-variant-numeric: lining-nums tabular-nums;
-  color: var(--ink-2);
-  background: var(--surface-2);
-}
-.xk-teacher em[data-high] {
-  color: var(--shu);
-  background: rgba(var(--shu-rgb), 0.12);
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
 }
 .xk-when {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.45rem;
+  display: contents;
 }
 .xk-slot {
-  padding: 0.05rem 0.55rem;
+  padding: 0 0.45rem;
   border-radius: 999px;
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
   font-variant-numeric: lining-nums tabular-nums;
   white-space: nowrap;
   color: var(--ink-2);
@@ -241,91 +556,113 @@ button.xk-teacher:hover {
 .xk-sec-where {
   display: flex;
   flex-wrap: wrap;
-  column-gap: 0.875em;
-  margin-top: 0.375rem;
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
+  column-gap: 0.75em;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
   color: var(--ink-3);
 }
-.xk-clashes {
+.xk-slot[data-clash] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.16);
+}
+.xk-slot[data-clash] small {
+  color: inherit;
+  opacity: 0.7;
+}
+.xk-sec-line [data-clash]:not(.xk-slot),
+.xk-pref-sub [data-clash],
+.xk-pref-sub [data-hot] {
+  color: var(--shu);
+}
+.xk-sec-line {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.5rem;
-}
-.xk-clash {
-  padding: 0.05rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: var(--shu);
-  background: rgba(var(--shu-rgb), 0.14);
-}
-.xk-clash[data-level='lead'] {
-  background: rgba(var(--shu-rgb), 0.07);
-}
-.xk-clash[data-level='backup'] {
-  padding-left: 0;
+  align-items: center;
+  gap: 0.25rem 0.375rem;
+  margin-top: 0.1875rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
   color: var(--ink-3);
-  background: transparent;
+}
+.xk-sec-line > .part {
+  margin-left: 0.375rem;
+}
+/* 不满足筛选条件的教学班排在后面淡显 */
+.xk-sec[data-dim] {
+  opacity: 0.5;
+}
+.xk-sec[data-dim]:hover {
+  opacity: 1;
 }
 
 /* 余量：大数字 / 容量，下面一道占用条与待定人数（待定多于余量时主题色） */
 .xk-cap {
+  grid-area: cap;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 0.3rem;
+  align-items: flex-end;
+  gap: 0.0625rem;
   text-align: right;
 }
 .xk-cap-figure {
-  font-size: 1.5rem;
-  line-height: 1.1;
+  font-size: 1.125rem;
+  line-height: 1.2;
   font-variant-numeric: lining-nums tabular-nums;
 }
 .xk-cap-figure small {
-  margin-left: 0.3em;
-  font-size: 0.8125rem;
+  margin-left: 0.1em;
+  font-size: 0.75rem;
   color: var(--ink-3);
 }
 .xk-cap[data-full] .xk-cap-figure {
   color: var(--ink-3);
 }
-.xk-cap-bar {
-  display: block;
-  height: 0.25rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  overflow: hidden;
+.xk-cap-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
-.xk-cap-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: rgba(var(--shu-rgb), 0.55);
-}
-.xk-cap[data-full] .xk-cap-bar > span {
-  background: var(--ink-3);
-  opacity: 0.45;
-}
-.xk-cap-pending {
+.xk-cap-top em {
   font-size: 0.8125rem;
-  letter-spacing: 0.04em;
+  font-style: normal;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-2);
+}
+.xk-cap-top em small {
+  margin-right: 0.2em;
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+.xk-cap-top em[data-hot],
+.xk-cap-top em[data-hot] small {
+  color: var(--shu);
+}
+.xk-cap-line {
+  display: flex;
+  justify-content: flex-end;
+  column-gap: 0.625em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.03em;
+  font-variant-numeric: lining-nums tabular-nums;
   color: var(--ink-3);
   white-space: nowrap;
 }
-.xk-cap-pending[data-hot] {
-  color: var(--shu);
-}
 .xk-sec-acts {
+  grid-area: acts;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.625rem;
-  min-width: 7.75rem;
+  gap: 0.25rem;
+  min-width: 6.25rem;
   text-align: center;
+}
+.xk-sec-btn.btn {
+  padding: 0.3rem 0.875rem;
+  font-size: 0.8125rem;
+}
+.xk-sec-acts .act {
+  font-size: 0.8125rem;
 }
 .xk-sec-acts .btn {
   white-space: nowrap;
@@ -356,6 +693,11 @@ button.xk-teacher:hover {
   color: var(--shu);
   background: rgba(var(--shu-rgb), 0.12);
 }
+.xk-tag[data-tone='line'] {
+  color: var(--shu);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(var(--shu-rgb), 0.45);
+}
 
 /* ---- 志愿 ---- */
 .xk-mine-head {
@@ -385,11 +727,11 @@ button.xk-teacher:hover {
 
 /* 课表：星期一行、上午 / 下午 / 晚上三块浅底，块间空一小行；每天两半列，只上半学期的课占半格 */
 .xk-tt {
-  flex: none;
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-rows: 1.5rem repeat(5, minmax(0, 1fr)) 0.375rem repeat(5, minmax(0, 1fr)) 0.375rem repeat(3, minmax(0, 1fr));
-  height: clamp(14rem, 36vh, 21rem);
-  padding: 0 0.375rem 0.25rem;
+  padding: 0 0.125rem;
 }
 .xk-tt-day {
   grid-row: 1;
@@ -412,6 +754,15 @@ button.xk-teacher:hover {
   margin: 1px 2px;
   border-radius: var(--r-sm);
   background: var(--surface-2);
+  cursor: pointer;
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), box-shadow calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.xk-tt-bg:hover {
+  background: color-mix(in srgb, var(--surface-2) 75%, rgba(var(--shu-rgb), 0.5));
+}
+.xk-tt-bg[data-on] {
+  background: rgba(var(--shu-rgb), 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--shu-rgb), 0.55);
 }
 .xk-tt-block {
   position: relative;
@@ -458,24 +809,33 @@ button.xk-teacher:hover {
 .xk-tt-block[data-dim] {
   opacity: 0.28;
 }
+.xk-tt-block[data-focus][data-kind='lead'] {
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--cc) 70%, var(--ink));
+}
 
 /* 志愿组：标题，各志愿（次序圆点：领头的实心），空位（虚线圆点 + 加号，点了去找课） */
 .xk-groups {
-  margin-top: 0.625rem;
+  margin-top: 0.25rem;
+}
+.xk-mine-tabs .xk-ctl {
+  margin-left: 0.5rem;
 }
 .xk-group {
-  padding: 0.25rem 0.25rem 0.375rem;
+  padding: 0.125rem 0.25rem 0.25rem;
 }
 .xk-group + .xk-group {
   margin-top: 0.25rem;
+}
+.xk-group {
+  border-radius: var(--r-md);
 }
 .xk-group-head {
   display: flex;
   align-items: center;
   gap: 0.625rem;
   margin: 0;
-  padding: 0.25rem 0.5rem;
-  font-size: 1rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: 0.06em;
 }
@@ -495,7 +855,7 @@ button.xk-teacher:hover {
   grid-template-columns: 1.625rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.375rem 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-radius: var(--r-md);
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
@@ -539,9 +899,6 @@ button.xk-teacher:hover {
 }
 .xk-pref-body:hover .xk-pref-title {
   color: var(--shu);
-}
-.xk-pref-title .xk-clash {
-  font-size: 0.75rem;
 }
 .xk-pref-sub {
   display: flex;
@@ -625,6 +982,7 @@ button.xk-teacher:hover {
 .xk-watch {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
+  text-align: left;
   align-items: center;
   gap: 0.875rem;
   padding: 0.5rem 0.5rem;
@@ -636,6 +994,53 @@ button.xk-teacher:hover {
 }
 .xk-watch[data-done] {
   opacity: 0.45;
+}
+
+.xk-list,
+.xk-sheet .sheet-body {
+  container-type: inline-size;
+}
+@container (max-width: 30rem) {
+  .xk-sec {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'main main' 'cap acts';
+  }
+  .xk-cap {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+  .xk-sec-acts {
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+  }
+  .xk-course-side .xk-course-stats {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+  }
+  .xk-course-sub {
+    flex-wrap: wrap;
+  }
+  .xk-course-teachers {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
+/* ---- 课程详情侧页 ---- */
+.xk-sheet-sections.xk-sections {
+  padding: 0 0 1.5rem;
+  gap: 0.5rem;
+}
+.xk-sheet-sections .xk-sec {
+  background: var(--surface-2);
+}
+.xk-sheet-sections .xk-sec .xk-slot,
+.xk-sheet-sections .xk-teacher em:not([data-high]) {
+  background: var(--surface);
 }
 
 /* ---- 查老师侧页 ---- */
@@ -730,17 +1135,30 @@ button.xk-teacher:hover {
   color: var(--ink-3);
 }
 
-/* 窄窗口：上下两块，整页滚动 */
+/* 窄窗口：三块上下排，整页滚动，不能拖动 */
 @media (max-width: 960px) {
   html:not([data-platform='android']) .tools-page:has(.xk) {
     display: block;
     height: auto;
   }
   html:not([data-platform='android']) .xk {
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  html:not([data-platform='android']) .xk-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
   }
   html:not([data-platform='android']) .xk-find {
-    height: 70vh;
+    height: 75vh;
+  }
+  html:not([data-platform='android']) .xk-tt-panel {
+    height: 22rem;
+  }
+  html:not([data-platform='android']) .xk-split {
+    display: none;
   }
   html:not([data-platform='android']) .xk-groups {
     overflow: visible;
@@ -764,19 +1182,26 @@ html[data-platform='android'] .xk {
   display: block;
   margin-top: 0.75rem;
 }
-html[data-platform='android'] .xk[data-view='find'] .xk-mine,
-html[data-platform='android'] .xk[data-view='mine'] .xk-find {
+html[data-platform='android'] .xk[data-view='find'] .xk-right,
+html[data-platform='android'] .xk[data-view='mine'] .xk-find,
+html[data-platform='android'] .xk-split {
   display: none;
+}
+html[data-platform='android'] .xk-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+html[data-platform='android'] .xk-tt-panel {
+  height: 20rem;
+  padding: 0.5rem 0.25rem 0.375rem;
 }
 html[data-platform='android'] .xk :is(.xk-list, .xk-groups) {
   overflow: visible;
   mask-image: none;
 }
-html[data-platform='android'] .xk-search {
-  padding-right: 0.5rem;
-}
-html[data-platform='android'] .xk-course {
-  padding: 0.625rem 0.5rem;
+html[data-platform='android'] .xk-course-main {
+  padding-left: 0.5rem;
 }
 html[data-platform='android'] .xk-sections {
   padding: 0 0.25rem 0.25rem;
@@ -796,10 +1221,6 @@ html[data-platform='android'] .xk-sec-acts {
 html[data-platform='android'] .xk-cap {
   align-self: start;
   min-width: 4.5rem;
-}
-html[data-platform='android'] .xk-tt {
-  height: 19rem;
-  padding: 0;
 }
 html[data-platform='android'] .xk-pref-acts .xk-icon {
   width: 2.25rem;

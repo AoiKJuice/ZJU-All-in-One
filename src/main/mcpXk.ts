@@ -90,6 +90,12 @@ export function registerXkTools(
       annotations: read
     }, async ({ name, college }) => json(await call('cls:teacher', name, college)))
 
+    mcp.registerTool('get_teacher_ratings', {
+      description: '查老师：一批教师的评分（只查本地缓存的索引，很快，适合给一门课的所有教学班排序）；键为 姓名|学院，查不到为 null',
+      inputSchema: { teachers: z.array(z.object({ name: z.string(), college: z.string().optional() })).min(1) },
+      annotations: read
+    }, async ({ teachers }) => json(await call('cls:ratings', teachers)))
+
     mcp.registerTool('get_teacher_comments', {
       description: '查老师上某位教师的学生评论（get_teacher_rating 返回的 id）',
       inputSchema: { id: z.number(), sort: z.enum(['rate', 'time']).optional().describe('rate 按点赞（默认），time 按时间') },
