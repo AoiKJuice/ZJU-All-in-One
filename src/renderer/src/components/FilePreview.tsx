@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { FilePreview as Preview } from '@shared/types'
 import { useApp } from '@renderer/store'
 import { dur } from '@renderer/lib/motion'
+import { CloseButton } from '@renderer/components/IconButton'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
@@ -58,9 +59,7 @@ function View({ path, onClose }: { path: string; onClose: () => void }) {
         <button className="act" onClick={openExternally}>
           默认程序打开
         </button>
-        <button className="act" onClick={onClose}>
-          关闭
-        </button>
+        <CloseButton onClick={onClose} />
       </div>
       <div className="preview-stage">
         {error ? (

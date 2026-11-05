@@ -404,3 +404,15 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* 选项未选中时也有浅底外形：性别、校区这类可以一个都不选的组，空着时不能看起来像一行普通文字 */
+.forms-grid .choice.opt {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  transition: color calc(0.35s * var(--speed, 1)) var(--ease), background-color calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.forms-grid .choice.opt:hover {
+  background: var(--surface-2);
+}
+.forms-grid .choice.opt[data-active] {
+  background: transparent;
+}

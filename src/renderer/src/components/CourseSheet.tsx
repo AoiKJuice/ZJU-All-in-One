@@ -9,6 +9,7 @@ import { periodEnd, periodStart } from '@renderer/lib/periods'
 import { clock, dotDate, weekdayLabel } from '@renderer/lib/format'
 import { colorVar, courseColors } from '@renderer/lib/courseColor'
 import { dur } from '@renderer/lib/motion'
+import { CloseButton } from '@renderer/components/IconButton'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -98,9 +99,7 @@ function Body({ course }: { course: CourseOpen }) {
             <Joined parts={[session.teacher, `${dotDate(course.date)} ${weekdayLabel(session.weekday)}`, `${periodStart(session.startPeriod)}–${periodEnd(session.endPeriod)}`, session.location]} />
           </p>
         </div>
-        <button className="act" onClick={() => openCourse(null)}>
-          关闭
-        </button>
+        <CloseButton onClick={() => openCourse(null)} />
       </header>
 
       {lecture && (

@@ -2740,3 +2740,24 @@ html[data-style]:not([data-style='paper']) :is(.page-title, .section-title, .gro
 html[data-style]:not([data-style='paper']) .period-head {
   padding-left: 0.625rem;
 }
+
+/* 通用图标按钮（components/IconButton.tsx） */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.icon-btn svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}

@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { ClsComment, ClsTeacher } from '@shared/xk'
 import { Choice, Joined } from '@renderer/components/Type'
 import { dur } from '@renderer/lib/motion'
+import { CloseButton } from '@renderer/components/IconButton'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -49,7 +51,8 @@ export function XkSheet({ open, onClose, actions, children }: { open: boolean; o
     }
   }, [open, onClose])
 
-  return (
+  // portal 到 body：留在页面滚动区里会被刊头压住
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -64,15 +67,14 @@ export function XkSheet({ open, onClose, actions, children }: { open: boolean; o
           >
             <span className="acts xk-sheet-acts">
               {actions}
-              <button className="act" onClick={onClose}>
-                关闭
-              </button>
+              <CloseButton onClick={onClose} />
             </span>
             {children}
           </motion.aside>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

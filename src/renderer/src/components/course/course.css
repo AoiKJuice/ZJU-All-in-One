@@ -3,13 +3,14 @@
 
 /* 一屏：找课与志愿两栏各自滚动 */
 /* 主题色实底上的字色，与 .btn-solid 各风格一致 */
-.xk {
+.xk,
+.xk-sheet {
   --xk-on-shu: #fff;
 }
-html[data-style='material'][data-theme='dark'] .xk {
+html[data-style='material'][data-theme='dark'] :is(.xk, .xk-sheet) {
   --xk-on-shu: color-mix(in srgb, var(--shu) 22%, #000);
 }
-html[data-style='glass'][data-theme='dark'] .xk {
+html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
   --xk-on-shu: #0b0e15;
 }
 

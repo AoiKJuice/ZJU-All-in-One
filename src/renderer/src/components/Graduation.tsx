@@ -8,6 +8,7 @@ import { dotDate } from '@renderer/lib/format'
 import { dur } from '@renderer/lib/motion'
 import { MOBILE } from '@renderer/lib/platform'
 import './graduation.css'
+import { CloseButton } from '@renderer/components/IconButton'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const STATUS: Record<AuditStatus, string> = { passed: '通过', failed: '未通过', replaced: '已替代', studying: '在修', none: '未修' }
@@ -390,9 +391,7 @@ function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void
             exit={{ x: '100%' }}
             transition={{ duration: dur(0.6), ease: EASE }}
           >
-            <button className="act grad-sheet-close" onClick={onClose}>
-              关闭
-            </button>
+            <CloseButton className="grad-sheet-close" onClick={onClose} />
             {children}
           </motion.aside>
         </>

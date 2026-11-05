@@ -6,6 +6,7 @@ import { Joined } from './Type'
 import { DownloadRow, downloadFile } from './Download'
 import { clock, dotDate, relativeTo } from '@renderer/lib/format'
 import { dur } from '@renderer/lib/motion'
+import { CloseButton } from '@renderer/components/IconButton'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -85,9 +86,7 @@ function SheetActs({ a }: { a: Assignment }) {
           原页面 ↗
         </a>
       )}
-      <button className="act" onClick={() => openAssignment(null)}>
-        关闭
-      </button>
+      <CloseButton onClick={() => openAssignment(null)} />
     </span>
   )
 }
