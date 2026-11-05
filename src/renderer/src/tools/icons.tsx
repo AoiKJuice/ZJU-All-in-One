@@ -50,3 +50,18 @@ export function FormIcon() {
     </svg>
   )
 }
+
+/** 图书馆预约：摊开的书，右页夹一根主题色书签；悬停时左页微微翻起，书签往下一落、晃一晃 */
+export function LibraryIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <g className="ti-page">
+        <path className="ti-ink" d="M24 14.5C19.5 11.8 13 11 6.5 11.6v23.6c6.5-.6 13 .2 17.5 2.9" />
+        <path className="ti-ink" d="M11 18.6c3.4-.1 6.5.4 9 1.4M11 24.4c3.4-.1 6.5.4 9 1.4" />
+      </g>
+      <path className="ti-ink" d="M24 14.5c4.5-2.7 11-3.5 17.5-2.9v23.6c-6.5-.6-13 .2-17.5 2.9Z" />
+      <path className="ti-ink" d="M28 25.4c2.5-1 5.6-1.5 9-1.4" />
+      <path className="ti-accent ti-fill ti-ribbon" d="M31.5 12.4h5v11.4l-2.5-2.1-2.5 2.1Z" />
+    </svg>
+  )
+}

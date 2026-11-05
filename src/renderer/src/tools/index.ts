@@ -3,8 +3,9 @@ import type { ToolId } from '@renderer/store'
 import { Graduation } from '@renderer/components/Graduation'
 import { CourseTool } from '@renderer/components/course/CourseTool'
 import { FormFill } from '@renderer/components/FormFill'
+import { LibraryTool } from '@renderer/components/library/LibraryTool'
 import { MOBILE } from '@renderer/lib/platform'
-import { CourseIcon, FormIcon, GraduationIcon } from './icons'
+import { CourseIcon, FormIcon, GraduationIcon, LibraryIcon } from './icons'
 
 /**
  * 工具注册表：工具页按顺序画入口（徽标 + 名称），点开后整页显示 View，标题旁有返回。
@@ -24,7 +25,8 @@ export interface ToolDef {
 const ALL: ToolDef[] = [
   { id: 'graduation', name: '毕业自审', version: 'v0.4', Icon: GraduationIcon, View: Graduation },
   { id: 'course', name: '选课', version: 'v0.3', Icon: CourseIcon, View: CourseTool },
-  { id: 'forms', name: '问卷填写', version: 'v0.2', Icon: FormIcon, View: FormFill, desktop: true }
+  { id: 'forms', name: '问卷填写', version: 'v0.2', Icon: FormIcon, View: FormFill, desktop: true },
+  { id: 'library', name: '图书馆预约', version: 'v0.3', Icon: LibraryIcon, View: LibraryTool }
 ]
 
 export const TOOLS: ToolDef[] = ALL.filter((t) => !(MOBILE && t.desktop))

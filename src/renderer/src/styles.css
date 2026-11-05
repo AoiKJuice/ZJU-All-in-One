@@ -2300,6 +2300,40 @@ html[data-theme='dark'] {
     stroke-dashoffset: 0;
   }
 }
+/* 图书馆预约：左页绕书脊微微翻起再落下；书签往下一落、像挂着一样晃两下 */
+.tool-icon .ti-page {
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+}
+.tool-icon .ti-ribbon {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+.tool-card:hover .ti-page {
+  animation: ti-flip calc(0.9s * var(--speed, 1)) var(--ease);
+}
+.tool-card:hover .ti-ribbon {
+  animation: ti-dangle calc(1s * var(--speed, 1)) var(--ease);
+}
+@keyframes ti-flip {
+  35% {
+    transform: scaleX(0.86) skewY(-4deg) translateY(-1px);
+  }
+  70% {
+    transform: scaleX(1.02);
+  }
+}
+@keyframes ti-dangle {
+  25% {
+    transform: translateY(3px) scaleY(1.12);
+  }
+  50% {
+    transform: translateY(2px) scaleY(1.08) rotate(6deg);
+  }
+  75% {
+    transform: translateY(1px) rotate(-3deg);
+  }
+}
 .tool-head {
   display: flex;
   align-items: center;

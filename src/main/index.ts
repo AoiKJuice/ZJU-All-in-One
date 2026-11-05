@@ -4,6 +4,7 @@ import { registerIpc } from './ipc'
 import { initMcp } from './mcp'
 import { initTodos } from './todos'
 import { initXkWatch } from './xkwatch'
+import { initLibWatch } from './libwatch'
 import { initializeDiagnostics } from './diagnostics'
 
 // 打包后应用名取 productName（"ZJU All in One"），数据目录会随之改变；固定到开发时的目录，登录态与 Whisper 模型共用
@@ -107,6 +108,7 @@ if (!app.requestSingleInstanceLock()) {
     initMcp()
     initTodos()
     initXkWatch()
+    initLibWatch()
     createWindow()
     app.on('activate', showMainWindow)
   })
