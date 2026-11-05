@@ -40,7 +40,7 @@ function monthDay(day: string): string {
   return `${m}月${d}日`
 }
 
-/** 每天检查时段的几个常用档，其余自定义 */
+/** 每天定时查询的几个常用档，其余自定义 */
 const WINDOWS = [
   { label: '全天', from: '08:00', to: '22:30' },
   { label: '上午', from: '08:00', to: '12:00' },
@@ -49,6 +49,13 @@ const WINDOWS = [
 ]
 const windowLabel = (from: string, to: string): string => WINDOWS.find((w) => w.from === from && w.to === to)?.label ?? `${from}–${to}`
 
+type Window = { from?: string; to?: string }
+const timed = (w: Window): w is { from: string; to: string } => Boolean(w.from && w.to)
+const sameWindow = (a: Window, b: Window): boolean => (a.from ?? '') === (b.from ?? '') && (a.to ?? '') === (b.to ?? '')
+
+/** 左栏区域名旁的订阅标签 */
+const TAG = { auto: '自动预约', on: '订阅中', wait: '定时' } as const
+
 const sameScope = (a: LibScope, b: LibScope): boolean => a.kind === b.kind && a.id === b.id
 const sameScopes = (a: LibScope[], b: LibScope[]): boolean => a.length === b.length && a.every((s) => b.some((x) => sameScope(s, x)))
 
@@ -56,8 +63,10 @@ const sameScopes = (a: LibScope[], b: LibScope[]): boolean => a.length === b.len
 const scopeTitle = (scopes: LibScope[]): string => (scopes.length > 1 ? `${scopes[0].label} 等 ${scopes.length} 处` : (scopes[0]?.label ?? ''))
 
 const minutes = (hm: string): number => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5))
-/** 现在（北京时间）是否在每天的检查时段里，时段可跨零点 */
-function inWindow(from: string, to: string): boolean {
+/** 现在（北京时间）该不该查：不定时的一直查；定时的只在时段里，时段可跨零点 */
+function inWindow(w: Window): boolean {
+  if (!timed(w)) return true
+  const { from, to } = w
   const now = minutes(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()))
   const a = minutes(from)
   const b = minutes(to)
@@ -115,9 +124,10 @@ interface Seed {
 }
 
 /**
- * 工具「图书馆预约」。上方「当前预约」只放正在生效的预约；左边按馆 → 层 → 区域看余座，
- * 点区域行即勾选（行尾「选座」才展开空座），右边是订阅：没勾选时列出进行中的订阅与套餐（一键复用），
- * 一勾选就变成三步的新订阅表单（区域、时段、方式），可顺带存为套餐。手机端只有当前预约与选座
+ * 工具「图书馆预约」。左边按馆 → 层 → 区域看余座，点区域行即勾选（行尾「选座」才展开空座）。
+ * 右边没勾选时依次是：已预约（正在生效的预约）、正在查询、定时（每天定时、还没到时段的）、套餐；
+ * 订阅＝正在查询，停止即结束；一勾选右边就变成三节的新订阅表单（区域、每天定时可选、有空座时通知或自动预约），可顺带存为套餐。
+ * 手机端只有选座与已预约
  */
 export function LibraryTool() {
   const notify = useApp((s) => s.notify)
@@ -164,11 +174,18 @@ export function LibraryTool() {
     return () => clearInterval(timer)
   }, [epoch, loadBookings])
 
-  // 已在订阅里的区域：名称旁带小标签
+  // 已在订阅里的区域：名称旁带小标签（自动预约 > 订阅中 > 定时）
   const watched = useMemo(() => {
-    const map = new Map<string, boolean>()
+    const rank = { auto: 3, on: 2, wait: 1 } as const
+    const map = new Map<string, keyof typeof rank>()
     if (!data) return map
-    for (const w of watches.filter((x) => !x.done && !x.paused)) for (const a of areasIn(data, w.scopes)) map.set(a.area.id, map.get(a.area.id) || w.auto)
+    for (const w of watches) {
+      const state = !inWindow(w) ? 'wait' : w.auto ? 'auto' : 'on'
+      for (const a of areasIn(data, w.scopes)) {
+        const old = map.get(a.area.id)
+        if (!old || rank[state] > rank[old]) map.set(a.area.id, state)
+      }
+    }
     return map
   }, [data, watches])
 
@@ -206,9 +223,9 @@ export function LibraryTool() {
     void loadOverview(date)
   }
 
-  /** 订阅：同样的范围与时段已有一条时改它，不另起一条 */
-  const subscribe = async (input: { scopes: LibScope[]; from: string; to: string; auto: boolean; name?: string }): Promise<void> => {
-    const same = watches.find((w) => sameScopes(w.scopes, input.scopes) && w.from === input.from && w.to === input.to)
+  /** 开始订阅：同样的范围与时段已有一条时改它，不另起一条 */
+  const subscribe = async (input: { scopes: LibScope[]; from?: string; to?: string; auto: boolean; name?: string }): Promise<void> => {
+    const same = watches.find((w) => sameScopes(w.scopes, input.scopes) && sameWindow(w, input))
     const list = await window.zju['lib:watch']({ ...input, id: same?.id })
     setWatches(list)
     setFresh(same?.id ?? list.at(-1)?.id ?? null)
@@ -229,30 +246,49 @@ export function LibraryTool() {
     setSeed((s) => ({ key: s.key + 1, preset: p }))
   }
 
+  /** 停止＝结束这项订阅，给一次撤销 */
+  const stop = async (w: LibWatch): Promise<void> => {
+    setWatches(await window.zju['lib:unwatch'](w.id))
+    notify('已停止', {
+      label: '撤销',
+      run: () => void window.zju['lib:watch']({ id: w.id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto: w.auto }).then(setWatches)
+    })
+  }
+
   const live = bookings.filter(isCurrent)
+  const querying = watches.filter((w) => inWindow(w))
+  const waiting = watches.filter((w) => !inWindow(w))
   const composing = picked.length > 0 || seed.preset !== undefined
+
+  const booked = live.length > 0 && (
+    <section className="lib-group">
+      <h3 className="lib-group-head">已预约</h3>
+      <ul className="lib-cards">
+        {live.map((b) => (
+          <CurrentBooking key={b.id} booking={b} onCancel={cancel} />
+        ))}
+      </ul>
+    </section>
+  )
+
+  const watchCard = (w: LibWatch) => (
+    <WatchCard
+      key={w.id}
+      watch={w}
+      fresh={w.id === fresh}
+      saved={presets.some((p) => sameScopes(p.scopes, w.scopes) && sameWindow(p, w))}
+      onAuto={async (auto) => setWatches(await window.zju['lib:watch']({ id: w.id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto }))}
+      onStop={() => void stop(w)}
+      onSave={async () => {
+        await savePreset({ name: w.name ?? scopeTitle(w.scopes), scopes: w.scopes, from: w.from, to: w.to })
+        notify('已存为套餐')
+      }}
+    />
+  )
 
   return (
     <div className="lib">
-      <AnimatePresence initial={false}>
-        {live.length > 0 && (
-          <motion.section
-            key="now"
-            className="lib-now"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: dur(0.4), ease: EASE }}
-          >
-            <div className="lib-now-inner">
-              {live.map((b) => (
-                <CurrentBooking key={b.id} booking={b} onCancel={cancel} />
-              ))}
-            </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
-
+      {MOBILE && booked}
       <div className="lib-main">
         <Reveal i={1} flat className="panel lib-find">
           <div className="lib-head">
@@ -332,7 +368,7 @@ export function LibraryTool() {
                         <>
                           <span className="lib-area-name">
                             {a.name}
-                            {watching !== undefined && <span className="lib-tag" data-tone="soft">{watching ? '自动预约' : '订阅中'}</span>}
+                            {watching && <span className="lib-tag" data-tone={watching === 'wait' ? undefined : 'soft'}>{TAG[watching]}</span>}
                           </span>
                           <Meter free={a.free} total={a.total} />
                         </>
@@ -404,31 +440,25 @@ export function LibraryTool() {
                 </motion.div>
               ) : (
                 <motion.div key="idle" className="lib-side-body" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: dur(0.3), ease: EASE }}>
-                  <h2 className="lib-side-title">订阅</h2>
-                  {watches.length === 0 && presets.length === 0 ? (
-                    <Steps active={0} />
-                  ) : (
-                    <div className="pane-scroll lib-side-scroll">
-                      {watches.length > 0 && (
+                  <div className="pane-scroll lib-side-scroll">
+                    {booked}
+                    {watches.length === 0 && presets.length === 0 ? (
+                      <Steps active={0} />
+                    ) : (
+                      <>
+                      {querying.length > 0 && (
                         <section className="lib-group">
-                          <h3 className="lib-group-head">我的订阅</h3>
-                          <ul className="lib-cards">
-                            {watches.map((w) => (
-                              <WatchCard
-                                key={w.id}
-                                watch={w}
-                                fresh={w.id === fresh}
-                                saved={presets.some((p) => sameScopes(p.scopes, w.scopes) && p.from === w.from && p.to === w.to)}
-                                onAuto={async (auto) => setWatches(await window.zju['lib:watch']({ id: w.id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto }))}
-                                onPause={async (paused) => setWatches(await window.zju['lib:watch']({ id: w.id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto: w.auto, paused }))}
-                                onRemove={async () => setWatches(await window.zju['lib:unwatch'](w.id))}
-                                onSave={async () => {
-                                  await savePreset({ name: w.name ?? scopeTitle(w.scopes), scopes: w.scopes, from: w.from, to: w.to })
-                                  notify('已存为套餐')
-                                }}
-                              />
-                            ))}
-                          </ul>
+                          <h3 className="lib-group-head">
+                            <span className="lib-live-dot" aria-hidden />
+                            正在查询
+                          </h3>
+                          <ul className="lib-cards">{querying.map(watchCard)}</ul>
+                        </section>
+                      )}
+                      {waiting.length > 0 && (
+                        <section className="lib-group">
+                          <h3 className="lib-group-head">定时</h3>
+                          <ul className="lib-cards">{waiting.map(watchCard)}</ul>
                         </section>
                       )}
                       {presets.length > 0 && (
@@ -439,7 +469,7 @@ export function LibraryTool() {
                               <PresetCard
                                 key={p.id}
                                 preset={p}
-                                live={watches.find((w) => !w.done && !w.paused && sameScopes(w.scopes, p.scopes) && w.from === p.from && w.to === p.to)}
+                                live={watches.find((w) => sameScopes(w.scopes, p.scopes) && sameWindow(w, p))}
                                 onSubscribe={(auto) => void subscribe({ name: p.name, scopes: p.scopes, from: p.from, to: p.to, auto })}
                                 onEdit={() => editPreset(p)}
                                 onRemove={async () => setPresets(await window.zju['lib:removePreset'](p.id))}
@@ -448,8 +478,9 @@ export function LibraryTool() {
                           </ul>
                         </section>
                       )}
-                    </div>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -464,7 +495,7 @@ export function LibraryTool() {
 function Steps({ active }: { active: number }) {
   return (
     <ol className="lib-steps">
-      {['勾选区域', '设定时段', '开始订阅'].map((t, i) => (
+      {['勾选区域', '选择怎么查', '开始订阅'].map((t, i) => (
         <li key={t} data-on={i === active || undefined}>
           <span className="lib-step-no">{i + 1}</span>
           {t}
@@ -474,20 +505,21 @@ function Steps({ active }: { active: number }) {
   )
 }
 
-/** 新订阅 / 编辑套餐：① 区域（左边勾选）② 每天检查的时段 ③ 有空座时通知我还是自动预约；填了套餐名就顺带存为套餐 */
+/** 新订阅 / 编辑套餐：① 区域（左边勾选）② 每天定时（可选，不开就是现在开始查到今天结束）③ 有空座时通知我还是自动预约；填了套餐名就顺带存为套餐 */
 function Composer(props: {
   scopes: LibScope[]
   overview: LibOverview | null
   preset?: LibPreset
   onRemove: (s: LibScope) => void
   onClose: () => void
-  onSubscribe: (input: { scopes: LibScope[]; from: string; to: string; auto: boolean; name?: string }) => Promise<void>
+  onSubscribe: (input: { scopes: LibScope[]; from?: string; to?: string; auto: boolean; name?: string }) => Promise<void>
   onSavePreset: (preset: Omit<LibPreset, 'id'> & { id?: string }) => Promise<void>
 }) {
   const { scopes, preset } = props
+  const [daily, setDaily] = useState(preset ? timed(preset) : false)
   const [from, setFrom] = useState(preset?.from ?? WINDOWS[0].from)
   const [to, setTo] = useState(preset?.to ?? WINDOWS[0].to)
-  const [custom, setCustom] = useState(preset ? !WINDOWS.some((w) => w.from === preset.from && w.to === preset.to) : false)
+  const [custom, setCustom] = useState(preset && timed(preset) ? !WINDOWS.some((w) => w.from === preset.from && w.to === preset.to) : false)
   const [auto, setAuto] = useState(false)
   const [name, setName] = useState(preset?.name ?? '')
   const [busy, setBusy] = useState(false)
@@ -495,7 +527,8 @@ function Composer(props: {
   const areas = props.overview ? areasIn(props.overview, scopes) : []
   const free = areas.reduce((n, a) => n + (a.area.free ?? 0), 0)
   const total = areas.reduce((n, a) => n + (a.area.total ?? 0), 0)
-  const ready = scopes.length > 0 && Boolean(from && to && from !== to)
+  const ready = scopes.length > 0 && (!daily || Boolean(from && to && from !== to))
+  const span = daily ? { from, to } : {}
 
   const run = async (job: () => Promise<void>): Promise<void> => {
     setBusy(true)
@@ -505,11 +538,11 @@ function Composer(props: {
       setBusy(false)
     }
   }
-  const presetInput = (): Omit<LibPreset, 'id'> & { id?: string } => ({ ...(preset ? { id: preset.id } : {}), name: name.trim() || scopeTitle(scopes), scopes, from, to })
+  const presetInput = (): Omit<LibPreset, 'id'> & { id?: string } => ({ ...(preset ? { id: preset.id } : {}), name: name.trim() || scopeTitle(scopes), scopes, ...span })
   const start = (): Promise<void> =>
     run(async () => {
       if (name.trim()) await props.onSavePreset(presetInput())
-      await props.onSubscribe({ scopes, from, to, auto, ...(name.trim() ? { name: name.trim() } : {}) })
+      await props.onSubscribe({ scopes, ...span, auto, ...(name.trim() ? { name: name.trim() } : {}) })
     })
 
   return (
@@ -556,8 +589,13 @@ function Composer(props: {
             <span className="lib-step-no" data-done>
               2
             </span>
-            每天检查的时段
+            每天定时
+            <button className="lib-toggle" role="switch" aria-checked={daily} aria-label="每天定时" data-on={daily || undefined} onClick={() => setDaily((x) => !x)}>
+              <span />
+            </button>
           </h3>
+          {daily && (
+          <>
           <div className="lib-options">
             {WINDOWS.map((w) => (
               <Choice
@@ -587,6 +625,8 @@ function Composer(props: {
               <span className="lib-dash">–</span>
               <input className="field lib-time" type="time" value={to} onChange={(e) => setTo(e.target.value)} aria-label="每天结束" />
             </span>
+          )}
+          </>
           )}
         </section>
 
@@ -635,54 +675,36 @@ function ModeCard({ on, title, icon, onClick }: { on: boolean; title: string; ic
   )
 }
 
-/** 我的订阅：名称与范围、每天的检查时段、现在的余座；自动预约勾选，停止 / 继续、存为套餐、删除为图标 */
-function WatchCard(props: {
-  watch: LibWatch
-  fresh: boolean
-  saved: boolean
-  onAuto: (auto: boolean) => void
-  onPause: (paused: boolean) => void
-  onRemove: () => void
-  onSave: () => void
-}) {
+/** 一项订阅（正在查询或等着定时开始）：名称与范围、现在的余座或开始时刻；自动预约勾选，停止、存为套餐为图标 */
+function WatchCard(props: { watch: LibWatch; fresh: boolean; saved: boolean; onAuto: (auto: boolean) => void; onStop: () => void; onSave: () => void }) {
   const { watch: w } = props
-  const active = inWindow(w.from, w.to)
-  const stopped = Boolean(w.paused || w.done)
-  const status = w.paused ? '已停止' : w.done ? w.done : !active ? `${w.from} 开始` : w.free === null ? '未查过' : w.free ? `余 ${w.free}` : '满座'
+  const active = inWindow(w)
+  const status = !active ? `${w.from} 开始` : w.free === null ? '查询中' : w.free ? `余 ${w.free}` : '满座'
   return (
-    <li className="lib-card" data-done={stopped || undefined} data-fresh={props.fresh || undefined}>
+    <li className="lib-card" data-fresh={props.fresh || undefined}>
       <div className="lib-card-top">
         <span className="min-w-0">
           <span className="lib-card-title">{w.name ?? scopeTitle(w.scopes)}</span>
           <ScopeLine scopes={w.scopes} />
         </span>
-        <span className="lib-card-status" data-tone={w.done && !w.paused ? 'done' : !stopped && active && w.free ? 'free' : undefined}>
+        <span className="lib-card-status" data-tone={active && w.free ? 'free' : undefined}>
           {status}
         </span>
       </div>
       <div className="lib-card-bottom">
         <span className="lib-sub">
-          <Joined parts={[`每天 ${windowLabel(w.from, w.to)}`, !stopped && w.checkedAt && `${ago(w.checkedAt)}查过`]} />
+          <Joined parts={[timed(w) ? `每天 ${windowLabel(w.from, w.to)}` : '今天', active && w.checkedAt && `${ago(w.checkedAt)}查过`]} />
         </span>
         <span className="lib-acts">
-          {!stopped && <AutoCheck on={w.auto} onChange={props.onAuto} />}
-          {stopped ? (
-            <IconButton label={w.done && !w.paused ? '重新开始' : '继续'} onClick={() => props.onPause(false)}>
-              <path d="M8.5 6.5v11l9-5.5Z" />
-            </IconButton>
-          ) : (
-            <IconButton label="停止" onClick={() => props.onPause(true)}>
-              <path d="M9 6.5v11M15 6.5v11" />
-            </IconButton>
-          )}
+          <AutoCheck on={w.auto} onChange={props.onAuto} />
           {!props.saved && (
             <IconButton label="存为套餐" onClick={props.onSave}>
               <path d="M7 4.5h10v15l-5-3.5-5 3.5Z" />
             </IconButton>
           )}
-          <ArmedIcon label="删除" confirm="确认删除" onRun={props.onRemove}>
-            <TrashPath />
-          </ArmedIcon>
+          <IconButton label="停止" onClick={props.onStop}>
+            <rect x="6.5" y="6.5" width="11" height="11" rx="2.5" />
+          </IconButton>
         </span>
       </div>
     </li>
@@ -701,14 +723,12 @@ function PresetCard(props: { preset: LibPreset; live: LibWatch | undefined; onSu
         </span>
         {live && (
           <span className="lib-tag" data-tone="soft">
-            {live.auto ? '自动预约中' : '订阅中'}
+            {inWindow(live) ? '订阅中' : '定时'}
           </span>
         )}
       </div>
       <div className="lib-card-bottom">
-        <span className="lib-sub">
-          <Joined parts={[`每天 ${windowLabel(p.from, p.to)}`]} />
-        </span>
+        <span className="lib-sub">{timed(p) && <Joined parts={[`每天 ${windowLabel(p.from, p.to)}`]} />}</span>
         <span className="lib-acts">
           {!live && (
             <>
@@ -812,7 +832,7 @@ function ArmedIcon({ label, confirm, onRun, children }: { label: string; confirm
 function CurrentBooking({ booking: b, onCancel }: { booking: LibBooking; onCancel: (b: LibBooking) => Promise<void> }) {
   const [busy, setBusy] = useState(false)
   return (
-    <div className="lib-booking">
+    <li className="lib-card lib-booking">
       <span className="lib-booking-mark" aria-hidden>
         <SeatGlyph />
       </span>
@@ -837,7 +857,7 @@ function CurrentBooking({ booking: b, onCancel }: { booking: LibBooking; onCance
           }}
         />
       )}
-    </div>
+    </li>
   )
 }
 

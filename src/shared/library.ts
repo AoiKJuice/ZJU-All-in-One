@@ -69,34 +69,36 @@ export interface LibScope {
   label: string
 }
 
-/** 余座订阅：每天 from–to 之间定时查当天余座，有空座时提醒；auto 为用户事先授权的自动预约（约上即停） */
+/**
+ * 订阅＝正在查询余座的一项；停止即结束（从列表里去掉），要再用就存成套餐。
+ * 不带 from / to 的是手动开始的，开始后一直查到当天结束；带 from / to 的是每天定时的，只在该时段里查。
+ * 有空座时通知；auto 为用户事先授权的自动预约，约上后这一项结束
+ */
 export interface LibWatch {
   id: string
-  /** 从套餐订阅时为套餐名 */
+  /** 从套餐开始时为套餐名 */
   name?: string
   scopes: LibScope[]
-  /** HH:MM，每天的检查时段 */
-  from: string
-  to: string
+  /** HH:MM，每天定时查询的时段；不定时则没有 */
+  from?: string
+  to?: string
+  /** 手动开始的那天（YYYY-MM-DD），过了这天自动结束 */
+  day?: string
   auto: boolean
   /** 最近一次查到的范围内余座合计 */
   free: number | null
   checkedAt: number | null
-  /** 已自动约上（或自动预约失败）后停止 */
-  done?: string
-  /** 用户停止：留在列表里但不再检查 */
-  paused?: boolean
 }
 
-export type LibWatchInput = Pick<LibWatch, 'scopes' | 'from' | 'to' | 'auto' | 'name' | 'paused'> & { id?: string }
+export type LibWatchInput = Pick<LibWatch, 'scopes' | 'from' | 'to' | 'auto' | 'name'> & { id?: string }
 
-/** 套餐：存下的一组范围与每天的检查时段，一键订阅 / 自动预约 */
+/** 套餐：存下的一组范围与（可选的）每天定时时段，一键开始订阅 / 自动预约 */
 export interface LibPreset {
   id: string
   name: string
   scopes: LibScope[]
-  from: string
-  to: string
+  from?: string
+  to?: string
 }
 
 export type LibPresetInput = Omit<LibPreset, 'id'> & { id?: string }
@@ -115,7 +117,7 @@ export interface LibraryApi {
   'lib:bookings': () => Promise<LibBooking[]>
   /** 写：取消预约 */
   'lib:cancel': (bookingId: string) => Promise<LibWriteResult>
-  /** 余座订阅（只在桌面端） */
+  /** 订阅（正在查询的，只在桌面端）；lib:unwatch 即停止 */
   'lib:watches': () => Promise<LibWatch[]>
   'lib:watch': (input: LibWatchInput) => Promise<LibWatch[]>
   'lib:unwatch': (id: string) => Promise<LibWatch[]>

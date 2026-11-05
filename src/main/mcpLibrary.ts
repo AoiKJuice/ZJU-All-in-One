@@ -48,20 +48,25 @@ async function areaLabel(areaId: string): Promise<string> {
 }
 
 /** 范围与时段：给 preset_id 时取套餐里存的，否则用传入的 */
-async function resolveWatch(args: { preset_id?: string; scopes?: z.infer<typeof scope>[]; from?: string; to?: string }): Promise<{ name?: string; scopes: LibScope[]; from: string; to: string }> {
+async function resolveWatch(args: { preset_id?: string; scopes?: z.infer<typeof scope>[]; from?: string; to?: string }): Promise<{ name?: string; scopes: LibScope[]; from?: string; to?: string }> {
+  if (Boolean(args.from) !== Boolean(args.to)) throw new Error('from 与 to 要一起给')
   if (args.preset_id) {
     const preset = (await call('lib:presets')).find((p) => p.id === args.preset_id)
     if (!preset) throw new Error('没有这个套餐')
-    return { name: preset.name, scopes: preset.scopes, from: args.from ?? preset.from, to: args.to ?? preset.to }
+    const from = args.from ?? preset.from
+    const to = args.to ?? preset.to
+    return { name: preset.name, scopes: preset.scopes, ...(from && to ? { from, to } : {}) }
   }
-  if (!args.scopes?.length || !args.from || !args.to) throw new Error('需要 preset_id，或 scopes、from、to')
-  return { scopes: await labelScopes(args.scopes), from: args.from, to: args.to }
+  if (!args.scopes?.length) throw new Error('需要 preset_id 或 scopes')
+  return { scopes: await labelScopes(args.scopes), ...(args.from && args.to ? { from: args.from, to: args.to } : {}) }
 }
+
+const windowText = (w: { from?: string; to?: string }): string => (w.from && w.to ? `每天 ${w.from}–${w.to}` : '今天，从现在开始')
 
 const watchInput = {
   preset_id: z.string().optional().describe('list_library_presets 的套餐 id；给了就用套餐里的范围与时段'),
   scopes: z.array(scope).min(1).optional(),
-  from: hm.optional(),
+  from: hm.optional().describe('每天定时查询的开始；与 to 一起给，不给则从现在开始查到今天结束'),
   to: hm.optional()
 }
 
@@ -102,7 +107,7 @@ export function registerLibraryTools(
   if (tools.app) {
     mcp.registerTool('watch_library_seats', {
       description:
-        '图书馆余座订阅：每天 from–to 之间（可跨零点）每 45–90 秒查一次当天范围内的余座，由满座变出空座时弹 Windows 通知。范围给 preset_id（套餐）或 scopes + from + to。只提醒不预约；要自动预约用 auto_reserve_library_seat',
+        '图书馆订阅（开始查询余座）：每 45–90 秒查一次当天范围内的余座，由满座变出空座时弹 Windows 通知。范围给 preset_id（套餐）或 scopes；给 from + to 为每天定时（只在该时段查，可跨零点），不给则从现在查到今天结束。只通知不预约；要自动预约用 auto_reserve_library_seat',
       inputSchema: watchInput,
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true }
     }, async (args) => json(await call('lib:watch', { ...(await resolveWatch(args)), auto: false })))
@@ -113,23 +118,13 @@ export function registerLibraryTools(
     }, async () => json(await call('lib:presets')))
 
     mcp.registerTool('unwatch_library_seats', {
-      description: '取消一个图书馆余座订阅（list_library_watches 的 id）',
+      description: '停止一个图书馆订阅（list_library_watches 的 id）：结束查询，从列表里去掉',
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
     }, async ({ id }) => json(await call('lib:unwatch', id)))
 
-    mcp.registerTool('pause_library_watch', {
-      description: '停止或继续一个图书馆余座订阅（list_library_watches 的 id）：停止后留在列表里但不再检查',
-      inputSchema: { id: z.string(), paused: z.boolean().describe('true 停止，false 继续') },
-      annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
-    }, async ({ id, paused }) => {
-      const w = (await call('lib:watches')).find((x) => x.id === id)
-      if (!w) throw new Error('没有这个订阅')
-      return json(await call('lib:watch', { id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto: w.auto, paused }))
-    })
-
     mcp.registerTool('list_library_watches', {
-      description: '当前的图书馆余座订阅：范围、每天的检查时段、是否授权自动预约、是否已停止（paused）、最近查到的余座',
+      description: '正在进行的图书馆订阅：范围、每天定时的时段（没有 from / to 的是今天手动开始的）、是否授权自动预约、最近查到的余座',
       annotations: { readOnlyHint: true, openWorldHint: false }
     }, async () => json(await call('lib:watches')))
   }
@@ -159,12 +154,12 @@ export function registerLibraryTools(
 
     mcp.registerTool('auto_reserve_library_seat', {
       description:
-        '图书馆余座订阅并授权自动预约：每天 from–to 之间查范围内余座，有空座时自动预约当天最早还没结束的时段里的一个空座，约上即停（并停掉其余自动预约）；失败不重试，关掉自动只通知。范围给 preset_id（套餐）或 scopes + from + to。应用内会请用户确认授权',
+        '图书馆订阅并授权自动预约：查范围内余座，有空座时自动预约当天最早还没结束的时段里的一个空座，约上后这一项结束并关掉其余订阅的自动预约；失败不重试，关掉自动只通知。范围给 preset_id（套餐）或 scopes；给 from + to 为每天定时，不给则从现在查到今天结束。应用内会请用户确认授权',
       inputSchema: watchInput,
       annotations: write
     }, async (args) => {
       const w = await resolveWatch(args)
-      if (!(await askUser({ action: 'libauto', courseName: w.scopes.map((s) => s.label).join('　'), title: `每天 ${w.from}–${w.to}`, files: [], comment: '' }))) return cancelled
+      if (!(await askUser({ action: 'libauto', courseName: w.scopes.map((s) => s.label).join('　'), title: windowText(w), files: [], comment: '' }))) return cancelled
       return json(await call('lib:watch', { ...w, auto: true }))
     })
   }

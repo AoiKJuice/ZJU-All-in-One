@@ -25,7 +25,7 @@ const ALL: ToolDef[] = [
   { id: 'graduation', name: '毕业自审', Icon: GraduationIcon, View: Graduation },
   { id: 'course', name: '选课', Icon: CourseIcon, View: CourseTool },
   { id: 'forms', name: '问卷填写', Icon: FormIcon, View: FormFill, desktop: true },
-  { id: 'library', name: '图书馆预约', Icon: LibraryIcon, View: LibraryTool, version: 'v0.2' }
+  { id: 'library', name: '图书馆预约', Icon: LibraryIcon, View: LibraryTool, version: 'v0.3' }
 ]
 
 export const TOOLS: ToolDef[] = ALL.filter((t) => !(MOBILE && t.desktop))
