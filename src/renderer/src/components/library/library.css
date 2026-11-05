@@ -1,12 +1,14 @@
 /* 工具「图书馆预约」（components/library/）。只用主题变量，三种风格经 .panel 与变量自动适配 */
 /* 本文件随组件引入，注入顺序可能早于 styles.css：覆盖 .field 等通用类时选择器要多一级 */
 
-/* 主题色实底上的字色，与 .btn-solid 各风格一致 */
 .lib {
+  /* 主题色实底上的字色，与 .btn-solid 各风格一致 */
   --lib-on-shu: #fff;
   /* 余量条的剩余（绿）与已占（红） */
   --lib-free: #3f9a68;
   --lib-used: rgba(201, 84, 74, 0.55);
+  /* 面板里再分一层的浅底：各风格的 --surface-2 有的与面板几乎同色，叠一层墨色 */
+  --lib-layer: color-mix(in srgb, var(--surface-2) 70%, color-mix(in srgb, var(--ink) 6%, transparent));
 }
 html[data-theme='dark'] .lib {
   --lib-free: #5cb985;
@@ -19,7 +21,7 @@ html[data-style='glass'][data-theme='dark'] .lib {
   --lib-on-shu: #0b0e15;
 }
 
-/* 一屏：找座与预约两栏各自滚动 */
+/* 一屏：上方当前预约，下面找座与订阅两栏各自滚动 */
 .tools-page:has(.lib) {
   display: flex;
   flex-direction: column;
@@ -36,17 +38,60 @@ html[data-style='glass'][data-theme='dark'] .lib {
 .lib {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: clamp(1.25rem, 2.5vw, 2rem);
+  display: flex;
+  flex-direction: column;
   margin-top: clamp(1rem, 3vh, 1.75rem);
 }
+.lib-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+}
 .lib-find,
-.lib-mine {
+.lib-side {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
+
+/* ---- 当前预约 ---- */
+.lib-now {
+  flex: none;
+  overflow: hidden;
+}
+.lib-now-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: clamp(1rem, 2.5vh, 1.5rem);
+}
+.lib-booking {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.125rem;
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 82%, rgba(var(--shu-rgb), 0.5));
+  box-shadow: var(--shadow);
+}
+.lib-booking-mark {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  color: var(--lib-on-shu);
+  background: var(--shu);
+}
+.lib-booking-mark svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+/* ---- 左栏：日期、馆、层与区域 ---- */
 .lib-head {
   display: flex;
   align-items: center;
@@ -63,7 +108,7 @@ html[data-style='glass'][data-theme='dark'] .lib {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.125rem;
-  padding: 0.25rem 0.125rem 0.5rem;
+  padding: 0.25rem 0.125rem 0.625rem;
 }
 .lib-tabs .choice {
   white-space: nowrap;
@@ -78,67 +123,147 @@ html[data-style='glass'][data-theme='dark'] .lib {
   color: inherit;
   opacity: 0.7;
 }
-.lib-tabs-end {
-  margin-left: auto;
+/* 该馆里有勾选的：页签旁一个主题色小点 */
+.lib-tab-dot {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-left: 0.4em;
+  border-radius: 50%;
+  vertical-align: 0.15em;
+  background: var(--shu);
+}
+.lib-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.875rem 0.35rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--lib-layer);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-all:hover,
+.lib-all[data-mark] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
 }
 
-/* ---- 楼层与区域 ---- */
-.lib-floor + .lib-floor {
-  margin-top: 1rem;
+/* 层与区域分开：左侧一列楼层（只切换），右边一块卡片放当前楼层的区域 */
+.lib-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lib-browse {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.875rem;
+}
+.lib-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.lib-rail-item {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.625rem 0.75rem 0.7rem;
+  border-radius: var(--r-md);
+  text-align: left;
+  color: var(--ink-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.lib-rail-item:hover {
+  color: var(--ink);
+  background: var(--lib-layer);
+}
+.lib-rail-item[data-active] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.lib-rail-name {
+  display: flex;
+  align-items: center;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.lib-rail-item .lib-meter {
+  text-align: left;
+}
+.lib-rail-item .lib-count {
+  font-size: 0.9375rem;
+  color: inherit;
+}
+.lib-floor {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.375rem 0.375rem 0.5rem;
+  border-radius: var(--r-lg);
+  background: var(--lib-layer);
 }
 .lib-floor-head {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 1.125rem 0.25rem 0.375rem;
-  font-size: 0.9375rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0.25rem 0.625rem 0.625rem;
+}
+.lib-floor-name {
+  font-size: 1.125rem;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
-.lib-floor-name {
-  flex: 1;
-  min-width: 0;
-  padding-left: 0.375rem;
-}
-.lib-floor-head .lib-count {
-  font-size: 0.9375rem;
-  font-weight: 400;
-  color: var(--ink-2);
-}
 .lib-areas {
+  flex: 1;
+  min-height: 0;
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.lib-areas > li {
+.lib-area {
   border-radius: var(--r-md);
+  background: var(--surface);
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
-.lib-areas > li + li {
-  margin-top: 0.125rem;
+.lib-area + .lib-area {
+  margin-top: 0.25rem;
 }
-.lib-areas > li[data-open] {
-  background: var(--surface-2);
+/* 勾上的区域：主题色浅底 */
+.lib-area[data-mark] {
+  background: color-mix(in srgb, var(--surface) 86%, rgba(var(--shu-rgb), 0.6));
 }
-.lib-area {
+.lib-area-row {
   display: flex;
   align-items: center;
-  padding-left: 0.375rem;
-  border-radius: var(--r-md);
-  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
-.lib-areas > li:not([data-open]) > .lib-area:hover {
-  background: var(--surface-2);
-}
-.lib-area-main {
+.lib-area-hit {
   flex: 1;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 7.5rem;
+  grid-template-columns: auto minmax(0, 1fr) 8rem;
   align-items: center;
-  gap: 1rem;
-  padding: 0.625rem 1.125rem 0.625rem 0.375rem;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 0.75rem 0.5rem 0.75rem 0.75rem;
+  border-radius: var(--r-md);
   text-align: left;
+}
+.lib-area-hit:hover .lib-area-name {
+  color: var(--shu);
 }
 .lib-area-name {
   display: flex;
@@ -150,9 +275,74 @@ html[data-style='glass'][data-theme='dark'] .lib {
   white-space: nowrap;
   transition: color calc(0.35s * var(--speed, 1)) var(--ease);
 }
-.lib-area-main:hover .lib-area-name {
-  color: var(--shu);
+/* 选座：行尾的展开按钮，与勾选分开 */
+.lib-seat-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0.625rem 0 0.25rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.875rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--lib-layer);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
+.lib-seat-btn:hover,
+.lib-seat-btn[data-on] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.lib-chevron {
+  width: 1rem;
+  height: 1rem;
+  color: var(--ink-3);
+  transition: transform calc(0.4s * var(--speed, 1)) var(--ease);
+}
+.lib-seat-btn .lib-chevron {
+  color: inherit;
+}
+[aria-expanded='true'] > .lib-chevron {
+  transform: rotate(180deg);
+}
+
+/* 勾选框：圆角方框，勾上为主题色实底，被上级带上的为浅色，部分为横线 */
+.lib-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.375rem;
+  border: 1.6px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  transition: background-color calc(0.25s * var(--speed, 1)) var(--ease), border-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.lib-box svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke: var(--lib-on-shu);
+  stroke-dasharray: 12;
+  stroke-dashoffset: 12;
+  transition: stroke-dashoffset calc(0.3s * var(--speed, 1)) var(--ease);
+}
+button:hover > .lib-box {
+  border-color: var(--shu);
+}
+.lib-box[data-mark] svg {
+  stroke-dashoffset: 0;
+}
+.lib-box[data-mark='on'],
+.lib-box[data-mark='partial'] {
+  border-color: var(--shu);
+  background: var(--shu);
+}
+.lib-box[data-mark='implied'] {
+  border-color: rgba(var(--shu-rgb), 0.4);
+  background: rgba(var(--shu-rgb), 0.4);
+}
+
 .lib-meter {
   display: flex;
   flex-direction: column;
@@ -190,51 +380,6 @@ html[data-style='glass'][data-theme='dark'] .lib {
   transition: width calc(0.5s * var(--speed, 1)) var(--ease);
 }
 
-/* 行首勾选：勾上为主题色实心，被整层 / 整馆带上的为浅色 */
-.lib-check {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  color: var(--ink-3);
-  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
-}
-.lib-check svg {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-.lib-check-ring {
-  stroke: currentColor;
-  transition: fill calc(0.25s * var(--speed, 1)) var(--ease), stroke calc(0.25s * var(--speed, 1)) var(--ease);
-}
-.lib-check-tick {
-  stroke: var(--lib-on-shu);
-  stroke-dasharray: 12;
-  stroke-dashoffset: 12;
-  transition: stroke-dashoffset calc(0.3s * var(--speed, 1)) var(--ease);
-}
-.lib-check:hover {
-  color: var(--shu);
-  background: rgba(var(--shu-rgb), 0.1);
-}
-.lib-check[data-state] .lib-check-tick {
-  stroke-dashoffset: 0;
-}
-.lib-check[data-state='on'] {
-  color: var(--shu);
-}
-.lib-check[data-state='on'] .lib-check-ring {
-  fill: var(--shu);
-}
-.lib-check[data-state='implied'] {
-  color: rgba(var(--shu-rgb), 0.55);
-}
-.lib-check[data-state='implied'] .lib-check-ring {
-  fill: rgba(var(--shu-rgb), 0.45);
-}
-
 /* ---- 展开的区域：时段与空座 ---- */
 .lib-drawer {
   overflow: hidden;
@@ -246,7 +391,7 @@ html[data-style='glass'][data-theme='dark'] .lib {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-  padding: 0.125rem 0.625rem 0.75rem;
+  padding: 0 0.75rem 0.75rem;
 }
 .lib-segs {
   display: flex;
@@ -263,7 +408,7 @@ html[data-style='glass'][data-theme='dark'] .lib {
   max-height: 12.5rem;
   overflow-y: auto;
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: var(--lib-layer);
 }
 .lib-seat {
   width: 100%;
@@ -273,8 +418,7 @@ html[data-style='glass'][data-theme='dark'] .lib {
   letter-spacing: 0.04em;
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--ink-2);
-  /* 墨色薄底：各风格的 --surface-2 与座位区底色有的几乎一样 */
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  background: var(--surface);
   transition: color calc(0.25s * var(--speed, 1)) var(--ease), background-color calc(0.25s * var(--speed, 1)) var(--ease);
 }
 .lib-seat:hover {
@@ -307,20 +451,20 @@ html[data-style='glass'][data-theme='dark'] .lib {
   letter-spacing: 0.06em;
   white-space: nowrap;
   color: var(--ink-2);
-  background: var(--surface);
+  background: var(--lib-layer);
 }
 .lib-tag {
   flex: none;
   padding: 0.08rem 0.6rem;
   border-radius: 999px;
   font-size: 0.75rem;
+  font-weight: 400;
   letter-spacing: 0.06em;
   white-space: nowrap;
   color: var(--ink-3);
-  background: var(--surface-2);
+  background: var(--lib-layer);
 }
-.lib-tag[data-tone='soft'],
-.lib-tag[data-tone='hot'] {
+.lib-tag[data-tone='soft'] {
   color: var(--shu);
   background: rgba(var(--shu-rgb), 0.12);
 }
@@ -333,79 +477,118 @@ html[data-style='glass'][data-theme='dark'] .lib {
   color: var(--ink-3);
 }
 
-/* ---- 我的预约 / 订阅 ---- */
-.lib-side {
-  margin-top: 0.25rem;
+/* ---- 右栏：订阅 ---- */
+.lib-side-body,
+.lib-compose {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-.lib-bookings,
-.lib-watches,
-.lib-presets {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.lib-side-title {
+  padding: 0.125rem 0.5rem 0.625rem;
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
-.lib-booking,
-.lib-watch,
-.lib-preset {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 0.5rem 0.625rem;
-  border-radius: var(--r-md);
-  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
+.lib-side-scroll {
+  flex: 1;
+  min-height: 0;
 }
-.lib-preset {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.lib-booking:hover,
-.lib-watch:hover,
-.lib-preset:hover {
-  background: var(--surface-2);
-}
-.lib-booking[data-done],
-.lib-watch[data-done] {
-  opacity: 0.5;
-}
-.lib-item-title {
-  display: block;
-  font-size: 1rem;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* 右栏分组：套餐、订阅 */
 .lib-group + .lib-group {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
 }
 .lib-group-head {
-  padding: 0.25rem 0.625rem 0.375rem;
+  padding: 0 0.5rem 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   color: var(--ink-2);
 }
-/* 订阅的余座：有空座时为绿 */
-.lib-free {
-  font-size: 0.875rem;
+.lib-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lib-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--r-md);
+  background: var(--lib-layer);
+  transition: opacity calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.6s * var(--speed, 1)) var(--ease);
+}
+.lib-card[data-done] {
+  opacity: 0.55;
+}
+.lib-card[data-fresh] {
+  background: color-mix(in srgb, var(--surface-2) 75%, rgba(var(--shu-rgb), 0.5));
+}
+.lib-card-top,
+.lib-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.875rem;
+}
+.lib-card-top {
+  align-items: flex-start;
+}
+.lib-card-title {
+  display: block;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-scope-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.375rem;
+}
+.lib-mini {
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface);
+}
+/* 订阅的现况：有空座为绿 */
+.lib-card-status {
+  flex: none;
+  font-size: 1.125rem;
+  line-height: 1.2;
   white-space: nowrap;
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--ink-3);
 }
-.lib-free[data-on] {
+.lib-card-status[data-tone='free'] {
   color: var(--lib-free);
+}
+.lib-card-status[data-tone='done'] {
+  color: var(--shu);
 }
 .lib-acts {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.375rem;
 }
-.lib-acts .act,
-.lib-booking .act {
+.lib-acts .act {
   white-space: nowrap;
   font-size: 0.875rem;
+}
+.lib .btn.lib-btn-sm {
+  padding: 0.3rem 0.875rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 .lib-icon {
   display: grid;
@@ -425,19 +608,149 @@ html[data-style='glass'][data-theme='dark'] .lib {
   height: 1.125rem;
 }
 
-/* 勾选后的操作条：左栏底部，已选范围、时段、存为套餐 / 订阅 / 自动预约 */
-.lib-bar-wrap {
-  flex: none;
-  overflow: hidden;
+/* 图标按钮的删除确认：展开成主题色胶囊写「确认删除」 */
+.lib-icon[data-armed] {
+  width: auto;
+  gap: 0.25rem;
+  padding: 0 0.625rem 0 0.375rem;
+  border-radius: 999px;
+  display: inline-flex;
+  color: var(--lib-on-shu);
+  background: var(--shu);
 }
-.lib-bar {
+.lib-icon[data-armed]:hover {
+  color: var(--lib-on-shu);
+  background: var(--shu);
+}
+.lib-icon-confirm {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* 订阅卡片上的「自动预约」勾选 */
+.lib-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface);
+  transition: color calc(0.25s * var(--speed, 1)) var(--ease), background-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.lib-auto .lib-box {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.3rem;
+}
+.lib-auto .lib-box svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.lib-auto:hover,
+.lib-auto[data-on] {
+  color: var(--shu);
+}
+.lib-auto[data-on] {
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.lib-auto[data-armed] {
+  color: var(--lib-on-shu);
+  background: var(--shu);
+}
+
+/* 空状态：订阅三步，第一步亮 */
+.lib-steps {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0 0.5rem;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+.lib-steps li {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
-  margin-top: 0.5rem;
-  padding: 0.875rem;
+  padding: 0.625rem 0.75rem;
   border-radius: var(--r-md);
-  background: var(--surface-2);
+  font-size: 1rem;
+  color: var(--ink-3);
+  background: var(--lib-layer);
+}
+.lib-steps li[data-on] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.lib-step-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-3);
+  background: var(--surface);
+}
+.lib-steps li[data-on] .lib-step-no,
+.lib-step-no[data-done] {
+  color: var(--lib-on-shu);
+  background: var(--shu);
+}
+
+/* 新订阅表单：编号的几节，底部两个按钮 */
+.lib-compose-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 0.25rem;
+}
+.lib-step {
+  padding: 0.75rem 0.875rem 0.875rem;
+  border-radius: var(--r-md);
+  background: var(--lib-layer);
+}
+.lib-step + .lib-step {
+  margin-top: 0.5rem;
+}
+.lib-step-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.lib-step-head-quiet {
+  color: var(--ink-2);
+}
+.lib-step-meta {
+  margin-left: auto;
+  display: flex;
+  gap: 0.375rem;
+  font-weight: 400;
+}
+.lib-step-meta .part {
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface);
+}
+.lib-step-empty {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--r-md);
+  font-size: 0.9375rem;
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.08);
 }
 .lib-scopes {
   list-style: none;
@@ -445,9 +758,8 @@ html[data-style='glass'][data-theme='dark'] .lib {
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 0.375rem;
-  max-height: 4.5rem;
+  max-height: 6.5rem;
   overflow-y: auto;
 }
 .lib-scope {
@@ -477,43 +789,110 @@ html[data-style='glass'][data-theme='dark'] .lib {
   width: 0.875rem;
   height: 0.875rem;
 }
-.lib-bar-row {
+.lib-options {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
+  gap: 0.25rem;
+}
+.lib-options .choice {
+  white-space: nowrap;
+}
+.lib-option-sub {
+  margin-left: 0.45em;
+  font-size: 0.8em;
+  opacity: 0.6;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .lib-window {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  margin-right: auto;
+  margin-top: 0.625rem;
 }
-.lib-bar .lib-time.field,
-.lib-bar .lib-name-field.field {
+.lib .lib-time.field,
+.lib .lib-name-field.field {
   min-height: 0;
-  padding: 0.35rem 0.75rem;
+  padding: 0.4rem 0.875rem;
   border-radius: 999px;
   font-size: 0.9375rem;
   background: var(--surface);
 }
-.lib-bar .lib-time.field {
-  width: 6.5rem;
+.lib .lib-time.field {
+  width: 6.75rem;
   font-variant-numeric: lining-nums tabular-nums;
+}
+.lib .lib-name-field.field {
+  width: 100%;
 }
 .lib-dash {
   color: var(--ink-3);
 }
-.lib-name {
-  display: inline-flex;
-  align-items: center;
+/* 有空座时：通知我 / 自动预约，两张可选卡片，右侧单选圆点 */
+.lib-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
 }
-.lib-bar .lib-name-field.field {
-  width: 11rem;
+.lib-mode {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--r-md);
+  text-align: left;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
-.lib-bar-row .btn,
-.lib-bar-row .act {
+.lib-mode:hover {
+  box-shadow: inset 0 0 0 1.5px rgba(var(--shu-rgb), 0.35);
+}
+.lib-mode[data-on] {
+  background: color-mix(in srgb, var(--surface) 85%, rgba(var(--shu-rgb), 0.6));
+  box-shadow: inset 0 0 0 1.5px var(--shu);
+}
+.lib-mode-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  color: var(--ink-2);
+  background: var(--lib-layer);
+}
+.lib-mode[data-on] .lib-mode-icon {
+  color: var(--lib-on-shu);
+  background: var(--shu);
+}
+.lib-mode-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.lib-mode-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.lib-radio {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  border: 1.6px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  transition: border calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.lib-mode[data-on] .lib-radio {
+  border: 5px solid var(--shu);
+}
+.lib-compose-acts {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.875rem 0.25rem 0;
+}
+.lib-compose-acts .btn {
   white-space: nowrap;
 }
 
@@ -522,24 +901,19 @@ html[data-style='glass'][data-theme='dark'] .lib {
     display: block;
     height: auto;
   }
-  html:not([data-platform='android']) .lib {
+  html:not([data-platform='android']) .lib-main {
     grid-template-columns: minmax(0, 1fr);
   }
   html:not([data-platform='android']) .lib-find {
     height: 70vh;
   }
-  html:not([data-platform='android']) .lib-side {
+  html:not([data-platform='android']) .lib-side-scroll {
     overflow: visible;
     mask-image: none;
   }
 }
 
-/* ---- 手机：顶部 找座 / 预约 切换，各占整页，整页滚动；没有订阅 ---- */
-.lib-switch {
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.75rem;
-}
+/* ---- 手机：当前预约 + 选座，整页滚动；没有订阅 ---- */
 html[data-platform='android'] .tools-page:has(.lib) {
   display: block;
   height: auto;
@@ -550,24 +924,50 @@ html[data-platform='android'] .lib {
   display: block;
   margin-top: 0.75rem;
 }
-html[data-platform='android'] .lib[data-view='find'] .lib-mine,
-html[data-platform='android'] .lib[data-view='mine'] .lib-find {
-  display: none;
+html[data-platform='android'] .lib-main {
+  display: block;
 }
-html[data-platform='android'] .lib :is(.lib-list, .lib-side) {
+html[data-platform='android'] .lib-list {
   overflow: visible;
   mask-image: none;
 }
-html[data-platform='android'] .lib-area {
-  padding-right: 0;
+html[data-platform='android'] .lib-booking {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.75rem 0.875rem;
 }
-html[data-platform='android'] .lib-area-main {
-  grid-template-columns: minmax(0, 1fr) 6rem;
-  padding: 0.625rem 0.5rem;
+html[data-platform='android'] .lib-booking-mark {
+  display: none;
+}
+html[data-platform='android'] .lib-booking .btn {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+html[data-platform='android'] .lib-area-hit {
+  grid-template-columns: minmax(0, 1fr) 6rem auto;
+  padding: 0.75rem 0.625rem;
 }
 html[data-platform='android'] .lib-seats {
   grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
 }
 html[data-platform='android'] .lib-seat {
   padding: 0.45rem 0;
+}
+/* 手机：楼层改成一排横向页签，区域整页滚动 */
+html[data-platform='android'] .lib-browse {
+  display: block;
+}
+html[data-platform='android'] .lib-rail {
+  flex-direction: row;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+html[data-platform='android'] .lib-rail-item {
+  min-width: 6.5rem;
+}
+html[data-platform='android'] .lib-floor {
+  margin-top: 0.625rem;
+}
+html[data-platform='android'] .lib-areas {
+  overflow: visible;
+  mask-image: none;
 }

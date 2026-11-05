@@ -48,11 +48,11 @@ async function areaLabel(areaId: string): Promise<string> {
 }
 
 /** 范围与时段：给 preset_id 时取套餐里存的，否则用传入的 */
-async function resolveWatch(args: { preset_id?: string; scopes?: z.infer<typeof scope>[]; from?: string; to?: string }): Promise<{ scopes: LibScope[]; from: string; to: string }> {
+async function resolveWatch(args: { preset_id?: string; scopes?: z.infer<typeof scope>[]; from?: string; to?: string }): Promise<{ name?: string; scopes: LibScope[]; from: string; to: string }> {
   if (args.preset_id) {
     const preset = (await call('lib:presets')).find((p) => p.id === args.preset_id)
     if (!preset) throw new Error('没有这个套餐')
-    return { scopes: preset.scopes, from: args.from ?? preset.from, to: args.to ?? preset.to }
+    return { name: preset.name, scopes: preset.scopes, from: args.from ?? preset.from, to: args.to ?? preset.to }
   }
   if (!args.scopes?.length || !args.from || !args.to) throw new Error('需要 preset_id，或 scopes、from、to')
   return { scopes: await labelScopes(args.scopes), from: args.from, to: args.to }
@@ -118,8 +118,18 @@ export function registerLibraryTools(
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
     }, async ({ id }) => json(await call('lib:unwatch', id)))
 
+    mcp.registerTool('pause_library_watch', {
+      description: '停止或继续一个图书馆余座订阅（list_library_watches 的 id）：停止后留在列表里但不再检查',
+      inputSchema: { id: z.string(), paused: z.boolean().describe('true 停止，false 继续') },
+      annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+    }, async ({ id, paused }) => {
+      const w = (await call('lib:watches')).find((x) => x.id === id)
+      if (!w) throw new Error('没有这个订阅')
+      return json(await call('lib:watch', { id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto: w.auto, paused }))
+    })
+
     mcp.registerTool('list_library_watches', {
-      description: '当前的图书馆余座订阅：范围、每天的检查时段、是否授权自动预约、最近查到的余座',
+      description: '当前的图书馆余座订阅：范围、每天的检查时段、是否授权自动预约、是否已停止（paused）、最近查到的余座',
       annotations: { readOnlyHint: true, openWorldHint: false }
     }, async () => json(await call('lib:watches')))
   }

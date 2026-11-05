@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   areasIn,
   type LibArea,
   type LibBooking,
   type LibBuilding,
+  type LibFloor,
   type LibOverview,
   type LibPreset,
   type LibScope,
@@ -21,6 +22,7 @@ import './library.css'
 const EASE = [0.22, 1, 0.36, 1] as const
 
 type Loaded<T> = { data: T } | { error: string }
+type Mark = 'on' | 'implied' | 'partial' | undefined
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
@@ -38,11 +40,37 @@ function monthDay(day: string): string {
   return `${m}月${d}日`
 }
 
+/** 每天检查时段的几个常用档，其余自定义 */
+const WINDOWS = [
+  { label: '全天', from: '08:00', to: '22:30' },
+  { label: '上午', from: '08:00', to: '12:00' },
+  { label: '下午', from: '12:00', to: '18:00' },
+  { label: '晚上', from: '18:00', to: '22:30' }
+]
+const windowLabel = (from: string, to: string): string => WINDOWS.find((w) => w.from === from && w.to === to)?.label ?? `${from}–${to}`
+
 const sameScope = (a: LibScope, b: LibScope): boolean => a.kind === b.kind && a.id === b.id
 const sameScopes = (a: LibScope[], b: LibScope[]): boolean => a.length === b.length && a.every((s) => b.some((x) => sameScope(s, x)))
 
 /** 若干范围的简称：一处写全名，多处写「第一处 等 N 处」 */
 const scopeTitle = (scopes: LibScope[]): string => (scopes.length > 1 ? `${scopes[0].label} 等 ${scopes.length} 处` : (scopes[0]?.label ?? ''))
+
+const minutes = (hm: string): number => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5))
+/** 现在（北京时间）是否在每天的检查时段里，时段可跨零点 */
+function inWindow(from: string, to: string): boolean {
+  const now = minutes(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()))
+  const a = minutes(from)
+  const b = minutes(to)
+  return a <= b ? now >= a && now < b : now >= a || now < b
+}
+
+const ago = (t: number): string => {
+  const m = Math.floor((Date.now() - t) / 60_000)
+  return m < 1 ? '刚刚' : m < 60 ? `${m} 分钟前` : `${Math.floor(m / 60)} 小时前`
+}
+
+/** 正在生效的预约（可取消的、或状态表明还没结束的） */
+const isCurrent = (b: LibBooking): boolean => b.canCancel || /待签到|使用中|已签到|暂离|预约成功/.test(b.status)
 
 /**
  * 勾选 / 取消一项范围。勾上一馆（层）即包含其下全部；在已勾的上级里取消一个下级时，
@@ -52,7 +80,7 @@ function toggleScope(buildings: LibBuilding[], picked: LibScope[], kind: LibScop
   for (const b of buildings) {
     const bScope: LibScope = { kind: 'building', id: b.id, label: b.name }
     const bPicked = picked.some((s) => sameScope(s, bScope))
-    const floorScope = (f: LibBuilding['floors'][number]): LibScope => ({ kind: 'floor', id: f.id, label: `${b.name} ${f.name}` })
+    const floorScope = (f: LibFloor): LibScope => ({ kind: 'floor', id: f.id, label: `${b.name} ${f.name}` })
     if (kind === 'building' && b.id === id) {
       if (bPicked) return picked.filter((s) => !sameScope(s, bScope))
       const inside = new Set(b.floors.flatMap((f) => [`floor${f.id}`, ...f.areas.map((a) => `area${a.id}`)]))
@@ -80,10 +108,16 @@ function toggleScope(buildings: LibBuilding[], picked: LibScope[], kind: LibScop
   return picked
 }
 
+/** 订阅表单的初值：新订阅为空，编辑套餐时带上套餐 */
+interface Seed {
+  key: number
+  preset?: LibPreset
+}
+
 /**
- * 工具「图书馆预约」：左边找座（日期、馆、各层区域的余座，区域展开后选时段与空座预约）。
- * 桌面端在行首勾选馆 / 层 / 区域（可多选），左栏底部的操作条一键订阅、自动预约或存为套餐；
- * 右边是我的预约与订阅（套餐一键订阅、各订阅的余座与自动预约）。预约与取消、授权自动预约都要二次点击确认
+ * 工具「图书馆预约」。上方「当前预约」只放正在生效的预约；左边按馆 → 层 → 区域看余座，
+ * 点区域行即勾选（行尾「选座」才展开空座），右边是订阅：没勾选时列出进行中的订阅与套餐（一键复用），
+ * 一勾选就变成三步的新订阅表单（区域、时段、方式），可顺带存为套餐。手机端只有当前预约与选座
  */
 export function LibraryTool() {
   const notify = useApp((s) => s.notify)
@@ -91,16 +125,18 @@ export function LibraryTool() {
   const [overview, setOverview] = useState<Loaded<LibOverview> | null>(null)
   const [date, setDate] = useState<string | undefined>(undefined)
   const [building, setBuilding] = useState<string | null>(null)
+  const [floor, setFloor] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
-  const [bookings, setBookings] = useState<Loaded<LibBooking[]> | null>(null)
+  const [bookings, setBookings] = useState<LibBooking[]>([])
   const [watches, setWatches] = useState<LibWatch[]>([])
   const [presets, setPresets] = useState<LibPreset[]>([])
   const [picked, setPicked] = useState<LibScope[]>([])
-  const [side, setSide] = useState<'bookings' | 'watch'>('bookings')
-  const [view, setView] = useState<'find' | 'mine'>('find')
+  const [seed, setSeed] = useState<Seed>({ key: 0 })
+  const [fresh, setFresh] = useState<string | null>(null)
 
   const data = overview && 'data' in overview ? overview.data : null
   const current = data?.buildings.find((b) => b.id === building) ?? data?.buildings[0]
+  const floorNow = current?.floors.find((f) => f.id === floor) ?? current?.floors[0]
 
   const loadOverview = useCallback(
     (day?: string) =>
@@ -110,14 +146,7 @@ export function LibraryTool() {
       ),
     []
   )
-  const loadBookings = useCallback(
-    () =>
-      window.zju['lib:bookings']().then(
-        (d) => setBookings({ data: d }),
-        (e) => setBookings({ error: errorText(e) })
-      ),
-    []
-  )
+  const loadBookings = useCallback(() => window.zju['lib:bookings']().then(setBookings, () => setBookings([])), [])
 
   // 开着时每分钟静默刷新余座；订阅（桌面端）每 15 秒取一次，看后台查到的余座
   useEffect(() => {
@@ -135,29 +164,33 @@ export function LibraryTool() {
     return () => clearInterval(timer)
   }, [epoch, loadBookings])
 
-  // 已在订阅里的区域：名称旁带「订阅中」
+  // 已在订阅里的区域：名称旁带小标签
   const watched = useMemo(() => {
-    if (!data) return new Map<string, boolean>()
     const map = new Map<string, boolean>()
-    for (const w of watches.filter((x) => !x.done)) for (const a of areasIn(data, w.scopes)) map.set(a.area.id, map.get(a.area.id) || w.auto)
+    if (!data) return map
+    for (const w of watches.filter((x) => !x.done && !x.paused)) for (const a of areasIn(data, w.scopes)) map.set(a.area.id, map.get(a.area.id) || w.auto)
     return map
   }, [data, watches])
 
   const pick = (kind: LibScope['kind'], id: string): void => {
     if (data) setPicked((list) => toggleScope(data.buildings, list, kind, id))
   }
-  const state = (kind: LibScope['kind'], id: string, parents: LibScope[]): 'on' | 'implied' | undefined =>
-    picked.some((s) => s.kind === kind && s.id === id) ? 'on' : parents.some((p) => picked.some((s) => sameScope(s, p))) ? 'implied' : undefined
+  const has = (kind: LibScope['kind'], id: string): boolean => picked.some((s) => s.kind === kind && s.id === id)
+
+  const buildingMark = (b: LibBuilding): Mark =>
+    has('building', b.id) ? 'on' : b.floors.some((f) => has('floor', f.id) || f.areas.some((a) => has('area', a.id))) ? 'partial' : undefined
+  const floorMark = (b: LibBuilding, f: LibFloor): Mark =>
+    has('floor', f.id) ? 'on' : has('building', b.id) ? 'implied' : f.areas.some((a) => has('area', a.id)) ? 'partial' : undefined
+  const areaMark = (b: LibBuilding, f: LibFloor, a: LibArea): Mark => (has('area', a.id) ? 'on' : has('floor', f.id) || has('building', b.id) ? 'implied' : undefined)
 
   const reserve = async (area: LibArea, seat: LibSeat, segment: LibSegment): Promise<void> => {
     try {
       const r = await window.zju['lib:reserve'](area.id, seat.id, segment)
       notify(r.status === 'saved' ? `已预约 ${seat.name} 号` : r.message || '结果未知')
+      if (r.status === 'saved') setOpen(null)
     } catch (e) {
       notify(errorText(e))
     }
-    setSide('bookings')
-    if (MOBILE) setView('mine')
     void loadBookings()
     void loadOverview(date)
   }
@@ -173,90 +206,156 @@ export function LibraryTool() {
     void loadOverview(date)
   }
 
-  const subscribe = async (scopes: LibScope[], from: string, to: string, auto: boolean): Promise<void> => {
-    // 同样的范围与时段已有订阅时改它，不另起一条
-    const same = watches.find((w) => sameScopes(w.scopes, scopes) && w.from === from && w.to === to)
-    setWatches(await window.zju['lib:watch']({ id: same?.id, scopes, from, to, auto }))
-    setSide('watch')
-    notify(auto ? '已订阅并自动预约' : '已订阅')
+  /** 订阅：同样的范围与时段已有一条时改它，不另起一条 */
+  const subscribe = async (input: { scopes: LibScope[]; from: string; to: string; auto: boolean; name?: string }): Promise<void> => {
+    const same = watches.find((w) => sameScopes(w.scopes, input.scopes) && w.from === input.from && w.to === input.to)
+    const list = await window.zju['lib:watch']({ ...input, id: same?.id })
+    setWatches(list)
+    setFresh(same?.id ?? list.at(-1)?.id ?? null)
+    notify(input.auto ? '已开始自动预约' : '已开始订阅')
   }
 
-  const savePreset = async (name: string, from: string, to: string): Promise<void> => {
-    setPresets(await window.zju['lib:savePreset']({ name, scopes: picked, from, to }))
-    setSide('watch')
-    notify('已存为套餐')
+  const savePreset = async (preset: Omit<LibPreset, 'id'> & { id?: string }): Promise<void> => {
+    setPresets(await window.zju['lib:savePreset'](preset))
   }
+
+  const finish = (): void => {
+    setPicked([])
+    setSeed((s) => ({ key: s.key + 1 }))
+  }
+
+  const editPreset = (p: LibPreset): void => {
+    setPicked(p.scopes)
+    setSeed((s) => ({ key: s.key + 1, preset: p }))
+  }
+
+  const live = bookings.filter(isCurrent)
+  const composing = picked.length > 0 || seed.preset !== undefined
 
   return (
-    <div className="lib" data-view={view}>
-      {MOBILE && (
-        <div className="lib-switch">
-          <Choice group="lib-view" active={view === 'find'} onClick={() => setView('find')}>
-            找座
-          </Choice>
-          <Choice group="lib-view" active={view === 'mine'} onClick={() => setView('mine')}>
-            预约
-          </Choice>
-        </div>
-      )}
+    <div className="lib">
+      <AnimatePresence initial={false}>
+        {live.length > 0 && (
+          <motion.section
+            key="now"
+            className="lib-now"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: dur(0.4), ease: EASE }}
+          >
+            <div className="lib-now-inner">
+              {live.map((b) => (
+                <CurrentBooking key={b.id} booking={b} onCancel={cancel} />
+              ))}
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
 
-      <Reveal i={1} flat className="panel lib-find">
-        <div className="lib-head">
-          <span className="lib-choices">
-            {data?.dates.map((d) => (
-              <Choice key={d} group="lib-date" active={d === data.date} onClick={() => setDate(d)}>
-                {dayLabel(d, data.dates)}
+      <div className="lib-main">
+        <Reveal i={1} flat className="panel lib-find">
+          <div className="lib-head">
+            <span className="lib-choices">
+              {data?.dates.map((d) => (
+                <Choice key={d} group="lib-date" active={d === data.date} onClick={() => setDate(d)}>
+                  {dayLabel(d, data.dates)}
+                </Choice>
+              ))}
+            </span>
+            {!MOBILE && current && (
+              <button className="lib-all" data-mark={buildingMark(current)} onClick={() => pick('building', current.id)}>
+                <Box mark={buildingMark(current)} />
+                全选本馆
+              </button>
+            )}
+          </div>
+          <div className="lib-tabs">
+            {data?.buildings.map((b) => (
+              <Choice key={b.id} group="lib-building" className="small" active={b.id === current?.id} onClick={() => {
+                  setBuilding(b.id)
+                  setFloor(null)
+                  setOpen(null)
+                }}>
+                {b.name}
+                <span className="lib-tab-free">{b.free ?? ''}</span>
+                {!MOBILE && buildingMark(b) && <span className="lib-tab-dot" aria-hidden />}
               </Choice>
             ))}
-          </span>
-        </div>
-        <div className="lib-tabs">
-          {data?.buildings.map((b) => (
-            <Choice key={b.id} group="lib-building" className="small" active={b.id === current?.id} onClick={() => setBuilding(b.id)}>
-              {b.name}
-              <span className="lib-tab-free">{b.free ?? ''}</span>
-            </Choice>
-          ))}
-          {!MOBILE && current && (
-            <button className="act lib-tabs-end" data-on={state('building', current.id, []) ? true : undefined} onClick={() => pick('building', current.id)}>
-              整馆
-            </button>
-          )}
-        </div>
-        <div className="pane-scroll lib-list">
-          {!overview ? (
-            <Quiet loading error={null} empty="无" />
-          ) : 'error' in overview ? (
-            <Quiet loading={false} error={overview.error} empty="无" />
-          ) : !current ? (
-            <p className="quiet">无</p>
-          ) : (
-            current.floors.map((f) => {
-              const bScope: LibScope = { kind: 'building', id: current.id, label: '' }
-              const fScope: LibScope = { kind: 'floor', id: f.id, label: '' }
-              return (
-                <section key={f.id} className="lib-floor">
-                  <h3 className="lib-floor-head">
-                    {!MOBILE && <Check state={state('floor', f.id, [bScope])} label={f.name} onClick={() => pick('floor', f.id)} />}
-                    <span className="lib-floor-name">{f.name}</span>
-                    <Count free={f.free} total={f.total} />
-                  </h3>
-                  <ul className="lib-areas">
-                    {f.areas.map((a) => {
+          </div>
+          <div className="lib-list">
+            {!overview ? (
+              <Quiet loading error={null} empty="无" />
+            ) : 'error' in overview ? (
+              <Quiet loading={false} error={overview.error} empty="无" />
+            ) : !current || !floorNow ? (
+              <p className="quiet">无</p>
+            ) : (
+              <div className="lib-browse">
+                {/* 楼层：左侧一列只管切换，勾选在右边卡片里 */}
+                <nav className="lib-rail" aria-label="楼层">
+                  {current.floors.map((f) => (
+                    <button
+                      key={f.id}
+                      className="lib-rail-item"
+                      data-active={f.id === floorNow.id || undefined}
+                      onClick={() => {
+                        setFloor(f.id)
+                        setOpen(null)
+                      }}
+                    >
+                      <span className="lib-rail-name">
+                        {f.name}
+                        {!MOBILE && floorMark(current, f) && <span className="lib-tab-dot" aria-hidden />}
+                      </span>
+                      <Meter free={f.free} total={f.total} />
+                    </button>
+                  ))}
+                </nav>
+
+                <section className="lib-floor">
+                  <header className="lib-floor-head">
+                    <h3 className="lib-floor-name">{floorNow.name}</h3>
+                    {!MOBILE && (
+                      <button className="lib-all" data-mark={floorMark(current, floorNow)} onClick={() => pick('floor', floorNow.id)}>
+                        <Box mark={floorMark(current, floorNow)} />
+                        全选本层
+                      </button>
+                    )}
+                  </header>
+                  <ul className="pane-scroll lib-areas">
+                    {floorNow.areas.map((a) => {
                       const expanded = open === a.id
+                      const mark = areaMark(current, floorNow, a)
                       const watching = watched.get(a.id)
+                      const body = (
+                        <>
+                          <span className="lib-area-name">
+                            {a.name}
+                            {watching !== undefined && <span className="lib-tag" data-tone="soft">{watching ? '自动预约' : '订阅中'}</span>}
+                          </span>
+                          <Meter free={a.free} total={a.total} />
+                        </>
+                      )
                       return (
-                        <li key={a.id} data-open={expanded || undefined}>
-                          <div className="lib-area">
-                            {!MOBILE && <Check state={state('area', a.id, [bScope, fScope])} label={a.name} onClick={() => pick('area', a.id)} />}
-                            <button className="lib-area-main" onClick={() => setOpen(expanded ? null : a.id)} aria-expanded={expanded}>
-                              <span className="lib-area-name">
-                                {a.name}
-                                {watching !== undefined && <span className="lib-tag" data-tone="soft">{watching ? '自动预约' : '订阅中'}</span>}
-                              </span>
-                              <Meter free={a.free} total={a.total} />
+                        <li key={a.id} className="lib-area" data-open={expanded || undefined} data-mark={mark}>
+                          {MOBILE ? (
+                            <button className="lib-area-hit" onClick={() => setOpen(expanded ? null : a.id)} aria-expanded={expanded}>
+                              {body}
+                              <Chevron />
                             </button>
-                          </div>
+                          ) : (
+                            <div className="lib-area-row">
+                              <button className="lib-area-hit" aria-pressed={mark !== undefined} onClick={() => pick('area', a.id)}>
+                                <Box mark={mark} />
+                                {body}
+                              </button>
+                              <button className="lib-seat-btn" data-on={expanded || undefined} aria-expanded={expanded} onClick={() => setOpen(expanded ? null : a.id)}>
+                                选座
+                                <Chevron />
+                              </button>
+                            </div>
+                          )}
                           <AnimatePresence initial={false}>
                             {expanded && (
                               <motion.div
@@ -276,79 +375,468 @@ export function LibraryTool() {
                     })}
                   </ul>
                 </section>
-              )
-            })
-          )}
-        </div>
-        <AnimatePresence initial={false}>
-          {!MOBILE && picked.length > 0 && (
-            <motion.div
-              key="bar"
-              className="lib-bar-wrap"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: dur(0.4), ease: EASE }}
-            >
-              <SelectBar
-                scopes={picked}
-                onRemove={(s) => setPicked((list) => list.filter((x) => !sameScope(x, s)))}
-                onClear={() => setPicked([])}
-                onSubscribe={async (from, to, auto) => {
-                  await subscribe(picked, from, to, auto)
-                  setPicked([])
-                }}
-                onSavePreset={async (name, from, to) => {
-                  await savePreset(name, from, to)
-                  setPicked([])
-                }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Reveal>
-
-      <Reveal i={2} flat className="panel lib-mine">
-        {!MOBILE && (
-          <div className="lib-head">
-            <span className="lib-choices">
-              <Choice group="lib-side" active={side === 'bookings'} onClick={() => setSide('bookings')}>
-                预约
-              </Choice>
-              <Choice group="lib-side" active={side === 'watch'} onClick={() => setSide('watch')}>
-                订阅
-              </Choice>
-            </span>
+              </div>
+            )}
           </div>
+        </Reveal>
+
+        {!MOBILE && (
+          <Reveal i={2} flat className="panel lib-side">
+            <AnimatePresence mode="wait" initial={false}>
+              {composing ? (
+                <motion.div key={`compose${seed.key}`} className="lib-side-body" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: dur(0.3), ease: EASE }}>
+                  <Composer
+                    scopes={picked}
+                    overview={data}
+                    preset={seed.preset}
+                    onRemove={(s) => setPicked((list) => list.filter((x) => !sameScope(x, s)))}
+                    onClose={finish}
+                    onSubscribe={async (input) => {
+                      await subscribe(input)
+                      finish()
+                    }}
+                    onSavePreset={async (preset) => {
+                      await savePreset(preset)
+                      notify(preset.id ? '已更新套餐' : '已存为套餐')
+                      finish()
+                    }}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div key="idle" className="lib-side-body" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: dur(0.3), ease: EASE }}>
+                  <h2 className="lib-side-title">订阅</h2>
+                  {watches.length === 0 && presets.length === 0 ? (
+                    <Steps active={0} />
+                  ) : (
+                    <div className="pane-scroll lib-side-scroll">
+                      {watches.length > 0 && (
+                        <section className="lib-group">
+                          <h3 className="lib-group-head">我的订阅</h3>
+                          <ul className="lib-cards">
+                            {watches.map((w) => (
+                              <WatchCard
+                                key={w.id}
+                                watch={w}
+                                fresh={w.id === fresh}
+                                saved={presets.some((p) => sameScopes(p.scopes, w.scopes) && p.from === w.from && p.to === w.to)}
+                                onAuto={async (auto) => setWatches(await window.zju['lib:watch']({ id: w.id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto }))}
+                                onPause={async (paused) => setWatches(await window.zju['lib:watch']({ id: w.id, name: w.name, scopes: w.scopes, from: w.from, to: w.to, auto: w.auto, paused }))}
+                                onRemove={async () => setWatches(await window.zju['lib:unwatch'](w.id))}
+                                onSave={async () => {
+                                  await savePreset({ name: w.name ?? scopeTitle(w.scopes), scopes: w.scopes, from: w.from, to: w.to })
+                                  notify('已存为套餐')
+                                }}
+                              />
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+                      {presets.length > 0 && (
+                        <section className="lib-group">
+                          <h3 className="lib-group-head">套餐</h3>
+                          <ul className="lib-cards">
+                            {presets.map((p) => (
+                              <PresetCard
+                                key={p.id}
+                                preset={p}
+                                live={watches.find((w) => !w.done && !w.paused && sameScopes(w.scopes, p.scopes) && w.from === p.from && w.to === p.to)}
+                                onSubscribe={(auto) => void subscribe({ name: p.name, scopes: p.scopes, from: p.from, to: p.to, auto })}
+                                onEdit={() => editPreset(p)}
+                                onRemove={async () => setPresets(await window.zju['lib:removePreset'](p.id))}
+                              />
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Reveal>
         )}
-        <div className="pane-scroll lib-side">
-          {side === 'watch' && !MOBILE ? (
-            presets.length === 0 && watches.length === 0 ? (
-              <p className="quiet">无</p>
-            ) : (
-              <>
-                {presets.length > 0 && (
-                  <PresetList
-                    presets={presets}
-                    watches={watches}
-                    onSubscribe={(p, auto) => subscribe(p.scopes, p.from, p.to, auto)}
-                    onRemove={async (id) => setPresets(await window.zju['lib:removePreset'](id))}
-                  />
-                )}
-                {watches.length > 0 && (
-                  <WatchList
-                    watches={watches}
-                    onRemove={async (id) => setWatches(await window.zju['lib:unwatch'](id))}
-                    onAuto={async (w, auto) => setWatches(await window.zju['lib:watch']({ id: w.id, scopes: w.scopes, from: w.from, to: w.to, auto }))}
-                  />
-                )}
-              </>
-            )
+      </div>
+    </div>
+  )
+}
+
+/** 订阅三步：空状态里只亮第一步，表单里各节用同样的编号 */
+function Steps({ active }: { active: number }) {
+  return (
+    <ol className="lib-steps">
+      {['勾选区域', '设定时段', '开始订阅'].map((t, i) => (
+        <li key={t} data-on={i === active || undefined}>
+          <span className="lib-step-no">{i + 1}</span>
+          {t}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** 新订阅 / 编辑套餐：① 区域（左边勾选）② 每天检查的时段 ③ 有空座时通知我还是自动预约；填了套餐名就顺带存为套餐 */
+function Composer(props: {
+  scopes: LibScope[]
+  overview: LibOverview | null
+  preset?: LibPreset
+  onRemove: (s: LibScope) => void
+  onClose: () => void
+  onSubscribe: (input: { scopes: LibScope[]; from: string; to: string; auto: boolean; name?: string }) => Promise<void>
+  onSavePreset: (preset: Omit<LibPreset, 'id'> & { id?: string }) => Promise<void>
+}) {
+  const { scopes, preset } = props
+  const [from, setFrom] = useState(preset?.from ?? WINDOWS[0].from)
+  const [to, setTo] = useState(preset?.to ?? WINDOWS[0].to)
+  const [custom, setCustom] = useState(preset ? !WINDOWS.some((w) => w.from === preset.from && w.to === preset.to) : false)
+  const [auto, setAuto] = useState(false)
+  const [name, setName] = useState(preset?.name ?? '')
+  const [busy, setBusy] = useState(false)
+
+  const areas = props.overview ? areasIn(props.overview, scopes) : []
+  const free = areas.reduce((n, a) => n + (a.area.free ?? 0), 0)
+  const total = areas.reduce((n, a) => n + (a.area.total ?? 0), 0)
+  const ready = scopes.length > 0 && Boolean(from && to && from !== to)
+
+  const run = async (job: () => Promise<void>): Promise<void> => {
+    setBusy(true)
+    try {
+      await job()
+    } finally {
+      setBusy(false)
+    }
+  }
+  const presetInput = (): Omit<LibPreset, 'id'> & { id?: string } => ({ ...(preset ? { id: preset.id } : {}), name: name.trim() || scopeTitle(scopes), scopes, from, to })
+  const start = (): Promise<void> =>
+    run(async () => {
+      if (name.trim()) await props.onSavePreset(presetInput())
+      await props.onSubscribe({ scopes, from, to, auto, ...(name.trim() ? { name: name.trim() } : {}) })
+    })
+
+  return (
+    <div className="lib-compose">
+      <div className="lib-compose-head">
+        <h2 className="lib-side-title">{preset ? '编辑套餐' : '新订阅'}</h2>
+        <IconButton label="关闭" onClick={props.onClose}>
+          <path d="M7 7l10 10M17 7L7 17" />
+        </IconButton>
+      </div>
+      <div className="pane-scroll lib-side-scroll">
+        <section className="lib-step">
+          <h3 className="lib-step-head">
+            <span className="lib-step-no" data-done={scopes.length > 0 || undefined}>
+              1
+            </span>
+            区域
+            {areas.length > 0 && (
+              <span className="lib-step-meta">
+                <Joined parts={[`${areas.length} 个区域`, `余 ${free} / ${total}`]} />
+              </span>
+            )}
+          </h3>
+          {scopes.length === 0 ? (
+            <p className="lib-step-empty">勾选左侧区域</p>
           ) : (
-            <Bookings bookings={bookings} onCancel={cancel} />
+            <ul className="lib-scopes">
+              {scopes.map((s) => (
+                <li key={`${s.kind}${s.id}`} className="lib-scope">
+                  {s.label}
+                  <button aria-label="移出" title="移出" onClick={() => props.onRemove(s)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                      <path d="M8 8l8 8M16 8l-8 8" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
-      </Reveal>
+        </section>
+
+        <section className="lib-step">
+          <h3 className="lib-step-head">
+            <span className="lib-step-no" data-done>
+              2
+            </span>
+            每天检查的时段
+          </h3>
+          <div className="lib-options">
+            {WINDOWS.map((w) => (
+              <Choice
+                key={w.label}
+                group="lib-window"
+                className="small"
+                active={!custom && from === w.from && to === w.to}
+                onClick={() => {
+                  setCustom(false)
+                  setFrom(w.from)
+                  setTo(w.to)
+                }}
+              >
+                {w.label}
+                <span className="lib-option-sub">
+                  {w.from}–{w.to}
+                </span>
+              </Choice>
+            ))}
+            <Choice group="lib-window" className="small" active={custom} onClick={() => setCustom(true)}>
+              自定义
+            </Choice>
+          </div>
+          {custom && (
+            <span className="lib-window">
+              <input className="field lib-time" type="time" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="每天开始" />
+              <span className="lib-dash">–</span>
+              <input className="field lib-time" type="time" value={to} onChange={(e) => setTo(e.target.value)} aria-label="每天结束" />
+            </span>
+          )}
+        </section>
+
+        <section className="lib-step">
+          <h3 className="lib-step-head">
+            <span className="lib-step-no" data-done>
+              3
+            </span>
+            有空座时
+          </h3>
+          <div className="lib-modes">
+            <ModeCard on={!auto} title="通知我" icon={<BellGlyph />} onClick={() => setAuto(false)} />
+            <ModeCard on={auto} title="自动预约" icon={<BoltGlyph />} onClick={() => setAuto(true)} />
+          </div>
+        </section>
+
+        <section className="lib-step">
+          <h3 className="lib-step-head lib-step-head-quiet">套餐名</h3>
+          <input className="field lib-name-field" placeholder={scopes.length ? scopeTitle(scopes) : '套餐名'} value={name} onChange={(e) => setName(e.target.value)} aria-label="套餐名" />
+        </section>
+      </div>
+
+      <div className="lib-compose-acts">
+        <button className="btn" disabled={!ready || busy} onClick={() => void run(() => props.onSavePreset(presetInput()))}>
+          {preset ? '保存套餐' : '只存为套餐'}
+        </button>
+        {auto ? (
+          <ArmedButton className="btn btn-solid" label="开始自动预约" confirm="确认授权" disabled={!ready || busy} onRun={() => void start()} />
+        ) : (
+          <button className="btn btn-solid" disabled={!ready || busy} onClick={() => void start()}>
+            开始订阅
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ModeCard({ on, title, icon, onClick }: { on: boolean; title: string; icon: ReactNode; onClick: () => void }) {
+  return (
+    <button className="lib-mode" data-on={on || undefined} aria-pressed={on} onClick={onClick}>
+      <span className="lib-mode-icon">{icon}</span>
+      <span className="lib-mode-title">{title}</span>
+      <span className="lib-radio" aria-hidden />
+    </button>
+  )
+}
+
+/** 我的订阅：名称与范围、每天的检查时段、现在的余座；自动预约勾选，停止 / 继续、存为套餐、删除为图标 */
+function WatchCard(props: {
+  watch: LibWatch
+  fresh: boolean
+  saved: boolean
+  onAuto: (auto: boolean) => void
+  onPause: (paused: boolean) => void
+  onRemove: () => void
+  onSave: () => void
+}) {
+  const { watch: w } = props
+  const active = inWindow(w.from, w.to)
+  const stopped = Boolean(w.paused || w.done)
+  const status = w.paused ? '已停止' : w.done ? w.done : !active ? `${w.from} 开始` : w.free === null ? '未查过' : w.free ? `余 ${w.free}` : '满座'
+  return (
+    <li className="lib-card" data-done={stopped || undefined} data-fresh={props.fresh || undefined}>
+      <div className="lib-card-top">
+        <span className="min-w-0">
+          <span className="lib-card-title">{w.name ?? scopeTitle(w.scopes)}</span>
+          <ScopeLine scopes={w.scopes} />
+        </span>
+        <span className="lib-card-status" data-tone={w.done && !w.paused ? 'done' : !stopped && active && w.free ? 'free' : undefined}>
+          {status}
+        </span>
+      </div>
+      <div className="lib-card-bottom">
+        <span className="lib-sub">
+          <Joined parts={[`每天 ${windowLabel(w.from, w.to)}`, !stopped && w.checkedAt && `${ago(w.checkedAt)}查过`]} />
+        </span>
+        <span className="lib-acts">
+          {!stopped && <AutoCheck on={w.auto} onChange={props.onAuto} />}
+          {stopped ? (
+            <IconButton label={w.done && !w.paused ? '重新开始' : '继续'} onClick={() => props.onPause(false)}>
+              <path d="M8.5 6.5v11l9-5.5Z" />
+            </IconButton>
+          ) : (
+            <IconButton label="停止" onClick={() => props.onPause(true)}>
+              <path d="M9 6.5v11M15 6.5v11" />
+            </IconButton>
+          )}
+          {!props.saved && (
+            <IconButton label="存为套餐" onClick={props.onSave}>
+              <path d="M7 4.5h10v15l-5-3.5-5 3.5Z" />
+            </IconButton>
+          )}
+          <ArmedIcon label="删除" confirm="确认删除" onRun={props.onRemove}>
+            <TrashPath />
+          </ArmedIcon>
+        </span>
+      </div>
+    </li>
+  )
+}
+
+/** 套餐：一键开始订阅 / 自动预约；编辑载回左边的勾选与订阅表单 */
+function PresetCard(props: { preset: LibPreset; live: LibWatch | undefined; onSubscribe: (auto: boolean) => void; onEdit: () => void; onRemove: () => void }) {
+  const { preset: p, live } = props
+  return (
+    <li className="lib-card lib-preset">
+      <div className="lib-card-top">
+        <span className="min-w-0">
+          <span className="lib-card-title">{p.name}</span>
+          <ScopeLine scopes={p.scopes} />
+        </span>
+        {live && (
+          <span className="lib-tag" data-tone="soft">
+            {live.auto ? '自动预约中' : '订阅中'}
+          </span>
+        )}
+      </div>
+      <div className="lib-card-bottom">
+        <span className="lib-sub">
+          <Joined parts={[`每天 ${windowLabel(p.from, p.to)}`]} />
+        </span>
+        <span className="lib-acts">
+          {!live && (
+            <>
+              <button className="btn lib-btn-sm" onClick={() => props.onSubscribe(false)}>
+                开始订阅
+              </button>
+              <ArmedButton className="btn btn-solid lib-btn-sm" label="自动预约" confirm="确认授权" onRun={() => props.onSubscribe(true)} />
+            </>
+          )}
+          <IconButton label="编辑" onClick={props.onEdit}>
+            <path d="M5 19l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L9 17.5Z" />
+            <path d="M13.5 7l3 3" />
+          </IconButton>
+          <ArmedIcon label="删除" confirm="确认删除" onRun={props.onRemove}>
+            <TrashPath />
+          </ArmedIcon>
+        </span>
+      </div>
+    </li>
+  )
+}
+
+/** 范围小标签：最多三个，其余写 +N */
+function ScopeLine({ scopes }: { scopes: LibScope[] }) {
+  return (
+    <span className="lib-scope-line">
+      {scopes.slice(0, 3).map((s) => (
+        <span key={`${s.kind}${s.id}`} className="lib-mini">
+          {s.label}
+        </span>
+      ))}
+      {scopes.length > 3 && <span className="lib-mini">+{scopes.length - 3}</span>}
+    </span>
+  )
+}
+
+/** 「自动预约」勾选：勾上要再点一次确认授权，取消直接生效 */
+function AutoCheck({ on, onChange }: { on: boolean; onChange: (auto: boolean) => void }) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+  return (
+    <button
+      className="lib-auto"
+      data-on={on || undefined}
+      data-armed={armed || undefined}
+      aria-pressed={on}
+      onClick={() => {
+        if (on) return onChange(false)
+        if (!armed) return setArmed(true)
+        setArmed(false)
+        onChange(true)
+      }}
+    >
+      <Box mark={on ? 'on' : undefined} />
+      {armed ? '确认自动预约' : '自动预约'}
+    </button>
+  )
+}
+
+function TrashPath() {
+  return (
+    <>
+      <path d="M5 7h14M10 4.5h4M7 7l.8 11.2a1.5 1.5 0 0 0 1.5 1.3h5.4a1.5 1.5 0 0 0 1.5-1.3L17 7" />
+      <path d="M10.5 10.5v5.5M13.5 10.5v5.5" />
+    </>
+  )
+}
+
+/** 图标式的写操作：第一次点击展开成「确认…」，3 秒内再点才执行 */
+function ArmedIcon({ label, confirm, onRun, children }: { label: string; confirm: string; onRun: () => void; children: ReactNode }) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+  return (
+    <button
+      className="lib-icon"
+      data-armed={armed || undefined}
+      aria-label={armed ? confirm : label}
+      title={armed ? confirm : label}
+      onClick={() => {
+        if (!armed) return setArmed(true)
+        setArmed(false)
+        onRun()
+      }}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {children}
+      </svg>
+      {armed && <span className="lib-icon-confirm">{confirm}</span>}
+    </button>
+  )
+}
+
+function CurrentBooking({ booking: b, onCancel }: { booking: LibBooking; onCancel: (b: LibBooking) => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="lib-booking">
+      <span className="lib-booking-mark" aria-hidden>
+        <SeatGlyph />
+      </span>
+      <span className="min-w-0">
+        <span className="lib-card-title">{b.place}</span>
+        <span className="lib-sub">
+          <Joined parts={[monthDay(b.begin), `${b.begin.slice(11)}–${b.end.slice(11)}`]} />
+        </span>
+      </span>
+      <span className="lib-tag" data-tone="soft">
+        {b.status}
+      </span>
+      {b.canCancel && (
+        <ArmedButton
+          className="btn lib-btn-sm"
+          label={busy ? '取消中' : '取消预约'}
+          confirm="确认取消"
+          disabled={busy}
+          onRun={() => {
+            setBusy(true)
+            void onCancel(b).finally(() => setBusy(false))
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -377,158 +865,49 @@ function Meter({ free, total }: { free: number | null; total: number | null }) {
   )
 }
 
-/** 行首勾选：on 勾上，implied 由上级（整层 / 整馆）带上 */
-function Check({ state, label, onClick }: { state: 'on' | 'implied' | undefined; label: string; onClick: () => void }) {
+/** 勾选框：on 勾上，implied 由整层 / 整馆带上，partial 下面有一部分勾上 */
+function Box({ mark }: { mark: Mark }) {
   return (
-    <button className="lib-check" data-state={state} aria-label={`选择${label}`} aria-pressed={state !== undefined} onClick={onClick}>
-      <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle className="lib-check-ring" cx="12" cy="12" r="8.25" />
-        <path className="lib-check-tick" d="M8.2 12.3l2.6 2.5 5-5.2" />
+    <span className="lib-box" data-mark={mark} aria-hidden>
+      <svg viewBox="0 0 16 16" fill="none" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        {mark === 'partial' ? <path d="M4.5 8h7" /> : <path d="M4 8.3l2.6 2.5L12 5.4" />}
       </svg>
-    </button>
+    </span>
   )
 }
 
-/** 勾选后左栏底部的操作条：已选范围、每天的检查时段，一键订阅 / 自动预约，或存为套餐 */
-function SelectBar(props: {
-  scopes: LibScope[]
-  onRemove: (s: LibScope) => void
-  onClear: () => void
-  onSubscribe: (from: string, to: string, auto: boolean) => Promise<void>
-  onSavePreset: (name: string, from: string, to: string) => Promise<void>
-}) {
-  const [from, setFrom] = useState('08:00')
-  const [to, setTo] = useState('22:30')
-  const [naming, setNaming] = useState(false)
-  const [name, setName] = useState('')
-  const valid = Boolean(from && to && from !== to)
-
-  const save = (e: FormEvent): void => {
-    e.preventDefault()
-    if (!valid) return
-    void props.onSavePreset(name.trim() || scopeTitle(props.scopes), from, to)
-  }
-
+function Chevron() {
   return (
-    <div className="lib-bar">
-      <ul className="lib-scopes">
-        {props.scopes.map((s) => (
-          <li key={`${s.kind}${s.id}`} className="lib-scope">
-            {s.label}
-            <button aria-label="移出" title="移出" onClick={() => props.onRemove(s)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                <path d="M8 8l8 8M16 8l-8 8" />
-              </svg>
-            </button>
-          </li>
-        ))}
-        <li>
-          <IconButton label="清空" onClick={props.onClear}>
-            <path d="M7 7l10 10M17 7L7 17" />
-          </IconButton>
-        </li>
-      </ul>
-      <div className="lib-bar-row">
-        <span className="lib-window">
-          <input className="field lib-time" type="time" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="每天开始" />
-          <span className="lib-dash">–</span>
-          <input className="field lib-time" type="time" value={to} onChange={(e) => setTo(e.target.value)} aria-label="每天结束" />
-        </span>
-        {naming ? (
-          <form className="lib-name" onSubmit={save}>
-            <input className="field lib-name-field" autoFocus placeholder={scopeTitle(props.scopes)} value={name} onChange={(e) => setName(e.target.value)} aria-label="套餐名" />
-            <button type="submit" className="act" disabled={!valid}>
-              保存
-            </button>
-          </form>
-        ) : (
-          <button className="act" onClick={() => setNaming(true)}>
-            存为套餐
-          </button>
-        )}
-        <button className="btn" disabled={!valid} onClick={() => void props.onSubscribe(from, to, false)}>
-          订阅
-        </button>
-        <ArmedButton className="btn btn-solid" label="自动预约" confirm="确认授权" disabled={!valid} onRun={() => void props.onSubscribe(from, to, true)} />
-      </div>
-    </div>
+    <svg className="lib-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
   )
 }
 
-/** 套餐：一键订阅 / 自动预约；已在订阅里的显示状态 */
-function PresetList(props: { presets: LibPreset[]; watches: LibWatch[]; onSubscribe: (p: LibPreset, auto: boolean) => void; onRemove: (id: string) => void }) {
+function BellGlyph() {
   return (
-    <section className="lib-group">
-      <h3 className="lib-group-head">套餐</h3>
-      <ul className="lib-presets">
-        {props.presets.map((p) => {
-          const live = props.watches.find((w) => !w.done && sameScopes(w.scopes, p.scopes) && w.from === p.from && w.to === p.to)
-          return (
-            <li key={p.id} className="lib-preset">
-              <span className="min-w-0">
-                <span className="lib-item-title">{p.name}</span>
-                <span className="lib-sub">
-                  <Joined parts={[`${p.from}–${p.to}`, ...p.scopes.map((s) => s.label)]} />
-                </span>
-              </span>
-              <span className="lib-acts">
-                {live ? (
-                  <span className="lib-tag" data-tone="soft">
-                    {live.auto ? '自动预约中' : '订阅中'}
-                  </span>
-                ) : (
-                  <>
-                    <button className="act" onClick={() => props.onSubscribe(p, false)}>
-                      订阅
-                    </button>
-                    <ArmedButton label="自动预约" confirm="确认授权" onRun={() => props.onSubscribe(p, true)} />
-                  </>
-                )}
-                <IconButton label="删除套餐" onClick={() => props.onRemove(p.id)}>
-                  <path d="M7 7l10 10M17 7L7 17" />
-                </IconButton>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5h-14Z" />
+      <path d="M10.2 20.2a2 2 0 0 0 3.6 0" />
+    </svg>
   )
 }
 
-function WatchList(props: { watches: LibWatch[]; onRemove: (id: string) => void; onAuto: (w: LibWatch, auto: boolean) => void }) {
+function BoltGlyph() {
   return (
-    <section className="lib-group">
-      <h3 className="lib-group-head">订阅</h3>
-      <ul className="lib-watches">
-        {props.watches.map((w) => (
-          <li key={w.id} className="lib-watch" data-done={w.done ? true : undefined}>
-            <span className="min-w-0" title={w.scopes.map((s) => s.label).join('\n')}>
-              <span className="lib-item-title">{scopeTitle(w.scopes)}</span>
-              <span className="lib-sub">
-                <Joined parts={[`${w.from}–${w.to}`]} />
-              </span>
-            </span>
-            <span className="lib-free" data-on={w.free ? true : undefined}>
-              {w.done ?? (w.free === null ? '…' : `余 ${w.free}`)}
-            </span>
-            <span className="lib-acts">
-              {!w.done &&
-                (w.auto ? (
-                  <button className="act" data-on onClick={() => props.onAuto(w, false)}>
-                    自动预约
-                  </button>
-                ) : (
-                  <ArmedButton label="自动预约" confirm="确认授权" onRun={() => props.onAuto(w, true)} />
-                ))}
-              <IconButton label="取消订阅" onClick={() => props.onRemove(w.id)}>
-                <path d="M7 7l10 10M17 7L7 17" />
-              </IconButton>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M13 3.5 5.5 13.5H12l-1 7 7.5-10H12Z" />
+    </svg>
+  )
+}
+
+function SeatGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M7 11V6.5A2.5 2.5 0 0 1 9.5 4h5A2.5 2.5 0 0 1 17 6.5V11" />
+      <path d="M5 11h14v4H5Z" />
+      <path d="M7 15v5M17 15v5" />
+    </svg>
   )
 }
 
@@ -613,7 +992,7 @@ function SeatPicker({ area, day, onReserve }: { area: LibArea; day: string; onRe
           </span>
           <ArmedButton
             className="btn btn-solid"
-            label={busy ? '预约中' : '预约'}
+            label={busy ? '预约中' : seat ? `预约 ${seat.name} 号` : '选一个座位'}
             confirm="确认预约"
             disabled={!seat || busy}
             onRun={() => {
@@ -631,46 +1010,9 @@ function SeatPicker({ area, day, onReserve }: { area: LibArea; day: string; onRe
   )
 }
 
-function Bookings({ bookings, onCancel }: { bookings: Loaded<LibBooking[]> | null; onCancel: (b: LibBooking) => Promise<void> }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  if (!bookings) return <Quiet loading error={null} empty="无" />
-  if ('error' in bookings) return <Quiet loading={false} error={bookings.error} empty="无" />
-  if (bookings.data.length === 0) return <p className="quiet">无</p>
-  return (
-    <ul className="lib-bookings">
-      {bookings.data.map((b) => (
-        <li key={b.id} className="lib-booking" data-done={!b.canCancel || undefined}>
-          <span className="min-w-0">
-            <span className="lib-item-title">{b.place}</span>
-            <span className="lib-sub">
-              <Joined parts={[monthDay(b.begin), `${b.begin.slice(11)}–${b.end.slice(11)}`]} />
-            </span>
-          </span>
-          <span className="lib-tag" data-tone={b.canCancel ? 'soft' : undefined}>
-            {b.status}
-          </span>
-          {b.canCancel ? (
-            <ArmedButton
-              label={busy === b.id ? '取消中' : '取消'}
-              confirm="确认取消"
-              disabled={busy !== null}
-              onRun={() => {
-                setBusy(b.id)
-                void onCancel(b).finally(() => setBusy(null))
-              }}
-            />
-          ) : (
-            <span />
-          )}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button className="lib-icon" aria-label={label} title={label} onClick={onClick}>
+    <button className="lib-icon" aria-label={label} title={label} data-tip={label} onClick={onClick}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {children}
       </svg>

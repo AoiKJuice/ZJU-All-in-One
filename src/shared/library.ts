@@ -72,6 +72,8 @@ export interface LibScope {
 /** 余座订阅：每天 from–to 之间定时查当天余座，有空座时提醒；auto 为用户事先授权的自动预约（约上即停） */
 export interface LibWatch {
   id: string
+  /** 从套餐订阅时为套餐名 */
+  name?: string
   scopes: LibScope[]
   /** HH:MM，每天的检查时段 */
   from: string
@@ -82,9 +84,11 @@ export interface LibWatch {
   checkedAt: number | null
   /** 已自动约上（或自动预约失败）后停止 */
   done?: string
+  /** 用户停止：留在列表里但不再检查 */
+  paused?: boolean
 }
 
-export type LibWatchInput = Pick<LibWatch, 'scopes' | 'from' | 'to' | 'auto'> & { id?: string }
+export type LibWatchInput = Pick<LibWatch, 'scopes' | 'from' | 'to' | 'auto' | 'name' | 'paused'> & { id?: string }
 
 /** 套餐：存下的一组范围与每天的检查时段，一键订阅 / 自动预约 */
 export interface LibPreset {

@@ -2288,35 +2288,38 @@ html[data-theme='dark'] {
     stroke-dashoffset: 0;
   }
 }
-/* 图书馆预约：定位针抬起后落到椅背上、压扁回弹，椅子轻轻下沉接住 */
-.tool-icon :is(.ti-pin, .ti-chair) {
+/* 图书馆预约：左页绕书脊微微翻起再落下；书签往下一落、像挂着一样晃两下 */
+.tool-icon .ti-page {
   transform-box: fill-box;
-  transform-origin: 50% 100%;
+  transform-origin: 100% 50%;
 }
-.tool-card:hover .ti-pin {
-  animation: ti-drop calc(0.9s * var(--speed, 1)) var(--ease);
+.tool-icon .ti-ribbon {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
 }
-.tool-card:hover .ti-chair {
-  animation: ti-sink calc(0.9s * var(--speed, 1)) var(--ease);
+.tool-card:hover .ti-page {
+  animation: ti-flip calc(0.9s * var(--speed, 1)) var(--ease);
 }
-@keyframes ti-drop {
-  25% {
-    transform: translateY(-5px);
-  }
-  50% {
-    transform: translateY(2px) scale(1.12, 0.86);
+.tool-card:hover .ti-ribbon {
+  animation: ti-dangle calc(1s * var(--speed, 1)) var(--ease);
+}
+@keyframes ti-flip {
+  35% {
+    transform: scaleX(0.86) skewY(-4deg) translateY(-1px);
   }
   70% {
-    transform: translateY(-1px) scale(0.96, 1.05);
+    transform: scaleX(1.02);
   }
 }
-@keyframes ti-sink {
-  0%,
-  42% {
-    transform: none;
+@keyframes ti-dangle {
+  25% {
+    transform: translateY(3px) scaleY(1.12);
   }
-  55% {
-    transform: translateY(1.2px) scale(1.02, 0.97);
+  50% {
+    transform: translateY(2px) scaleY(1.08) rotate(6deg);
+  }
+  75% {
+    transform: translateY(1px) rotate(-3deg);
   }
 }
 .tool-head {

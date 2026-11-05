@@ -51,19 +51,17 @@ export function FormIcon() {
   )
 }
 
-/** 图书馆预约：一把阅览椅，悬停时主题色的定位针落到椅背上、弹一下，椅子轻轻下沉接住 */
+/** 图书馆预约：摊开的书，右页夹一根主题色书签；悬停时左页微微翻起，书签往下一落、晃一晃 */
 export function LibraryIcon() {
   return (
     <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <g className="ti-chair">
-        <rect className="ti-ink" x="14" y="22" width="20" height="10" rx="3" />
-        <path className="ti-ink" d="M10.5 35.5h27" />
-        <path className="ti-ink" d="M13.5 35.5v7M34.5 35.5v7M10.5 35.5c0-2 1.2-3.5 3.5-3.5h20c2.3 0 3.5 1.5 3.5 3.5" />
+      <g className="ti-page">
+        <path className="ti-ink" d="M24 14.5C19.5 11.8 13 11 6.5 11.6v23.6c6.5-.6 13 .2 17.5 2.9" />
+        <path className="ti-ink" d="M11 18.6c3.4-.1 6.5.4 9 1.4M11 24.4c3.4-.1 6.5.4 9 1.4" />
       </g>
-      <g className="ti-pin">
-        <path className="ti-accent" d="M24 18.5c-3.8-4-5.5-6.8-5.5-9.1a5.5 5.5 0 0 1 11 0c0 2.3-1.7 5.1-5.5 9.1Z" />
-        <circle className="ti-accent ti-fill" cx="24" cy="9.4" r="1.7" />
-      </g>
+      <path className="ti-ink" d="M24 14.5c4.5-2.7 11-3.5 17.5-2.9v23.6c-6.5-.6-13 .2-17.5 2.9Z" />
+      <path className="ti-ink" d="M28 25.4c2.5-1 5.6-1.5 9-1.4" />
+      <path className="ti-accent ti-fill ti-ribbon" d="M31.5 12.4h5v11.4l-2.5-2.1-2.5 2.1Z" />
     </svg>
   )
 }

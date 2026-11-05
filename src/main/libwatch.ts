@@ -29,10 +29,12 @@ export async function saveLibWatch(input: LibWatchInput): Promise<LibWatch[]> {
   const old = input.id ? load().find((w) => w.id === input.id) : undefined
   const next: LibWatch = {
     id: input.id ?? randomUUID(),
+    ...((input.name ?? old?.name) ? { name: input.name ?? old?.name } : {}),
     scopes: input.scopes,
     from: input.from,
     to: input.to,
     auto: input.auto,
+    ...(input.paused ? { paused: true } : {}),
     free: old?.free ?? null,
     checkedAt: old?.checkedAt ?? null
   }
@@ -108,7 +110,7 @@ function untilNext(active: LibWatch[], minutes: number): number {
   return Math.min(...waits) * 60_000
 }
 
-const scopeLabel = (w: LibWatch): string => w.scopes.map((s) => s.label).join('　')
+const scopeLabel = (w: LibWatch): string => w.name ?? w.scopes.map((s) => s.label).join('　')
 
 async function autoReserve(w: LibWatch, candidates: { id: string; free: number; label: string }[]): Promise<void> {
   const target = [...candidates].sort((a, b) => b.free - a.free)[0]
@@ -132,7 +134,7 @@ async function autoReserve(w: LibWatch, candidates: { id: string; free: number; 
 
 async function poll(): Promise<void> {
   const { minutes } = clock()
-  const due = load().filter((w) => !w.done && inWindow(w, minutes))
+  const due = load().filter((w) => !w.done && !w.paused && inWindow(w, minutes))
   let pause = 0
   if (due.length) {
     try {
@@ -161,7 +163,7 @@ async function poll(): Promise<void> {
 
 function schedule(delay?: number): void {
   clearTimeout(timer)
-  const active = load().filter((w) => !w.done)
+  const active = load().filter((w) => !w.done && !w.paused)
   if (!active.length) return
   const { minutes } = clock()
   const wait = delay ?? (active.some((w) => inWindow(w, minutes)) ? MIN + Math.random() * SPAN : Math.min(untilNext(active, minutes), 30 * 60_000))
