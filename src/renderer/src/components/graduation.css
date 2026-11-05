@@ -1,245 +1,265 @@
 /* 工具「毕业自审」（components/Graduation.tsx）。只用主题变量，三种风格经 .panel 与变量自动适配 */
 /* 本文件随组件引入，注入顺序可能早于 styles.css：覆盖 .row 等通用类时选择器要多一级 */
 
-/* 上排：总览（总学分 + 课堂与美育劳育五个数字块）与待完成清单 */
-.grad-top {
+/* 总览：左边毕业总学分，右边二三四课堂、美育、劳育五格，一行排开 */
+.grad-summary {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: clamp(1.25rem, 2.5vw, 2rem);
-  margin-top: clamp(1.25rem, 3.5vh, 2.25rem);
+  grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr);
   align-items: stretch;
+  gap: 0.5rem 1.25rem;
+  margin-top: clamp(1rem, 3vh, 1.75rem);
+  padding: 0.75rem;
 }
-.grad-overview,
-.grad-todo {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.grad-todo {
-  max-height: 26rem;
-}
-.grad-todo .rows {
-  flex: 1;
-  min-height: 0;
-}
-
 .grad-total {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  padding: 0 0.75rem 1rem;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
 }
-.grad-figure {
-  font-size: 2.25rem;
-  line-height: 1.15;
-  font-variant-numeric: lining-nums tabular-nums;
-  letter-spacing: 0.02em;
-}
-.grad-figure small,
-.grad-tile-figure small,
-.grad-module-figure small {
-  margin-left: 0.375em;
+.grad-label {
   font-size: 0.8125rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--ink-3);
 }
-
-/* 数字块：可点，点开看第二课堂记录 */
-.grad-tiles {
+.grad-figure {
+  font-size: 1.875rem;
+  line-height: 1.1;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.grad-figure small,
+.grad-stat-value small {
+  margin-left: 0.3em;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.grad-stats {
   display: grid;
-  /* 三个课堂一排、美育劳育一排（各占两格 / 三格） */
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.5rem;
-  padding: 0 0.375rem 0.5rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.375rem;
 }
-.grad-tiles > .grad-tile {
-  grid-column: span 2;
+.grad-summary > .grad-stats:only-child,
+.grad-summary > .quiet:only-child {
+  grid-column: 1 / -1;
 }
-.grad-tiles > .grad-tile-wide {
-  grid-column: span 3;
-}
-.grad-tile {
+.grad-stat {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 0.25rem;
+  align-items: flex-start;
+  gap: 0.125rem;
   min-width: 0;
-  padding: 0.75rem 0.875rem 0.625rem;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--r-md);
   background: var(--surface-2);
   text-align: left;
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
-.grad-tile:hover {
+.grad-stat:hover {
   background: rgba(var(--shu-rgb), 0.1);
 }
-.grad-tile-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.375rem;
-  font-size: 0.875rem;
+.grad-stat[data-short] {
+  background: rgba(var(--shu-rgb), 0.07);
+}
+.grad-stat-name {
+  font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
-.grad-tile-figure {
-  font-size: 1.5rem;
-  line-height: 1.25;
+.grad-stat-value {
+  font-size: 1.375rem;
+  line-height: 1.2;
   font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
 }
-.grad-tile-sub {
-  min-height: 1.4em;
-  font-size: 0.8125rem;
+.grad-stat-sub {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.625em;
+  font-size: 0.75rem;
   letter-spacing: 0.04em;
   color: var(--ink-3);
   white-space: nowrap;
 }
-.grad-tile-sub .part + .part {
-  margin-left: 0.75em;
+.grad-stat[data-short] .grad-stat-pass {
+  color: var(--shu);
 }
 .grad-note {
-  padding: 0.25rem 0.75rem 0.5rem;
+  grid-column: 1 / -1;
+  padding: 0 0.5rem;
 }
 
-/* 待完成：名称在左，还差什么在右（主题色） */
-.rows .grad-todo-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
+/* 培养方案：一行一个模块，列对齐成表——名称 / 进度条 / 学分 / 门数 / 还差什么 / 展开 */
+.grad-plan {
+  margin-top: clamp(0.875rem, 2.5vh, 1.25rem);
+}
+.grad-filter {
+  display: inline-flex;
+  gap: 0.125rem;
+}
+.rows > li > .grad-row {
+  grid-template-columns: minmax(0, 1fr) clamp(4rem, 9vw, 8rem) 6.5rem 4.75rem 6.25rem 1rem;
+  align-items: center;
+  gap: 0 1rem;
   width: 100%;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
   text-align: left;
+}
+.grad-row-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.grad-row .row-title {
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 下级模块字重轻一档 */
+.grad-row:not([data-depth='0']) .row-title {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.grad-kind {
+  flex: none;
+  padding: 0 0.4375rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+.grad-num {
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  font-variant-numeric: lining-nums tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.grad-count {
+  color: var(--ink-3);
 }
 .grad-gap {
   font-size: 0.875rem;
   letter-spacing: 0.04em;
   color: var(--shu);
+  text-align: right;
   white-space: nowrap;
 }
-.grad-gap .part + .part {
-  margin-left: 0.75em;
-}
-
-/* 培养方案：每个顶层模块一张固定高度的卡片 */
-.grad-plan {
-  margin-top: clamp(1.75rem, 4.5vh, 2.75rem);
-}
-.grad-modules {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: clamp(0.875rem, 1.6vw, 1.25rem);
-  margin-top: 0.25rem;
-}
-.grad-module {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.5rem;
-  min-width: 0;
-  padding: 1.125rem 1.25rem 1rem;
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  text-align: left;
-  transition: background-color calc(0.35s * var(--speed, 1)) var(--ease), transform calc(0.45s * var(--speed, 1)) var(--ease);
-}
-.grad-module:hover {
-  background: color-mix(in srgb, var(--surface) 70%, rgba(var(--shu-rgb), 0.12));
-  transform: translateY(-2px);
-}
-.grad-module-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
-  min-height: 2.8em;
-}
-.grad-module-kind {
-  flex: none;
-  margin-top: 0.15em;
-  padding: 0.05rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
+.grad-gap[data-done] {
   color: var(--ink-3);
+}
+.grad-row[data-done] .row-title,
+.grad-row[data-done] .grad-num {
+  color: var(--ink-3);
+}
+.grad-chevron {
+  display: flex;
+  justify-content: center;
+  color: var(--ink-3);
+}
+.grad-chevron svg {
+  width: 1rem;
+  height: 1rem;
+  transition: rotate calc(0.35s * var(--speed, 1)) var(--ease);
+}
+.grad-row[data-open] .grad-chevron svg {
+  rotate: 180deg;
+}
+.grad-row[data-open] {
   background: var(--surface-2);
-  white-space: nowrap;
-}
-/* 大类：认定 / 通识 / 专业 / 实践 / 其他，各一组卡片 */
-.grad-group-block + .grad-group-block {
-  margin-top: 1.5rem;
-}
-.grad-group-block > .group-title {
-  margin: 0.5rem 0 0.625rem;
-  padding: 0;
-}
-.grad-module-name {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 1.0625rem;
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: 0.06em;
-  text-wrap: balance;
-}
-.grad-module-figure {
-  font-size: 1.625rem;
-  line-height: 1.2;
-  font-variant-numeric: lining-nums tabular-nums;
-}
-.grad-module-figure small:only-child {
-  margin-left: 0;
-}
-.grad-module-foot {
-  min-height: 1.6em;
-  font-size: 0.875rem;
-  letter-spacing: 0.04em;
-  color: var(--shu);
-}
-.grad-module-foot .part + .part {
-  margin-left: 0.75em;
-}
-.grad-module[data-done] .grad-module-figure {
-  color: var(--ink-2);
 }
 
-/* 进度条：细圆角，完成后转淡 */
+/* 展开的课程：浅底圆角块，紧凑一行一门 */
+.grad-courses {
+  overflow: hidden;
+  list-style: none;
+  margin: 0.125rem 0 0.375rem;
+  padding: 0;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.grad-courses::before,
+.grad-courses::after {
+  content: '';
+  display: block;
+  height: 0.25rem;
+}
+.grad-course {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem 3rem 3.5rem;
+  align-items: baseline;
+  gap: 0 1rem;
+  padding: 0.3125rem 0.75rem 0.3125rem 1.75rem;
+  font-size: 0.9375rem;
+}
+.grad-course[data-past] {
+  opacity: 0.5;
+}
+.grad-course-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.75em;
+  min-width: 0;
+  letter-spacing: 0.03em;
+}
+.grad-course-note {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+.grad-grade {
+  color: var(--ink-3);
+}
+.grad-course .grad-chip {
+  justify-self: end;
+}
+
+/* 进度条：细圆角，完成后转淡；没有要求值时只留底槽 */
 .grad-meter {
   display: block;
-  height: 0.3125rem;
+  height: 0.25rem;
   border-radius: 999px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-.grad-module .grad-meter {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
+  overflow: hidden;
 }
 .grad-meter > span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: rgba(var(--shu-rgb), 0.6);
+  background: rgba(var(--shu-rgb), 0.65);
   transition: width calc(0.6s * var(--speed, 1)) var(--ease);
 }
 .grad-meter[data-full] > span {
   background: var(--ink-3);
   opacity: 0.45;
 }
+.grad-meter[data-empty] {
+  visibility: hidden;
+}
 
-/* 状态：通过 / 已替代 / 达标 淡显，未通过 / 未达标 主题色，在修 主题色浅底，未修 只有字 */
+/* 状态：通过 / 已替代 淡显，未通过主题色，在修主题色浅底，未修只有字 */
 .grad-chip {
-  padding: 0.1rem 0.625rem;
+  padding: 0.05rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 400;
   letter-spacing: 0.06em;
   white-space: nowrap;
   color: var(--ink-3);
-  background: var(--surface-2);
+  background: var(--surface);
 }
-.grad-chip[data-s='failed'],
-.grad-chip[data-s='short'] {
+.grad-chip[data-s='failed'] {
   color: var(--shu);
   background: rgba(var(--shu-rgb), 0.12);
 }
@@ -250,11 +270,8 @@
 .grad-chip[data-s='none'] {
   background: transparent;
 }
-.grad-tile .grad-chip[data-s='ok'] {
-  background: var(--surface);
-}
 
-/* 侧页 */
+/* 侧页：第二课堂记录 */
 .local-sheet .grad-sheet-close {
   position: absolute;
   top: calc(var(--mast-h) + 1.5rem);
@@ -268,81 +285,123 @@
   gap: 0.125rem;
   margin: 1rem 0 0.5rem;
 }
-.grad-group + .grad-group {
-  margin-top: 1rem;
-}
-.group-title.grad-group-title {
-  display: flex;
+.rows > .grad-record {
+  grid-template-columns: 3.5em minmax(0, 1fr) auto;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.25rem 0 0.125rem;
 }
-.grad-group-meta {
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  color: var(--ink-3);
-}
-.grad-sub-quiet {
-  padding: 0.25rem 0.75rem 0.5rem;
-}
-.rows > .grad-course {
-  grid-template-columns: minmax(0, 1fr) auto 3.75rem;
-  align-items: center;
-}
-.rows > .grad-course .row-sub,
 .rows > .grad-record .row-sub {
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.875em;
   margin-left: 0;
 }
-.grad-course .grad-chip {
-  justify-self: end;
-}
-.rows > .grad-record {
-  grid-template-columns: 3.5em minmax(0, 1fr) auto;
-  align-items: baseline;
-}
 
-@media (max-width: 960px) {
-  .grad-top {
+/* 窄窗口：总览上下排，表格去掉门数列 */
+@media (max-width: 900px) {
+  .grad-summary {
     grid-template-columns: minmax(0, 1fr);
   }
-  .grad-todo {
-    max-height: none;
+  .rows > li > .grad-row {
+    grid-template-columns: minmax(0, 1fr) 5rem 6rem 6rem 1rem;
+  }
+  .grad-row .grad-count {
+    display: none;
   }
 }
 
-/* 手机：单列，数字块两列，模块卡片单列 */
-html[data-platform='android'] .grad-top {
+/* 手机：总览五格一排（只写记点与达标），模块两行——名称与还差什么，下面进度条与学分门数 */
+html[data-platform='android'] .grad-summary {
   grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.625rem;
 }
-html[data-platform='android'] .grad-todo {
-  max-height: none;
+html[data-platform='android'] .grad-total {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'label label' 'figure meter';
+  align-items: center;
+  gap: 0.25rem 0.875rem;
+  padding: 0 0.25rem;
 }
-html[data-platform='android'] .grad-tile-head {
-  flex-direction: column;
-  align-items: flex-start;
+html[data-platform='android'] .grad-label {
+  grid-area: label;
+}
+html[data-platform='android'] .grad-figure {
+  grid-area: figure;
+  font-size: 1.5rem;
+}
+html[data-platform='android'] .grad-total .grad-meter {
+  grid-area: meter;
+}
+html[data-platform='android'] .grad-stats {
   gap: 0.25rem;
 }
-html[data-platform='android'] .grad-modules {
-  grid-template-columns: minmax(0, 1fr);
+html[data-platform='android'] .grad-stat {
+  align-items: center;
+  padding: 0.4375rem 0.125rem;
+  text-align: center;
 }
-html[data-platform='android'] .grad-module-head {
-  min-height: 0;
+html[data-platform='android'] .grad-stat-value {
+  font-size: 1.125rem;
+}
+html[data-platform='android'] .grad-stat-value small {
+  display: none;
+}
+html[data-platform='android'] .grad-stat-sub {
+  justify-content: center;
+}
+html[data-platform='android'] .grad-plan {
+  margin-top: 0.75rem;
+}
+html[data-platform='android'] .rows > li > .grad-row {
+  grid-template-columns: minmax(0, 1fr) auto auto 1rem;
+  grid-template-areas: 'name name gap chev' 'meter credits count chev';
+  gap: 0.3125rem 0.75rem;
+  padding: 0.5625rem 0.625rem;
+}
+html[data-platform='android'] .grad-row-name {
+  grid-area: name;
+}
+html[data-platform='android'] .grad-row .row-title {
+  font-size: 0.9375rem;
+  white-space: normal;
+}
+html[data-platform='android'] .grad-row .grad-meter {
+  grid-area: meter;
+  align-self: center;
+}
+html[data-platform='android'] .grad-row .grad-credits {
+  grid-area: credits;
+}
+html[data-platform='android'] .grad-row .grad-count {
+  display: block;
+  grid-area: count;
+}
+html[data-platform='android'] .grad-row .grad-gap {
+  grid-area: gap;
+  align-self: baseline;
+}
+html[data-platform='android'] .grad-row .grad-chevron {
+  grid-area: chev;
+}
+html[data-platform='android'] .grad-num,
+html[data-platform='android'] .grad-gap {
+  font-size: 0.8125rem;
+}
+html[data-platform='android'] .grad-course {
+  grid-template-columns: minmax(0, 1fr) 3.5rem 1.75rem 3rem;
+  gap: 0 0.5rem;
+  padding: 0.3125rem 0.625rem 0.3125rem 1rem;
+  font-size: 0.875rem;
+}
+html[data-platform='android'] .grad-course .grad-num {
+  font-size: 0.75rem;
 }
 html[data-platform='android'] .local-sheet .grad-sheet-close {
   top: calc(var(--sat) + 1rem);
   right: var(--gutter);
 }
-html[data-platform='android'] .rows > .grad-course {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-}
-html[data-platform='android'] .group-title.grad-group-title {
-  flex-direction: column;
-  gap: 0.125rem;
+html[data-platform='android'] .rows > .grad-record {
+  grid-template-columns: 3em minmax(0, 1fr) auto;
 }

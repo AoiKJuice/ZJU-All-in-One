@@ -23,6 +23,7 @@ export function Tools() {
                 </svg>
               </button>
               <h1 className="page-title">{current.name}</h1>
+              <span className="tool-version">{current.version}</span>
             </Reveal>
             <current.View />
           </motion.div>
@@ -39,6 +40,7 @@ export function Tools() {
                       <t.Icon />
                     </span>
                     <span className="tool-name">{t.name}</span>
+                    <span className="tool-version">{t.version}</span>
                   </button>
                 </Reveal>
               ))}

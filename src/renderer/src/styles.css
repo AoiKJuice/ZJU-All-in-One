@@ -2176,6 +2176,18 @@ html[data-theme='dark'] {
   letter-spacing: 0.1em;
   white-space: nowrap;
 }
+/* 工具版本：卡片里紧跟名称，工具页里在标题右下 */
+.tool-version {
+  margin-top: -0.5rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-3);
+}
+.tool-head .tool-version {
+  align-self: flex-end;
+  margin: 0 0 0.6em 0.5rem;
+}
 /* 徽标部件：墨色主体、主题色点缀；悬停动效 */
 .tool-icon .ti-ink {
   stroke: var(--ink);
