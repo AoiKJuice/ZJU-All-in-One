@@ -138,6 +138,80 @@ html[data-style='glass'][data-theme='dark'] .lib {
   gap: 1rem;
   padding: 0 0.375rem 0.375rem;
 }
+.lib-head-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-right: auto;
+}
+.lib-open-at {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--ink-3);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lib-open-at svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.lib .lib-rules-btn {
+  padding-inline: 0.875rem;
+  font-size: 0.875rem;
+}
+/* 官方规则原文：日期下方的浮层 */
+.lib-find {
+  position: relative;
+}
+.lib-rules {
+  position: absolute;
+  z-index: 5;
+  top: 3.25rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  max-height: min(24rem, 70%);
+  padding: 0.75rem 0.5rem 0.75rem 1.125rem;
+  border-radius: var(--r-lg);
+  /* 浮层：液态玻璃等风格里 --surface 半透明，垫一层纸色并轻度模糊，免得透出下面的列表 */
+  background: color-mix(in srgb, var(--paper) 82%, var(--surface));
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-pop);
+}
+.lib-rules-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lib-rules-list {
+  margin: 0.25rem 0 0;
+  padding: 0 0.625rem 0 0;
+  list-style: none;
+  overflow-y: auto;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.lib-rules-list li + li {
+  margin-top: 0.375rem;
+}
+/* 列表的出错 / 空状态：一行原话 + 下一步按钮 */
+.lib-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.875rem 0.875rem;
+}
+.lib-note .quiet {
+  padding: 0;
+}
 .lib-choices {
   display: flex;
   gap: 0.25rem;
@@ -260,6 +334,26 @@ html[data-style='glass'][data-theme='dark'] .lib {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.25rem 0.25rem 0.625rem 0.625rem;
+}
+/* 余量条图例：小色块 + 两个字 */
+.lib-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.lib-legend i {
+  width: 0.625rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--lib-free);
+}
+.lib-legend i[data-k='used'] {
+  margin-left: 0.4rem;
+  background: var(--lib-used);
 }
 .lib-floor-name {
   font-size: 1.125rem;
@@ -395,6 +489,9 @@ button:hover > .lib-box {
   white-space: nowrap;
   font-variant-numeric: lining-nums tabular-nums;
 }
+.lib-count .lib-unit {
+  margin: 0 0.25em 0 0;
+}
 .lib-count small {
   margin-left: 0.3em;
   font-size: 0.8125rem;
@@ -467,6 +564,43 @@ button:hover > .lib-box {
 .lib-seat[data-on] {
   color: var(--lib-on-shu);
   background: var(--shu);
+  box-shadow: 0 0 0 2px var(--lib-layer), 0 0 0 3.5px var(--shu);
+}
+/* 选中的座位刚被别人占掉：划掉、写「已被占」，不能再点 */
+.lib-seats li[data-lost] {
+  grid-column: span 2;
+}
+.lib-seat[data-lost] {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.4em;
+  color: var(--ink-3);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  cursor: default;
+}
+.lib-seat[data-lost] .lib-seat-no {
+  text-decoration: line-through;
+}
+.lib-seat[data-lost] small {
+  font-size: 0.75rem;
+  color: var(--shu);
+}
+/* 只有一个时段：一行文字，不做成控件 */
+.lib-seg-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lib-seg-line svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--ink-3);
 }
 .lib-picker-acts {
   display: flex;
@@ -478,20 +612,6 @@ button:hover > .lib-box {
   white-space: nowrap;
 }
 
-/* 并列信息：浅底小标签 */
-.lib-chips {
-  display: flex;
-  gap: 0.375rem;
-}
-.lib-chips .part {
-  padding: 0.1rem 0.625rem;
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  color: var(--ink-2);
-  background: var(--lib-layer);
-}
 .lib-tag {
   flex: none;
   padding: 0.08rem 0.6rem;
@@ -588,17 +708,11 @@ button:hover > .lib-box {
 .lib-scope-line {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.375rem;
-}
-.lib-mini {
-  padding: 0.05rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  column-gap: 0.875em;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
   letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: var(--ink-2);
-  background: var(--surface);
+  color: var(--ink-3);
 }
 /* 订阅的现况：有空座为绿 */
 .lib-card-status {
@@ -772,17 +886,16 @@ button:hover > .lib-box {
 .lib-step-meta {
   margin-left: auto;
   display: flex;
-  gap: 0.375rem;
+  gap: 0.875em;
   font-weight: 400;
 }
+/* 元信息是无底色的次要文字（胶囊只留给状态） */
 .lib-step-meta .part {
-  padding: 0.05rem 0.55rem;
-  border-radius: 999px;
   font-size: 0.8125rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
-  color: var(--ink-2);
-  background: var(--surface);
+  color: var(--ink-3);
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .lib-step-empty {
   padding: 0.5rem 0.75rem;
@@ -1016,4 +1129,41 @@ html[data-platform='android'] .lib > .lib-group {
 .lib-booking .lib-card-title {
   white-space: normal;
   text-wrap: pretty;
+}
+
+/* 手机：馆页签一行横向滚动；已预约卡片放在最上方、更醒目；预约按钮通栏、点击区域大 */
+html[data-platform='android'] .lib-head {
+  flex-wrap: wrap;
+  row-gap: 0.375rem;
+}
+html[data-platform='android'] .lib-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: -0.25rem;
+  padding-inline: 0.25rem;
+}
+html[data-platform='android'] .lib-tabs::-webkit-scrollbar {
+  display: none;
+}
+html[data-platform='android'] .lib-tabs .choice {
+  flex: none;
+}
+html[data-platform='android'] .lib > .lib-group .lib-booking {
+  padding: 0.875rem 1rem;
+  background: color-mix(in srgb, var(--surface) 70%, rgba(var(--shu-rgb), 0.45));
+  box-shadow: var(--shadow);
+}
+html[data-platform='android'] .lib > .lib-group .lib-booking .lib-card-title {
+  font-size: 1.0625rem;
+}
+html[data-platform='android'] .lib-picker-acts .btn {
+  width: 100%;
+  min-height: 2.75rem;
+  font-size: 1rem;
+}
+html[data-platform='android'] .lib-rules {
+  top: 5.5rem;
+  left: 0.25rem;
+  right: 0.25rem;
 }

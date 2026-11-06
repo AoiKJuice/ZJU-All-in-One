@@ -14,6 +14,7 @@ export const libraryHandlers: LibraryCoreHandlers = {
   'lib:seats': (areaId, segment) => lib.getSeats(areaId, segment),
   'lib:reserve': (_areaId, seatId, segment) => lib.reserve(seatId, segment),
   'lib:bookings': () => lib.getBookings(),
+  'lib:rules': () => lib.getRules(),
   'lib:cancel': (bookingId) => lib.cancel(bookingId)
 }
 

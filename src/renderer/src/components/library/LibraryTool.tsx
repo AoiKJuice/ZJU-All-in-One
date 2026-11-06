@@ -8,6 +8,7 @@ import {
   type LibFloor,
   type LibOverview,
   type LibPreset,
+  type LibRules,
   type LibScope,
   type LibSeat,
   type LibSegment,
@@ -15,6 +16,7 @@ import {
 } from '@shared/library'
 import { useApp } from '@renderer/store'
 import { Choice, Joined, Quiet, Reveal } from '@renderer/components/Type'
+import { CloseButton } from '@renderer/components/IconButton'
 import { MOBILE } from '@renderer/lib/platform'
 import { dur } from '@renderer/lib/motion'
 import './library.css'
@@ -143,8 +145,11 @@ export function LibraryTool() {
   const [picked, setPicked] = useState<LibScope[]>([])
   const [seed, setSeed] = useState<Seed>({ key: 0 })
   const [fresh, setFresh] = useState<string | null>(null)
+  const [rules, setRules] = useState<LibRules | null>(null)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const loggedIn = useApp((s) => s.auth.loggedIn)
 
-  const data = overview && 'data' in overview ? overview.data : null
+  const data =overview && 'data' in overview ? overview.data : null
   const current = data?.buildings.find((b) => b.id === building) ?? data?.buildings[0]
   const floorNow = current?.floors.find((f) => f.id === floor) ?? current?.floors[0]
 
@@ -157,6 +162,15 @@ export function LibraryTool() {
     []
   )
   const loadBookings = useCallback(() => window.zju['lib:bookings']().then(setBookings, () => setBookings([])), [])
+  const retry = (): void => {
+    setOverview(null)
+    void loadOverview(date)
+  }
+
+  // 公开规则（次日开放时刻、官方规则原文）只取一次
+  useEffect(() => {
+    void window.zju['lib:rules']().then(setRules, () => setRules({ lines: [] }))
+  }, [])
 
   // 开着时每分钟静默刷新余座；订阅（桌面端）每 15 秒取一次，看后台查到的余座
   useEffect(() => {
@@ -299,6 +313,20 @@ export function LibraryTool() {
                 </Choice>
               ))}
             </span>
+            <span className="lib-head-info">
+              {/* 次日还没开放：写明几点开放（接口给不出就不写） */}
+              {rules?.openNext && data && data.dates.length < 2 && (
+                <span className="lib-open-at">
+                  <ClockGlyph />
+                  明天 {rules.openNext} 开放
+                </span>
+              )}
+              {rules && rules.lines.length > 0 && (
+                <button className="lib-all lib-rules-btn" data-mark={rulesOpen ? 'on' : undefined} aria-expanded={rulesOpen} onClick={() => setRulesOpen((x) => !x)}>
+                  规则
+                </button>
+              )}
+            </span>
             {!MOBILE && current && (
               <button className="lib-all" data-mark={buildingMark(current)} onClick={() => pick('building', current.id)}>
                 <Box mark={buildingMark(current)} />
@@ -306,6 +334,9 @@ export function LibraryTool() {
               </button>
             )}
           </div>
+          <AnimatePresence>
+            {rulesOpen && rules && <RulesCard lines={rules.lines} onClose={() => setRulesOpen(false)} />}
+          </AnimatePresence>
           <div className="lib-tabs">
             {data?.buildings.map((b) => (
               <Choice key={b.id} group="lib-building" className="small" active={b.id === current?.id} onClick={() => {
@@ -314,18 +345,31 @@ export function LibraryTool() {
                   setOpen(null)
                 }}>
                 {b.name}
-                <span className="lib-tab-free">{b.free ?? ''}</span>
+                {b.free !== null && <span className="lib-tab-free">余 {b.free}</span>}
                 {!MOBILE && buildingMark(b) && <span className="lib-tab-dot" aria-hidden />}
               </Choice>
             ))}
           </div>
           <div className="lib-list">
             {!overview ? (
-              <Quiet loading error={null} empty="无" />
+              <p className="quiet">…</p>
             ) : 'error' in overview ? (
-              <Quiet loading={false} error={overview.error} empty="无" />
+              !loggedIn && !import.meta.env.VITE_ZJU_DEMO ? (
+                <Quiet loading={false} error={null} empty="无" />
+              ) : (
+                // 闭馆、接口出错、图书馆登录失效（别处登录把这边顶掉）：原话照写，给重试 / 重新连接
+                <div className="lib-note">
+                  <p className="quiet">{overview.error}</p>
+                  <button className="btn lib-btn-sm" onClick={retry}>
+                    {/其他设备|登录|token/i.test(overview.error) ? '重新连接' : '重试'}
+                  </button>
+                </div>
+              )
             ) : !current || !floorNow ? (
-              <p className="quiet">无</p>
+              <div className="lib-note">
+                <p className="quiet">无</p>
+                <RefreshButton onClick={retry} />
+              </div>
             ) : (
               <div className="lib-browse">
                 {/* 楼层：左侧一列只管切换，勾选在右边卡片里 */}
@@ -352,6 +396,12 @@ export function LibraryTool() {
                 <section className="lib-floor">
                   <header className="lib-floor-head">
                     <h3 className="lib-floor-name">{floorNow.name}</h3>
+                    <span className="lib-legend" aria-hidden>
+                      <i data-k="free" />
+                      空余
+                      <i data-k="used" />
+                      已占
+                    </span>
                     {!MOBILE && (
                       <button className="lib-all" data-mark={floorMark(current, floorNow)} onClick={() => pick('floor', floorNow.id)}>
                         <Box mark={floorMark(current, floorNow)} />
@@ -402,7 +452,7 @@ export function LibraryTool() {
                                 exit={{ height: 0, opacity: 0 }}
                                 transition={{ duration: dur(0.4), ease: EASE }}
                               >
-                                <SeatPicker area={a} day={overview.data.date} onReserve={reserve} />
+                                <SeatPicker area={a} day={overview.data.date} onReserve={reserve} onWatch={MOBILE || mark ? undefined : () => pick('area', a.id)} />
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -549,9 +599,7 @@ function Composer(props: {
     <div className="lib-compose">
       <div className="lib-compose-head">
         <h2 className="lib-side-title">{preset ? '编辑套餐' : '新订阅'}</h2>
-        <IconButton label="关闭" onClick={props.onClose}>
-          <path d="M7 7l10 10M17 7L7 17" />
-        </IconButton>
+        <CloseButton onClick={props.onClose} />
       </div>
       <div className="pane-scroll lib-side-scroll">
         <section className="lib-step">
@@ -751,17 +799,60 @@ function PresetCard(props: { preset: LibPreset; live: LibWatch | undefined; onSu
   )
 }
 
-/** 范围小标签：最多三个，其余写 +N */
+/** 范围：无底色的次要文字，最多三处，其余写「等 N 处」 */
 function ScopeLine({ scopes }: { scopes: LibScope[] }) {
   return (
     <span className="lib-scope-line">
-      {scopes.slice(0, 3).map((s) => (
-        <span key={`${s.kind}${s.id}`} className="lib-mini">
-          {s.label}
-        </span>
-      ))}
-      {scopes.length > 3 && <span className="lib-mini">+{scopes.length - 3}</span>}
+      <Joined parts={[...scopes.slice(0, 3).map((s) => s.label), scopes.length > 3 && `等 ${scopes.length} 处`]} />
     </span>
+  )
+}
+
+/** 官方座位规则原文：日期旁「规则」展开的浮层 */
+function RulesCard({ lines, onClose }: { lines: string[]; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <motion.div
+      className="lib-rules"
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: dur(0.25), ease: EASE }}
+    >
+      <div className="lib-rules-head">
+        <h3 className="lib-group-head">规则</h3>
+        <CloseButton onClick={onClose} />
+      </div>
+      <ul className="lib-rules-list">
+        {lines.map((l, i) => (
+          <li key={i}>{l}</li>
+        ))}
+      </ul>
+    </motion.div>
+  )
+}
+
+function RefreshButton({ onClick }: { onClick: () => void }) {
+  return (
+    <IconButton label="刷新" onClick={onClick}>
+      <path d="M19 12a7 7 0 1 1-2.05-4.95" />
+      <path d="M19 4.5V8h-3.5" />
+    </IconButton>
+  )
+}
+
+function ClockGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4.2l2.8 1.8" />
+    </svg>
   )
 }
 
@@ -864,6 +955,7 @@ function CurrentBooking({ booking: b, onCancel }: { booking: LibBooking; onCance
 function Count({ free, total }: { free: number | null; total: number | null }) {
   return (
     <span className="lib-count" data-full={free === 0 || undefined}>
+      <small className="lib-unit">余</small>
       {free ?? '—'}
       {total !== null && <small>/ {total}</small>}
     </span>
@@ -931,14 +1023,19 @@ function SeatGlyph() {
   )
 }
 
-/** 展开的区域：选时段，再从空座里点一个，二次点击预约 */
-function SeatPicker({ area, day, onReserve }: { area: LibArea; day: string; onReserve: (a: LibArea, s: LibSeat, seg: LibSegment) => Promise<void> }) {
+/**
+ * 展开的区域：选时段（只有一段时是一行文字，不是控件），再从空座里点一个，二次点击预约。
+ * 开着时每 30 秒重取座位；选中的座位被别人占了就取消选择，在原处划掉并写「已被占」
+ */
+function SeatPicker(props: { area: LibArea; day: string; onReserve: (a: LibArea, s: LibSeat, seg: LibSegment) => Promise<void>; onWatch?: () => void }) {
+  const { area, day, onReserve } = props
   const [segments, setSegments] = useState<Loaded<LibSegment[]> | null>(null)
   const [segment, setSegment] = useState<LibSegment | null>(null)
   const [seats, setSeats] = useState<Loaded<LibSeat[]> | null>(null)
   const [seat, setSeat] = useState<LibSeat | null>(null)
+  const [lost, setLost] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // 预约后重取座位
+  // 预约后、点刷新时重取座位
   const [round, setRound] = useState(0)
 
   useEffect(() => {
@@ -958,28 +1055,51 @@ function SeatPicker({ area, day, onReserve }: { area: LibArea; day: string; onRe
     }
   }, [area.id, day])
 
+  // 换时段：清空重来
+  useEffect(() => {
+    setSeats(null)
+    setSeat(null)
+    setLost(null)
+  }, [area.id, segment])
+
   useEffect(() => {
     if (!segment) return
     let alive = true
-    setSeats(null)
-    setSeat(null)
-    window.zju['lib:seats'](area.id, segment).then(
-      (data) => alive && setSeats({ data }),
-      (e) => alive && setSeats({ error: errorText(e) })
-    )
+    const load = (): Promise<void> =>
+      window.zju['lib:seats'](area.id, segment).then(
+        (data) => {
+          if (alive) setSeats({ data })
+        },
+        (e) => {
+          if (alive) setSeats((old) => (old && 'data' in old ? old : { error: errorText(e) }))
+        }
+      )
+    void load()
+    const timer = setInterval(() => void load(), 30_000)
     return () => {
       alive = false
+      clearInterval(timer)
     }
   }, [area.id, segment, round])
+
+  // 选中的座位不再空闲：取消选择，记下来在原处标出
+  useEffect(() => {
+    if (!seat || !seats || !('data' in seats)) return
+    if (seats.data.find((s) => s.id === seat.id)?.state !== 'free') {
+      setLost(seat.id)
+      setSeat(null)
+    }
+  }, [seats, seat])
 
   if (!segments) return <p className="quiet lib-drawer-quiet">…</p>
   if ('error' in segments) return <p className="quiet lib-drawer-quiet">{segments.error}</p>
   if (segments.data.length === 0) return <p className="quiet lib-drawer-quiet">无</p>
-  const free = seats && 'data' in seats ? seats.data.filter((s) => s.state === 'free') : []
+  const list = seats && 'data' in seats ? seats.data.filter((s) => s.state === 'free' || s.id === lost) : []
+  const free = list.filter((s) => s.state === 'free')
 
   return (
     <div className="lib-picker">
-      {segments.data.length > 1 && (
+      {segments.data.length > 1 ? (
         <div className="lib-segs">
           {segments.data.map((s) => (
             <Choice key={s.id} group={`lib-seg-${area.id}`} className="small" active={s.id === segment?.id} onClick={() => setSegment(s)}>
@@ -987,39 +1107,72 @@ function SeatPicker({ area, day, onReserve }: { area: LibArea; day: string; onRe
             </Choice>
           ))}
         </div>
+      ) : (
+        segment && (
+          <p className="lib-seg-line">
+            <ClockGlyph />
+            {segment.start}–{segment.end}
+          </p>
+        )
       )}
       {!seats ? (
         <p className="quiet lib-drawer-quiet">…</p>
       ) : 'error' in seats ? (
-        <p className="quiet lib-drawer-quiet">{seats.error}</p>
-      ) : free.length === 0 ? (
-        <p className="quiet lib-drawer-quiet">无</p>
+        <div className="lib-note">
+          <p className="quiet">{seats.error}</p>
+          <button className="btn lib-btn-sm" onClick={() => setRound((n) => n + 1)}>
+            重试
+          </button>
+        </div>
+      ) : list.length === 0 ? (
+        <div className="lib-note">
+          <p className="quiet">无</p>
+          {props.onWatch && (
+            <button className="btn lib-btn-sm" onClick={props.onWatch}>
+              订阅余座
+            </button>
+          )}
+          <RefreshButton onClick={() => setRound((n) => n + 1)} />
+        </div>
       ) : (
         <ul className="lib-seats">
-          {free.map((s) => (
-            <li key={s.id}>
-              <button className="lib-seat" data-on={s.id === seat?.id || undefined} onClick={() => setSeat(s.id === seat?.id ? null : s)}>
-                {s.name}
-              </button>
-            </li>
-          ))}
+          {list.map((s) => {
+            const gone = s.state !== 'free'
+            return (
+              <li key={s.id} data-lost={gone || undefined}>
+                <button
+                  className="lib-seat"
+                  data-on={s.id === seat?.id || undefined}
+                  data-lost={gone || undefined}
+                  disabled={gone}
+                  aria-pressed={s.id === seat?.id}
+                  title={gone ? '已被占' : undefined}
+                  onClick={() => {
+                    setLost(null)
+                    setSeat(s.id === seat?.id ? null : s)
+                  }}
+                >
+                  <span className="lib-seat-no">{s.name}</span>
+                  {gone && <small>已被占</small>}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
       {segment && free.length > 0 && (
         <div className="lib-picker-acts">
-          <span className="lib-chips">
-            <Joined parts={[segments.data.length === 1 && `${segment.start}–${segment.end}`, seat && `${seat.name} 号`]} />
-          </span>
           <ArmedButton
             className="btn btn-solid"
-            label={busy ? '预约中' : seat ? `预约 ${seat.name} 号` : '选一个座位'}
-            confirm="确认预约"
+            label={busy ? '预约中' : seat ? `预约 ${seat.name} 号` : '先选一个座位'}
+            confirm={seat ? `确认预约 ${seat.name} 号` : '确认预约'}
             disabled={!seat || busy}
             onRun={() => {
               if (!seat) return
               setBusy(true)
               void onReserve(area, seat, segment).finally(() => {
                 setBusy(false)
+                setSeat(null)
                 setRound((n) => n + 1)
               })
             }}

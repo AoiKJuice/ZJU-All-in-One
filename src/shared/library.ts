@@ -103,6 +103,13 @@ export interface LibPreset {
 
 export type LibPresetInput = Omit<LibPreset, 'id'> & { id?: string }
 
+/** 预约系统公开的规则：次日座位几点开放（config.new）与官方座位规则原文（按行） */
+export interface LibRules {
+  /** HH:MM */
+  openNext?: string
+  lines: string[]
+}
+
 /** Agent 经 MCP 发起、要用户在应用内确认的图书馆写操作 */
 export type LibConfirmAction = 'libreserve' | 'libcancel' | 'libauto'
 
@@ -115,6 +122,8 @@ export interface LibraryApi {
   /** 写：预约一个座位（结果以回查本人预约为准，不重发） */
   'lib:reserve': (areaId: string, seatId: string, segment: LibSegment) => Promise<LibWriteResult>
   'lib:bookings': () => Promise<LibBooking[]>
+  /** 公开规则，不需登录 */
+  'lib:rules': () => Promise<LibRules>
   /** 写：取消预约 */
   'lib:cancel': (bookingId: string) => Promise<LibWriteResult>
   /** 订阅（正在查询的，只在桌面端）；lib:unwatch 即停止 */
@@ -135,6 +144,7 @@ export const LIBRARY_CHANNELS = [
   'lib:seats',
   'lib:reserve',
   'lib:bookings',
+  'lib:rules',
   'lib:cancel',
   'lib:watches',
   'lib:watch',

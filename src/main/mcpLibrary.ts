@@ -102,6 +102,11 @@ export function registerLibraryTools(
       description: '图书馆座位预约：本人的预约（地点、起止、状态原文、能否取消）。预约后需按图书馆规定按时签到，逾期一般记违约',
       annotations: read
     }, async () => json(await call('lib:bookings')))
+
+    mcp.registerTool('get_library_rules', {
+      description: '图书馆座位预约：预约系统公开的规则——openNext 为次日座位开放时刻（HH:MM，取不到时没有），lines 为官方座位规则原文（逐行）',
+      annotations: read
+    }, async () => json(await call('lib:rules')))
   }
 
   if (tools.app) {
