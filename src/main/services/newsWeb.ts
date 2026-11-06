@@ -1,0 +1,116 @@
+import type { NewsArticle, NewsFeed, NewsItem, NewsSettings, WebSource } from '@shared/news'
+import { zjuFetch } from '../http'
+import { logDiagnostic } from '../diagnostics'
+import { parseArticle, parseList } from './newsWebplus'
+import { isCampusHost, webvpnUrl } from './newsWebvpn'
+import { filterTitles } from './newsFilter'
+import { WEB_SOURCES } from './newsSources'
+
+// 校园资讯 · 来源 B：部处与学院官网栏目。来源表见 newsSources.ts（scripts/news-sources.mjs 生成，部处手工整理），
+// 列表页按 newsWebplus 的通用规则解析；直连失败的校内域名改走 WebVPN（未以登录态实测）。
+// 每个栏目只取第一页（最近十几条），合并后按日期排序、按地址去重，再做条目级过滤（newsFilter）
+
+const TIMEOUT = 15_000
+const FRESH = 10 * 60_000
+/** 只看近 120 天的条目 */
+const RECENT_DAYS = 120
+
+const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+  Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('超时')), ms))])
+
+async function loadPage(url: string): Promise<{ url: string; html: string }> {
+  const headers = { Accept: 'text/html,application/xhtml+xml,*/*' }
+  try {
+    const r = await withTimeout(zjuFetch(url, { headers, relogin: false }), TIMEOUT)
+    if (r.status >= 400) throw new Error(`HTTP ${r.status}`)
+    return { url: r.url, html: await r.text() }
+  } catch (error) {
+    if (!isCampusHost(url)) throw error
+    // 校内专用域名：经 WebVPN 再试（会话在 persist:zju，需已登录统一身份认证）
+    const r = await withTimeout(zjuFetch(await webvpnUrl(url), { headers }), TIMEOUT)
+    const landed = new URL(r.url)
+    if (landed.hostname === 'zjuam.zju.edu.cn' || /\/login/.test(landed.pathname)) throw new Error('WebVPN 未登录')
+    if (r.status >= 400) throw new Error(`WebVPN HTTP ${r.status}`)
+    return { url, html: await r.text() }
+  }
+}
+
+async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const out: PromiseSettledResult<R>[] = new Array(items.length)
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(size, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++
+        try {
+          out[i] = { status: 'fulfilled', value: await fn(items[i]) }
+        } catch (reason) {
+          out[i] = { status: 'rejected', reason }
+        }
+      }
+    })
+  )
+  return out
+}
+
+export const allSources = (): WebSource[] => WEB_SOURCES
+
+/** 默认关注：全部部处 */
+export const defaultSources = (): string[] => WEB_SOURCES.filter((s) => s.kind === 'office').map((s) => s.id)
+
+const label = (s: WebSource): string => `${s.org} · ${s.column}`
+
+let cached: { key: string; feed: NewsFeed } | null = null
+
+export async function fetchWebFeed(settings: NewsSettings, force = false): Promise<NewsFeed> {
+  const chosen = WEB_SOURCES.filter(
+    (s) => settings.sources.includes(s.id) && (settings.audience === 'all' || s.audience === 'all' || s.audience === settings.audience)
+  )
+  const key = `${chosen.map((s) => s.id).join(',')}|${settings.llm}`
+  if (!force && cached && cached.key === key && Date.now() - cached.feed.fetchedAt < FRESH) return cached.feed
+
+  const results = await pool(chosen, 6, async (s) => {
+    const page = await loadPage(s.url)
+    return { source: s, entries: parseList(page.html, page.url).entries }
+  })
+  const failed: NewsFeed['failed'] = []
+  const seen = new Set<string>()
+  const items: NewsItem[] = []
+  const cutoff = Date.now() - RECENT_DAYS * 86_400_000
+  results.forEach((r, i) => {
+    const s = chosen[i]
+    if (r.status === 'rejected') {
+      failed.push({ from: label(s), message: r.reason instanceof Error ? r.reason.message : String(r.reason) })
+      return
+    }
+    if (!r.value.entries.length) failed.push({ from: label(s), message: '页面结构变了，没读到条目' })
+    for (const e of r.value.entries) {
+      if (e.date && Date.parse(e.date) < cutoff) continue
+      const dedupe = e.url.replace(/^https?:/, '')
+      if (seen.has(dedupe)) continue
+      seen.add(dedupe)
+      items.push({ id: `web:${s.id}:${dedupe}`, kind: 'web', title: e.title, url: e.url, time: e.date, from: label(s), sourceId: s.id, audience: s.audience })
+    }
+  })
+  if (failed.length) logDiagnostic('news-web', { failed: failed.length, sources: chosen.length })
+
+  const verdict = await filterTitles(
+    items.map((i) => i.title),
+    settings.llm && settings.llmKey
+  )
+  const kept = items
+    .filter((_, i) => verdict.keep[i])
+    .map((item) => ({ ...item, judged: verdict.judged[items.indexOf(item)] || undefined }))
+    .sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''))
+  const feed: NewsFeed = { items: kept, failed, hidden: items.length - kept.length, fetchedAt: Date.now() }
+  cached = { key, feed }
+  return feed
+}
+
+/** 应用内阅读：只读校内页面（*.zju.edu.cn）与公众号文章 */
+export async function fetchArticle(url: string): Promise<NewsArticle> {
+  const host = new URL(url).hostname
+  if (!host.endsWith('.zju.edu.cn') && host !== 'mp.weixin.qq.com') throw new Error('只能打开校内网页与公众号文章')
+  const page = await loadPage(url)
+  return parseArticle(page.html)
+}

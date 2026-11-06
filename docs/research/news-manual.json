@@ -1,0 +1,18 @@
+[
+  { "id": "bksy-tzgg", "org": "本科生院", "column": "通知公告", "url": "https://bksy.zju.edu.cn/tzgg/list.htm", "audience": "undergrad", "basis": "本科生院网站唯一在更新的通知栏目（面包屑在「通识教育」下，通识课程、求是大讲堂、课程修读的通知都在这里）；教学培养、培养方案各栏目是文件而非通知，不收" },
+  { "id": "bksy-bmtz", "org": "本科生院", "column": "求是大讲堂报名通知", "url": "https://bksy.zju.edu.cn/bmtz/list.htm", "audience": "undergrad", "basis": "求是大讲堂讲座报名，场地审批系统不公开，讲座只能从这里抓" },
+  { "id": "grs-qbgg", "org": "研究生院", "column": "全部公告", "url": "http://www.grs.zju.edu.cn/qbgg/list.htm", "audience": "grad", "basis": "首页「全部公告」汇总各业务栏目的通知；各业务子栏目（培养、学位、奖助、导师）多数 400 天未更新或与之重复" },
+  { "id": "xgb-zxtz", "org": "党委学生工作部", "column": "最新通知", "url": "http://www.xgb.zju.edu.cn/53018/list.htm", "audience": "undergrad", "basis": "学工部首页「最新通知」，学生工作处与学工部合署，面向本科生" },
+  { "id": "xgb-hdyg", "org": "党委学生工作部", "column": "活动预告", "url": "http://www.xgb.zju.edu.cn/53026/list.htm", "audience": "undergrad", "basis": "学工部首页「活动预告」" },
+  { "id": "xgb-zz", "org": "党委学生工作部", "column": "学生资助", "url": "http://www.xgb.zju.edu.cn/53396/list.htm", "audience": "undergrad", "basis": "学生事务 → 学生资助（助学金、困难认定）" },
+  { "id": "xgb-pjpy", "org": "党委学生工作部", "column": "评奖评优", "url": "http://www.xgb.zju.edu.cn/53395/list.htm", "audience": "undergrad", "basis": "学生事务 → 评奖评优（奖学金、荣誉称号）" },
+  { "id": "xgb-qgzx", "org": "党委学生工作部", "column": "勤工助学", "url": "http://www.xgb.zju.edu.cn/qgzx/list.htm", "audience": "undergrad", "basis": "学生事务 → 勤工助学（岗位招聘）" },
+  { "id": "xgb-xl", "org": "心理健康教育与咨询中心", "column": "重要通知", "url": "http://www.xgb.zju.edu.cn/53403/list.htm", "audience": "all", "basis": "心理中心挂在学工部网站「心理健康」栏目下，没有独立站点；同栏目「公示公告」2023 年后未更新，不收" },
+  { "id": "xgb-cxcy", "org": "党委学生工作部", "column": "创新创业通知", "url": "http://www.xgb.zju.edu.cn/53411/list.htm", "audience": "undergrad", "basis": "创新创业 → 重要通知（竞赛、项目申报）" },
+  { "id": "ygb-tzgg", "org": "党委研究生工作部", "column": "通知公告", "url": "http://ygb.zju.edu.cn/tzgg/list.htm", "audience": "grad", "basis": "研工部首页「通知公告」汇总思政、实践、奖助、党建各栏目的通知" },
+  { "id": "ygb-hdyg", "org": "党委研究生工作部", "column": "活动预告", "url": "http://ygb.zju.edu.cn/31549/list.htm", "audience": "grad", "basis": "研工部首页「活动预告」" },
+  { "id": "tw-tzgg", "org": "团委", "column": "通知公告", "url": "https://zjutw.zju.edu.cn/tzgg/list.htm", "audience": "all", "basis": "团委首页「通知公告」（第二课堂、志愿、竞赛）" },
+  { "id": "tw-xshd", "org": "团委", "column": "学生活动", "url": "https://zjutw.zju.edu.cn/xshd/list.htm", "audience": "all", "basis": "团委「学生活动」，含不记点的活动，补素拓平台的盲区" },
+  { "id": "zhfw-jyjx", "org": "综合服务网", "column": "教育教学", "url": "https://zhfw.zju.edu.cn/zhfw_jyjx/list.htm", "audience": "all", "basis": "学校行政网只收「教育教学」与「重点提示」两栏：其余栏目（校务管理、科学研究、会议通知、招聘信息、学校文件）面向教职工" },
+  { "id": "zhfw-zdts", "org": "综合服务网", "column": "重点提示", "url": "https://zhfw.zju.edu.cn/zhfw_zdts/list.htm", "audience": "all", "basis": "学校行政网只收「教育教学」与「重点提示」两栏：重点提示为全校性的提醒（停水停电、安全、放假）" }
+]

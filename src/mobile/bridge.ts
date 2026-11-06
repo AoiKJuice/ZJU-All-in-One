@@ -19,6 +19,8 @@ import { resetXk, xkHandlers } from '../main/services/xkApi'
 import { demoXk } from '../main/services/demoXk'
 import { libraryHandlers, resetLibrary } from '../main/services/libraryApi'
 import { demoLibrary } from '../main/services/demoLibrary'
+import { newsHandlers } from '../main/services/newsApi'
+import { demoNews } from '../main/services/demoNews'
 import * as pta from '../main/services/pta'
 import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
 
@@ -216,6 +218,15 @@ const handlers: Handlers = {
   'lib:presets': async () => [],
   'lib:savePreset': unsupported,
   'lib:removePreset': unsupported,
+  // 校园资讯：公众号（微信读书要弹窗扫码）与钉钉（读本机库）只在桌面端
+  ...newsHandlers,
+  'news:weread': async () => ({ status: 'signedOut' as const, accounts: [] }),
+  'news:wereadLogin': unsupported,
+  'news:wereadLogout': unsupported,
+  'news:wereadAdd': unsupported,
+  'news:wereadRemove': unsupported,
+  'news:wechat': unsupported,
+  'news:dingtalk': unsupported,
   ...formsHandlers
 }
 
@@ -248,7 +259,11 @@ if (import.meta.env.VITE_ZJU_DEMO === '1') {
       Object.assign(demoTodos, { ignored: ignored ? [...demoTodos.ignored, id] : demoTodos.ignored.filter((x) => x !== id) }),
     'todo:remind': async (on: boolean) => Object.assign(demoTodos, { remind: on }),
     ...demoXk,
-    ...demoLibrary
+    ...demoLibrary,
+    ...demoNews,
+    'news:weread': async () => ({ status: 'signedOut' as const, accounts: [] }),
+    'news:wechat': unsupported,
+    'news:dingtalk': unsupported
   } satisfies Partial<Handlers>)
 }
 

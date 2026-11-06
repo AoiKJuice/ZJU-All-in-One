@@ -49,6 +49,7 @@ import { resetXk } from './services/xkApi'
 import { xkChannels } from './xkIpc'
 import { resetLibrary } from './services/libraryApi'
 import { libraryChannels } from './libIpc'
+import { newsChannels } from './newsIpc'
 import * as pta from './services/pta'
 import { getSystemStats } from './stats'
 import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
@@ -308,6 +309,8 @@ const handlers: Handlers = {
 ,
   // 图书馆预约（含演示模式的替换）见 libIpc.ts
   ...libraryChannels(process.env['ZJU_DEMO'] === '1'),
+  // 校园资讯（含演示模式的替换）见 newsIpc.ts
+  ...newsChannels(process.env['ZJU_DEMO'] === '1'),
   ...formsHandlers
 }
 

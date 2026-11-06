@@ -82,10 +82,18 @@ async function ensureLogin(): Promise<void> {
   loggedIn = true
 }
 
-async function get<T extends { code?: number }>(path: string): Promise<T> {
+async function get<T extends { code?: number }>(path: string, form?: Record<string, string | number>): Promise<T> {
   await ensureLogin()
   const load = async (): Promise<T | null> => {
-    const response = await zjuFetch(`${BASE}/${path}`, { headers: { Accept: 'application/json, text/plain, */*' } })
+    // 平台的 axios 封装：GET 参数放查询串，POST 体为 qs.stringify 的表单
+    const body = form ? new URLSearchParams(Object.entries(form).map(([k, v]) => [k, String(v)])).toString() : undefined
+    const response = await zjuFetch(`${BASE}/${path}`, {
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        ...(body !== undefined ? { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'https://sztz.zju.edu.cn', Referer: SERVICE } : {})
+      },
+      ...(body !== undefined ? { method: 'POST', body } : {})
+    })
     if (new URL(response.url).hostname !== 'sztz.zju.edu.cn' || !response.ok) return null
     const text = await response.text()
     // 会话过期时回到平台首页（HTML）
@@ -97,7 +105,7 @@ async function get<T extends { code?: number }>(path: string): Promise<T> {
     await ensureLogin()
     result = await load()
   }
-  if (result === null || result.code !== 0) throw new Error('第二课堂请求失败')
+  if (result === null || (result.code ?? 0) !== 0) throw new Error('第二课堂请求失败')
   return result
 }
 
@@ -164,3 +172,60 @@ export async function fetchPractice(): Promise<Practice> {
     records: records ? records.data.filter((r) => !r.sfsc).map(record) : null
   }
 }
+
+// ---- 校园资讯（工具「校园资讯」）：活动列表与通知，平台前端 hdzx / tzgg 两页的只读接口 ----
+// 活动：GET student/home/getXmList?keyword&page&limit&lx=2（活动中心页，lx=2 为活动；可带 date=YYYY-MM-DD 只看某天）→ { code: 0, data: 项目[], totalPages }。
+// 通知：POST student/tzgg/ajaxList（表单 pageIndex / pageSize / count）→ { code: 0, count, data: [{ mc, nr(HTML), fbsj, fbr, fjid, fjmc }] }。
+// 同页的 hdbm / hdqxbm（报名 / 取消）与 hdsc（收藏切换）是写操作，不调用。
+
+export interface XmRecord {
+  id?: number | string
+  mc?: string
+  /** 海报文件 id：common/file/view?id= */
+  hdhb?: string
+  xmlb?: { mc?: string }
+  xmfl?: { mc?: string }
+  xmlx?: { mc?: string; my?: boolean | number; ly?: boolean | number }
+  lxdw?: { mc?: string }
+  hdkssj?: string
+  hdjssj?: string
+  bmkssj?: string
+  bmjssj?: string
+  hddd?: string
+  zmrs?: number | null
+  bmrs?: number
+  zxfs?: number | string | null
+  zdfs?: number | string | null
+  fzr?: string
+  lxdh?: string
+  /** 报名方式：value 3 为不在本平台报名，具体方式在 jtbmfs（HTML） */
+  bmfs?: { value?: number; label?: string }
+  jtbmfs?: string
+  lxsx?: string
+  hdzysx?: string
+  sfbm?: boolean
+}
+
+export interface TzggRecord {
+  id?: number | string
+  mc?: string
+  nr?: string
+  fbsj?: string
+  fbr?: string
+  fjid?: string
+  fjmc?: string
+}
+
+export async function fetchActivityPage(page: number, keyword = ''): Promise<{ data: XmRecord[]; totalPages: number }> {
+  const query = new URLSearchParams({ keyword, page: String(page), limit: '20', lx: '2' })
+  const result = await get<{ code: number; data?: XmRecord[]; totalPages?: number }>(`student/home/getXmList?${query}`)
+  return { data: result.data ?? [], totalPages: result.totalPages ?? 0 }
+}
+
+export async function fetchNoticePage(page: number, size = 20): Promise<{ data: TzggRecord[]; count: number }> {
+  const result = await get<{ code: number; data?: TzggRecord[]; count?: number }>('student/tzgg/ajaxList', { pageIndex: page, pageSize: size, count: 0 })
+  return { data: result.data ?? [], count: result.count ?? 0 }
+}
+
+/** 平台文件（海报、附件）的查看地址 */
+export const fileUrl = (id: string): string => `${BASE}/common/file/view?id=${encodeURIComponent(id)}`

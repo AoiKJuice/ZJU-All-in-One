@@ -17,6 +17,7 @@ import { getTodoState, setIgnored } from './todos'
 import { registerXkTools } from './mcpXk'
 import { registerFormTools } from './forms/handlers'
 import { registerLibraryTools } from './mcpLibrary'
+import { registerNewsTools } from './mcpNews'
 
 // 本地 MCP 服务：让本机的 Agent（Claude Code 等）调用课表、作业、回放等信息与工具。
 // 只监听 127.0.0.1，请求需带 Authorization: Bearer <token>；无状态模式，每个请求新建一个 McpServer。
@@ -354,6 +355,7 @@ function buildServer(tools: Config['tools']): McpServer {
   registerXkTools(mcp, tools, askUser)
   registerFormTools(mcp, tools)
   registerLibraryTools(mcp, tools, askUser)
+  registerNewsTools(mcp, tools)
 
   return mcp
 }

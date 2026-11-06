@@ -5,7 +5,7 @@ import { applySettings, initialSettings, type Settings } from './lib/settings'
 
 export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
 /** 工具页里打开的工具（见 tools/index.ts） */
-export type ToolId = 'graduation' | 'course' | 'forms' | 'library'
+export type ToolId = 'graduation' | 'course' | 'forms' | 'library' | 'news'
 /** 应用内预览的对象：本机文件路径，或校内文件 */
 export type PreviewTarget = string | { url: string; name: string }
 
