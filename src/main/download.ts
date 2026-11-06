@@ -30,3 +30,20 @@ export async function downloadToFile(url: string, filePath: string): Promise<voi
   if (!response.ok || !response.body) throw new Error(`下载失败（${response.status}）`)
   await pipeline(Readable.fromWeb(response.body as unknown as WebReadableStream), createWriteStream(filePath))
 }
+
+/** 用登录会话把文件读进内存（应用内预览用，不落盘）；超过 limit 返回 null，交给下载 */
+export async function fetchBytes(url: string, limit: number): Promise<Uint8Array | null> {
+  const target = upgrade(url)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error('读取超时：服务器无响应')), 30_000)
+  const response = await zjuSession()
+    .fetch(target, { credentials: 'include', headers: headersFor(target), signal: controller.signal })
+    .finally(() => clearTimeout(timer))
+  if (!response.ok) throw new Error(`读取失败（${response.status}）`)
+  if (Number(response.headers.get('content-length') ?? 0) > limit) {
+    controller.abort()
+    return null
+  }
+  const data = new Uint8Array(await response.arrayBuffer())
+  return data.length > limit ? null : data
+}

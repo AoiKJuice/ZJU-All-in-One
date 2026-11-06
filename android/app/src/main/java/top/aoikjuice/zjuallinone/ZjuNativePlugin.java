@@ -146,11 +146,12 @@ public class ZjuNativePlugin extends Plugin {
                 out.put("status", status);
                 out.put("headers", headersOf(c, url));
                 byte[] data = readAll(bodyOf(c, status));
-                if (call.getBoolean("binary", false)) {
+                boolean binary = call.getBoolean("binary", false);
+                if (binary && data.length <= LARGE_BODY) {
                     out.put("base64", Base64.encodeToString(data, Base64.NO_WRAP));
                 } else if (data.length > LARGE_BODY) {
-                    // 大响应（如智云整节课的文字稿）不经桥传字符串：写进缓存文件，网页按本地地址读取后调 release 删掉
-                    File file = File.createTempFile("response", ".txt", getContext().getCacheDir());
+                    // 大响应（如智云整节课的文字稿、预览的附件）不经桥传字符串：写进缓存文件，网页按本地地址读取后调 release 删掉
+                    File file = File.createTempFile("response", binary ? ".bin" : ".txt", getContext().getCacheDir());
                     try (OutputStream o = new FileOutputStream(file)) {
                         o.write(data);
                     }

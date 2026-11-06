@@ -8,10 +8,11 @@ import {
   type SaveDialogOptions
 } from 'electron'
 import { readFile, stat } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
+import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { AUTH_EVENT, PROGRESS_EVENT, ZJU_CHANNELS, type ZjuApi, type ZjuChannel } from '@shared/ipc'
 import type { AuthState, FilePreview, TaskProgress } from '@shared/types'
+import { PREVIEW_LIMIT, previewKind } from '@shared/preview'
 import { hasCasCookie, login, logout } from './auth/zjuam'
 import { clearCredentials, loadCredentials, passwordLogin, relogin, saveCredentials } from './auth/password'
 import { answerConfirm, getMcpState, setMcp } from './mcp'
@@ -53,7 +54,7 @@ import { getSystemStats } from './stats'
 import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
-import { downloadToFile } from './download'
+import { downloadToFile, fetchBytes } from './download'
 import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockTranscript, mockPlatformTranscript } from './services/demo'
 
 type Handlers = {
@@ -122,21 +123,19 @@ async function getAuthState(): Promise<AuthState> {
   }
 }
 
-// 应用内预览：按扩展名分类，超过 50MB 不读内容（交给默认程序）
-const PREVIEW_KINDS: Record<string, [FilePreview['kind'], string]> = {
-  '.png': ['image', 'image/png'], '.jpg': ['image', 'image/jpeg'], '.jpeg': ['image', 'image/jpeg'],
-  '.gif': ['image', 'image/gif'], '.webp': ['image', 'image/webp'], '.bmp': ['image', 'image/bmp'], '.svg': ['image', 'image/svg+xml'],
-  '.pdf': ['pdf', 'application/pdf']
-}
-const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.csv', '.json', '.log', '.tex', '.py', '.c', '.cpp', '.h', '.hpp', '.java', '.js', '.ts', '.html', '.css', '.xml', '.m', '.r', '.go', '.rs', '.sql', '.yaml', '.yml'])
-const PREVIEW_LIMIT = 50 * 1024 * 1024
-
+// 应用内预览：按扩展名分类（shared/preview.ts），超过 50MB 不读内容（交给默认程序）
 async function previewFile(path: string): Promise<FilePreview> {
-  const ext = extname(path).toLowerCase()
-  const [kind, mime] = PREVIEW_KINDS[ext] ?? (TEXT_EXTENSIONS.has(ext) ? ['text', 'text/plain'] : ['other', 'application/octet-stream'])
   const name = basename(path)
+  const [kind, mime] = previewKind(name)
   if (kind === 'other' || (await stat(path)).size > PREVIEW_LIMIT) return { name, kind: 'other', mime }
   return { name, kind, mime, data: await readFile(path) }
+}
+
+async function previewUrl(url: string, name: string): Promise<FilePreview> {
+  const [kind, mime] = previewKind(name)
+  if (kind === 'other') return { name, kind, mime }
+  const data = await fetchBytes(url, PREVIEW_LIMIT)
+  return data ? { name, kind, mime, data } : { name, kind: 'other', mime }
 }
 
 async function chooseSavePath(
@@ -203,6 +202,7 @@ const handlers: Handlers = {
   },
   'file:reveal': async (_win, path) => shell.showItemInFolder(path),
   'file:preview': (_win, path) => previewFile(path),
+  'file:previewUrl': (_win, url, name) => previewUrl(url, name),
   'file:open': async (_win, path) => {
     const error = await shell.openPath(path)
     if (error) throw new Error(error)
@@ -304,7 +304,8 @@ const handlers: Handlers = {
   'mcp:answer': async (_win, id, approve) => answerConfirm(id, approve),
 
   // 选课与查老师（含演示模式的替换）见 xkIpc.ts
-  ...xkChannels(process.env['ZJU_DEMO'] === '1'),
+  ...xkChannels(process.env['ZJU_DEMO'] === '1')
+,
   // 图书馆预约（含演示模式的替换）见 libIpc.ts
   ...libraryChannels(process.env['ZJU_DEMO'] === '1'),
   ...formsHandlers
