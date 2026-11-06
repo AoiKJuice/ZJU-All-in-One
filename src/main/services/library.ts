@@ -1,4 +1,4 @@
-import type { LibBooking, LibBuilding, LibFloor, LibOverview, LibSeat, LibSeatState, LibSegment, LibWriteResult } from '@shared/library'
+import type { LibBooking, LibBuilding, LibFloor, LibOverview, LibRules, LibSeat, LibSeatState, LibSegment, LibWriteResult } from '@shared/library'
 import { ensureCas, zjuFetch } from '../http'
 
 // 图书馆座位预约（booking.lib.zju.edu.cn/h5，浙大图书馆空间预约平台，多校在用的同一套商业系统，前端 AES 的 IV 为 ZZWBKJ_ZHIHUAWEI）。
@@ -17,6 +17,8 @@ import { ensureCas, zjuFetch } from '../http'
 // - 预约：POST /api/Seat/confirm {aesjson}，aesjson = AES-128-CBC(PKCS7) 加密的 {"seat_id","segment"}，
 //   key = 当天 YYYYMMDD + 其倒序（16 字节），iv = ZZWBKJ_ZHIHUAWEI，结果 base64；
 // - 我的预约 POST /api/Member/seat {page, limit}；首页卡片 /api/index/subscribe 的 oksign 1 才可取消，取消 POST /api/Space/cancel {id}。
+// - 公开（不需登录，页面自己未登录时也调）：/api/index/config 的 data 为同一把每日 key 加密的 JSON，config.new 是次日座位开放时刻；
+//   /api/index/booking_rules 的 data.info.seat_rule 为座位规则 HTML。
 // 规则（官方 booking_rules）：可约当日与次日 8:30–22:30，每天 7:00 开放次日；每天只能取消一次；生效后 30 分钟内刷卡入馆
 // （网页签到入口在浙大关着），否则记违约，3 次冻结一周。
 // 以上都未以本应用的登录态实测（推测的字段在 docs 里标出）；预约与取消只能由用户本人验证，调试时一律不调用。
@@ -181,6 +183,60 @@ export async function aesjson(payload: Row, day = today()): Promise<string> {
   let binary = ''
   for (const b of sealed) binary += String.fromCharCode(b)
   return btoa(binary)
+}
+
+const HEADERS = { 'Content-Type': 'application/json;charset=UTF-8', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', lang: 'zh' }
+
+/** 不带登录态的公开接口 */
+async function open<T>(path: string): Promise<T | undefined> {
+  const reply = await (await zjuFetch(`${BASE}${path}`, { method: 'POST', headers: HEADERS, body: '{}' })).json<Reply<T>>().catch(() => null)
+  if (!reply) throw new Error('图书馆接口无响应')
+  return reply.data
+}
+
+const ymd = (offset: number): string => {
+  const d = new Date(Date.now() + offset * 864e5)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(d)
+}
+
+/** 解开 /api/index/config：服务器按它的日期加密，零点前后先试当天再试前后一天 */
+async function decryptJson(sealed: string): Promise<Row | undefined> {
+  const data = Uint8Array.from(atob(sealed), (c) => c.charCodeAt(0))
+  for (const offset of [0, -1, 1]) {
+    const d = ymd(offset).replaceAll('-', '')
+    try {
+      const key = await crypto.subtle.importKey('raw', bytes(d + [...d].reverse().join('')), { name: 'AES-CBC' }, false, ['decrypt'])
+      const plain = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: bytes(IV) }, key, data)
+      return JSON.parse(new TextDecoder().decode(plain)) as Row
+    } catch {
+      // 换一天的 key 再试
+    }
+  }
+  return undefined
+}
+
+/** 规则 HTML → 逐行文字 */
+export function ruleLines(html: string): string[] {
+  return html
+    .replace(/<br\s*\/?>|<\/(p|li|div|h\d)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .split('\n')
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+}
+
+export async function getRules(): Promise<LibRules> {
+  const [config, rules] = await Promise.all([
+    open<string>('/api/index/config').then((s) => (typeof s === 'string' ? decryptJson(s) : undefined)).catch(() => undefined),
+    open<Row>('/api/index/booking_rules').catch(() => undefined)
+  ])
+  const openNext = text((config?.['config'] as Row | undefined)?.['new'])
+  const info = rules?.['info'] as Row | undefined
+  return { ...(/^\d{1,2}:\d{2}$/.test(openNext) ? { openNext } : {}), lines: ruleLines(text(info?.['seat_rule'])) }
 }
 
 async function write(path: string, body: Row): Promise<LibWriteResult> {

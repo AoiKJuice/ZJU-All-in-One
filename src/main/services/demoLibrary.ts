@@ -1,4 +1,4 @@
-import type { LibArea, LibBooking, LibOverview, LibSeat, LibSegment, LibWriteResult } from '@shared/library'
+import type { LibArea, LibBooking, LibOverview, LibRules, LibSeat, LibSegment, LibWriteResult } from '@shared/library'
 import { today } from './library'
 import type { LibraryCoreHandlers } from './libraryApi'
 
@@ -60,10 +60,24 @@ const sum = (list: LibArea[]): Pick<LibArea, 'free' | 'total'> => ({
   total: list.reduce((n, a) => n + (a.total ?? 0), 0)
 })
 
+const hourNow = (): number => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', hourCycle: 'h23' }).format(new Date()))
+
+/** 演示用的通用规则文字（不是浙大原文） */
+const RULES: LibRules = {
+  openNext: '07:00',
+  lines: [
+    '可预约当日与次日座位，次日座位每天 07:00 开放。',
+    '预约生效后 30 分钟内刷卡入馆，逾期记违约一次。',
+    '每天可取消预约一次。',
+    '累计违约 3 次，暂停预约 7 天。'
+  ]
+}
+
 function overview(date = today()): LibOverview {
   const tomorrow = new Date(`${today()}T12:00:00+08:00`)
   tomorrow.setDate(tomorrow.getDate() + 1)
-  const dates = [today(), tomorrow.toISOString().slice(0, 10)]
+  // 与真实规则一致：次日座位 07:00 开放，此前只有今天
+  const dates = hourNow() >= 7 ? [today(), tomorrow.toISOString().slice(0, 10)] : [today()]
   return {
     date,
     dates,
@@ -141,5 +155,6 @@ export const demoLibrary: LibraryCoreHandlers = {
   'lib:seats': async (areaId, segment) => seats(areaId, segment),
   'lib:reserve': reserve,
   'lib:bookings': async () => bookings.map((b) => ({ ...b })),
+  'lib:rules': async () => RULES,
   'lib:cancel': cancel
 }
