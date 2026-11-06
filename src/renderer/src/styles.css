@@ -1356,6 +1356,239 @@ button.row {
   user-select: text;
 }
 
+.preview-bar {
+  align-items: center;
+}
+.preview-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.preview-handoff {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+}
+/* 文档类（Word / 表格 / 演示文稿 / 手机上的 PDF）：占满预览区，自己滚动 */
+.preview:is([data-kind='docx'], [data-kind='sheet'], [data-kind='slides'], [data-kind='pdf']) .preview-stage {
+  display: flex;
+  flex-direction: column;
+  place-items: stretch;
+}
+.preview-doc,
+.preview-slides,
+.preview-pdf,
+.preview-sheet {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+}
+.preview-doc {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.75rem;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  line-height: 1.8;
+  user-select: text;
+}
+.preview-doc h1,
+.preview-doc h2,
+.preview-doc h3 {
+  margin: 1.2em 0 0.4em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.preview-doc h1 {
+  font-size: 1.375rem;
+}
+.preview-doc h2 {
+  font-size: 1.1875rem;
+}
+.preview-doc h3 {
+  font-size: 1.0625rem;
+}
+.preview-doc p {
+  margin: 0.5em 0;
+}
+.preview-doc img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-sm);
+}
+.preview-doc table {
+  margin: 0.75em 0;
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+.preview-doc td,
+.preview-doc th {
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  vertical-align: top;
+}
+.preview-doc td p,
+.preview-doc th p {
+  margin: 0;
+}
+/* 表格：工作表切换 + 表格本身（首行、行号固定），单元格浅底分隔，不画线 */
+.preview-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+.preview-tabs {
+  display: flex;
+  flex: none;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+.preview-table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  user-select: text;
+}
+.preview-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.preview-table td,
+.preview-table th {
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+  text-align: left;
+  vertical-align: top;
+}
+.preview-table tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+.preview-table tr:first-child td {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--surface) 82%, var(--ink) 6%);
+}
+.preview-table th {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  font-weight: 400;
+  color: var(--ink-3);
+  text-align: right;
+  background: var(--surface);
+}
+.preview-table tr:first-child th {
+  z-index: 3;
+}
+.preview-table > .quiet {
+  padding: 0.75rem;
+}
+/* 演示文稿：一页一块，序号、标题、正文要点、图片 */
+.preview-slides {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.preview-slide {
+  position: relative;
+  padding: 1.25rem 1.5rem 1.25rem 3.25rem;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  user-select: text;
+}
+.preview-slide-no {
+  position: absolute;
+  top: 1.35rem;
+  left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--ink-3);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.preview-slide h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.preview-slide ul {
+  margin: 0;
+  padding-left: 1.1em;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+.preview-slide-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.preview-slide-images img {
+  width: 100%;
+  max-height: 22rem;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+/* PDF（手机端 pdf.js）：一页一张白纸 */
+.preview-pdf {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+.preview-pdf-page canvas {
+  display: block;
+  width: 100%;
+  border-radius: var(--r-sm);
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+/* 附件一行：名字（点开预览）与行尾下载 */
+.rows > .row.file-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.file-row .row-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.file-error {
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--shu);
+}
+.file-link {
+  color: var(--ink);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.file-link:hover {
+  color: var(--shu);
+}
+
 /* Agent 请求确认：居中一块纸，细线边框，不做卡片阴影 */
 .confirm {
   position: fixed;
@@ -1578,6 +1811,16 @@ button.row:hover,
 }
 .login-panel .login-field + .login-field {
   margin-top: 0.5rem;
+}
+
+/* 登录面板右上角关闭；学号框给它让出位置 */
+.login-panel {
+  padding-top: 2.75rem;
+}
+.login-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
 }
 
 /* 手机主页折叠长列表的「展开 / 收起」 */
@@ -2399,6 +2642,15 @@ html[data-platform='android'] .mast-meta {
   backdrop-filter: blur(1.25rem) saturate(1.3);
   box-shadow: var(--shadow-pop);
 }
+/* 横屏 / 平板：标签栏不铺满，居中保持手机上的宽度 */
+@media (min-width: 600px) {
+  .tabbar {
+    left: 50%;
+    right: auto;
+    width: 26rem;
+    translate: -50% 0;
+  }
+}
 .tabbar .mast-link {
   flex: 1;
   justify-content: center;
@@ -2587,11 +2839,43 @@ html[data-platform='android'] .replay-head {
   padding: 0 var(--gutter) 0 0.375rem;
 }
 .replay-back {
+  display: grid;
+  place-items: center;
   width: 2.5rem;
   height: 2.5rem;
-  font-size: 1.375rem;
-  line-height: 1;
+  border-radius: 999px;
   color: var(--ink-2);
+}
+.replay-back svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* 工具入口：手机上一行一个，徽标在左、版本在右，一屏放得下 */
+html[data-platform='android'] .tool-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+html[data-platform='android'] .tool-card {
+  flex-direction: row;
+  gap: 1rem;
+  padding: 0.75rem 1.125rem 0.75rem 0.875rem;
+}
+html[data-platform='android'] .tool-card:hover {
+  transform: none;
+}
+html[data-platform='android'] .tool-card .tool-icon svg {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+html[data-platform='android'] .tool-card .tool-version {
+  margin: 0 0 0 auto;
+}
+
+/* 文件预览：避开状态栏与手势条 */
+html[data-platform='android'] .preview {
+  padding: calc(var(--sat) + 0.75rem) var(--gutter) calc(var(--sab) + 1rem);
 }
 html[data-platform='android'] .replay-title {
   font-size: 1.25rem;
@@ -2671,14 +2955,26 @@ body {
   display: inline-block;
   max-width: 100%;
 }
-/* 设置的选中滑块为圆角矩形（其余选项保持胶囊形） */
+/* 设置的选中滑块为圆角矩形（其余选项保持胶囊形）；未选中的也有浅底，看得出能点 */
 .opt {
   border-radius: var(--r-sm);
+  background: var(--surface-2);
 }
 html[data-platform='android'] .settings-row > span:last-child {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(6.75rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
   gap: 0.375rem;
+}
+html[data-platform='android'] .settings-row > span.settings-flow:last-child {
+  display: flex;
+  justify-content: space-between;
+}
+html[data-platform='android'] .settings-flow > form {
+  flex: 1 1 100%;
+}
+html[data-platform='android'] .settings-groups {
+  gap: 1rem;
+  margin-top: 1.25rem;
 }
 html[data-platform='android'] .settings-row .opt {
   justify-content: center;
@@ -2695,17 +2991,9 @@ a.act {
   display: inline-block;
 }
 
-/* 并列信息（Joined）：段间留白代替分隔线；侧页、课程详情、回放页顶部的元信息为浅底小标签 */
+/* 并列信息（Joined）：段间留白代替分隔线；侧页、课程详情、回放页顶部的元信息同样是不带底色的次要文字 */
 .part:not(:last-child) {
   margin-right: 1.1em;
-}
-.sheet-meta .part,
-.course-sheet-meta .part,
-.replay-meta .part {
-  margin: 0.25rem 0.375rem 0 0;
-  padding: 0.0625rem 0.625rem;
-  border-radius: 999px;
-  background: var(--surface-2);
 }
 
 /* 课表：上午、下午、晚上三块卡片，块之间空一行；表头星期直接在纸面上 */

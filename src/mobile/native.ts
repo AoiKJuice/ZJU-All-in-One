@@ -94,6 +94,32 @@ export async function nativeFetch(url: string, init: FetchInit = {}): Promise<Fe
   throw new Error('跳转次数过多')
 }
 
+/** 二进制文件（预览用）：同样逐跳跟随跳转，大文件经缓存文件读回，不走 base64 字符串 */
+export async function nativeBytes(url: string, headers: Record<string, string> = {}): Promise<Uint8Array> {
+  let current = url.replace(/^http:\/\/([^/]*\.zju\.edu\.cn)/, 'https://$1')
+  for (let hop = 0; hop < 20; hop++) {
+    const response = await native.request({ url: current, method: 'GET', headers, binary: true })
+    const location = response.headers['location']
+    if (response.status >= 300 && response.status < 400 && location) {
+      const next = new URL(location, current)
+      if (next.protocol === 'http:' && next.hostname.endsWith('.zju.edu.cn')) next.protocol = 'https:'
+      current = next.href
+      continue
+    }
+    if (response.status < 200 || response.status >= 300) throw new Error(`读取失败（${response.status}）`)
+    if (response.file) {
+      const file = response.file
+      try {
+        return new Uint8Array(await (await fetch(Capacitor.convertFileSrc(file))).arrayBuffer())
+      } finally {
+        void native.release({ file })
+      }
+    }
+    return Uint8Array.from(atob(response.base64 ?? ''), (c) => c.charCodeAt(0))
+  }
+  throw new Error('跳转次数过多')
+}
+
 async function readCached(file: string): Promise<string> {
   try {
     return await (await fetch(Capacitor.convertFileSrc(file))).text()

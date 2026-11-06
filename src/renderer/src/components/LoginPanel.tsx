@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '@renderer/store'
 import { MOBILE } from '@renderer/lib/platform'
 import { dur } from '@renderer/lib/motion'
+import { CloseButton } from './IconButton'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
@@ -63,6 +64,7 @@ function Form({ onClose }: { onClose: () => void }) {
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: dur(0.35), ease: [0.22, 1, 0.36, 1] }}
     >
+      <CloseButton className="login-close" onClick={onClose} />
       <input
         className="field login-field"
         autoFocus
@@ -81,12 +83,12 @@ function Form({ onClose }: { onClose: () => void }) {
       />
       {error && <p className="login-error">{error}</p>}
       <div className="acts mt-4">
-        <button type="submit" className="act" disabled={busy || !username.trim() || !password}>
+        <button type="submit" className="btn btn-solid" disabled={busy || !username.trim() || !password}>
           {busy ? '登录中' : '登录'}
         </button>
         <span className="flex-1" />
         {!MOBILE && (
-          <button type="button" className="act" disabled={busy} onClick={() => void run()}>
+          <button type="button" className="btn" disabled={busy} onClick={() => void run()}>
             网页登录
           </button>
         )}

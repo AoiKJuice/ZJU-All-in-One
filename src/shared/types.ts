@@ -181,7 +181,8 @@ export interface AssignmentDetail {
 /** 应用内预览本机文件：图片 / PDF / 文本直接显示，其余交给系统默认程序 */
 export interface FilePreview {
   name: string
-  kind: 'image' | 'pdf' | 'text' | 'other'
+  /** docx / sheet（xlsx、xls、ods、csv）/ slides（pptx）在界面里解析显示 */
+  kind: 'image' | 'pdf' | 'text' | 'docx' | 'sheet' | 'slides' | 'other'
   mime: string
   /** other 或文件过大时不带内容 */
   data?: Uint8Array

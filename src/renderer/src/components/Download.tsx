@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useApp } from '@renderer/store'
 import { MOBILE } from '@renderer/lib/platform'
+import { canPreview } from '@shared/preview'
+import { IconButton } from './IconButton'
 
 // 手机端下到系统"下载"目录，没有"所在位置"，直接用其他应用打开
 const REVEAL = MOBILE ? '打开' : '打开位置'
@@ -27,21 +29,32 @@ export function useDownload() {
   return { state, start, reveal }
 }
 
-/** 附件一行：点名字下载，尾注显示进度 / 打开位置 */
+/** 附件一行：点名字在应用内预览（能预览的类型），否则下载；行尾下载图标，下完换成打开 */
 export function DownloadRow({ url, name }: { url: string; name: string }) {
   const { state, start, reveal } = useDownload()
+  const openPreview = useApp((s) => s.openPreview)
+  const preview = canPreview(name)
   return (
-    <li className="row !grid-cols-[minmax(0,1fr)_auto] !py-2">
-      <button className="text-left" disabled={state.kind === 'busy'} onClick={() => void start(url, name)}>
+    <li className="row file-row">
+      <button className="text-left" disabled={state.kind === 'busy'} onClick={() => (preview ? openPreview({ url, name }) : void start(url, name))}>
         <span className="row-title !text-base">{name}</span>
       </button>
       <span className="row-end">
         {state.kind === 'busy' && '下载中'}
-        {state.kind === 'error' && <span className="text-[var(--shu)]">{state.message}</span>}
+        {state.kind === 'error' && (
+          <span className="file-error" title={state.message}>
+            {state.message}
+          </span>
+        )}
         {state.kind === 'done' && (
           <button className="act" onClick={reveal}>
             {REVEAL}
           </button>
+        )}
+        {(state.kind === 'idle' || state.kind === 'error') && (
+          <IconButton label="下载" onClick={() => void start(url, name)}>
+            <path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14" />
+          </IconButton>
         )}
       </span>
     </li>

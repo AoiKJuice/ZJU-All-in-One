@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import type { Assignment, AssignmentDetail, PickedFile } from '@shared/types'
+import type { Assignment, AssignmentDetail, Attachment, PickedFile } from '@shared/types'
+import { canPreview } from '@shared/preview'
 import { useApp } from '@renderer/store'
 import { Joined } from './Type'
 import { DownloadRow, downloadFile } from './Download'
@@ -82,8 +83,10 @@ function SheetActs({ a }: { a: Assignment }) {
       </button>
       {/* 原页面放在标题旁的动作里，不跟在元信息后面（窄时会单独掉到下一行） */}
       {a.url && a.type !== 'pta' && (
-        <a className="act" href={a.url} target="_blank" rel="noreferrer">
-          原页面 ↗
+        <a className="icon-btn" href={a.url} target="_blank" rel="noreferrer" aria-label="原页面" title="原页面">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M14 4h6v6M20 4l-8.5 8.5M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+          </svg>
         </a>
       )}
       <CloseButton onClick={() => openAssignment(null)} />
@@ -118,6 +121,19 @@ function PtaBody({ a }: { a: Assignment }) {
         </div>
       )}
     </>
+  )
+}
+
+/** 已交 / 草稿里的文件名：能预览的点开在应用内看，其余下载 */
+function FileLink({ file }: { file: Attachment }) {
+  const openPreview = useApp((s) => s.openPreview)
+  return (
+    <button
+      className="file-link block max-w-full truncate text-left"
+      onClick={() => (canPreview(file.name) ? openPreview(file) : void downloadFile(file.url, file.name))}
+    >
+      {file.name}
+    </button>
   )
 }
 
@@ -218,7 +234,8 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
                   if (!link || !FILE_LINK.test(link.href)) return
                   e.preventDefault()
                   const name = link.textContent?.trim() || decodeURIComponent(new URL(link.href).pathname.split('/').pop() ?? 'file')
-                  void downloadFile(link.href, name)
+                  if (canPreview(name)) openPreview({ url: link.href, name })
+                  else void downloadFile(link.href, name)
                 }}
                 dangerouslySetInnerHTML={{ __html: clean(detail.descriptionHtml) }}
               />}
@@ -241,7 +258,12 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
                       <span className="row-time">
                         {dotDate(s.submittedAt)} {clock(s.submittedAt)}
                       </span>
-                      <span className="text-[0.9375rem]"><Joined parts={[s.comment, ...s.files.map((f) => f.name)]} /></span>
+                      <span className="min-w-0 text-[0.9375rem]">
+                        {s.comment && <span className="block">{s.comment}</span>}
+                        {s.files.map((f) => (
+                          <FileLink key={f.url} file={f} />
+                        ))}
+                      </span>
                       {s.canRetract ? (
                         <button className="act" data-on={retractArmed === s.id || undefined} disabled={retracting !== null} onClick={() => void retract(s.id)}>
                           {retracting === s.id ? '撤回中' : retractArmed === s.id ? '确认撤回' : '撤回'}
@@ -260,7 +282,10 @@ function Body({ a, onSubmitted }: { a: Assignment; onSubmitted: () => void }) {
                 <ul className="rows">
                   <li className="row !grid-cols-[minmax(0,1fr)] !py-2">
                     <span className="text-[0.9375rem] text-[var(--ink-2)]">
-                      <Joined parts={[detail.draft.comment, ...detail.draft.files.map((f) => f.name)]} />
+                      {detail.draft.comment && <span className="block">{detail.draft.comment}</span>}
+                      {detail.draft.files.map((f) => (
+                        <FileLink key={f.url} file={f} />
+                      ))}
                     </span>
                   </li>
                 </ul>

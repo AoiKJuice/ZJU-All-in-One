@@ -31,7 +31,7 @@ export function Settings() {
   return (
     <div className="page">
       <OutlineWord text="Settings" />
-      <div className="mt-20 flex max-w-3xl flex-col gap-14">
+      <div className="settings-groups mt-20 flex max-w-3xl flex-col gap-14">
         <Reveal>
           <Section title="外观">
             <Row label="风格">
@@ -130,13 +130,12 @@ function ZjuAccount() {
   }, [armed])
 
   return (
-    <Row label="统一身份认证">
+    <Row label="统一身份认证" flow>
       {auth.loggedIn ? (
         <>
           <span className="text-[var(--ink)]">{auth.account ? maskAccount(auth.account) : '已登录'}</span>
           <button
-            className="act"
-            data-on={armed || undefined}
+            className={armed ? 'btn btn-solid' : 'btn'}
             disabled={authBusy}
             onClick={() => {
               if (!armed) return setArmed(true)
@@ -150,7 +149,7 @@ function ZjuAccount() {
       ) : (
         <>
           <span className="text-[var(--ink-3)]">未登录</span>
-          <button className="act" data-login-toggle onClick={() => setLoginOpen(true)}>
+          <button className="btn btn-solid" data-login-toggle onClick={() => setLoginOpen(true)}>
             登录
           </button>
         </>
@@ -209,11 +208,11 @@ function Pta() {
         ))}
       </Row>
       {pta.enabled && (
-        <Row label="PTA 账号">
+        <Row label="PTA 账号" flow>
           {pta.loggedIn ? (
             <>
               <span className="text-[var(--ink)]">{pta.user ?? '已登录'}</span>
-              <button className="act" disabled={busy} onClick={() => void run(() => window.zju['pta:logout']())}>
+              <button className="btn" disabled={busy} onClick={() => void run(() => window.zju['pta:logout']())}>
                 退出
               </button>
             </>
@@ -238,11 +237,11 @@ function Pta() {
               </div>
               {error && <p className="login-error">{error}</p>}
               <div className="acts mt-3">
-                <button type="submit" className="act" disabled={busy || !username.trim() || !password}>
+                <button type="submit" className="btn btn-solid" disabled={busy || !username.trim() || !password}>
                   {busy ? '登录中' : '登录'}
                 </button>
                 {!MOBILE && (
-                  <button type="button" className="act" disabled={busy} onClick={() => void run(() => window.zju['pta:login']())}>
+                  <button type="button" className="btn" disabled={busy} onClick={() => void run(() => window.zju['pta:login']())}>
                     网页登录
                   </button>
                 )}
@@ -337,11 +336,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 const RowGroup = createContext('')
 
 /** 一行设置：左侧名称，右侧选项 */
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({ label, flow, children }: { label: string; flow?: boolean; children: ReactNode }) {
   return (
     <li className="row settings-row">
       <span className="settings-label">{label}</span>
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-2">
+      <span className={`flex flex-wrap items-center gap-x-2 gap-y-2${flow ? ' settings-flow' : ''}`}>
         <RowGroup.Provider value={label}>{children}</RowGroup.Provider>
       </span>
     </li>

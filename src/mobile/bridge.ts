@@ -3,7 +3,8 @@ import type { AuthState, FilePreview, McpState, OpenRequest } from '@shared/type
 import { hasCasCookie, logout } from './zjuam'
 import { onCasExpired } from './http'
 import { logDiagnostic } from './diagnostics'
-import { native } from './native'
+import { native, nativeBytes } from './native'
+import { PREVIEW_LIMIT, previewKind } from '@shared/preview'
 import { picked } from './shims/fs'
 import { getTodoState, onReminderTap, setIgnored, setRemind, updateAssignments } from './todos'
 import { formsHandlers } from './forms'
@@ -103,16 +104,18 @@ function pickFiles(): ReturnType<ZjuApi['homework:pick']> {
 async function previewFile(path: string): Promise<FilePreview> {
   const file = picked.get(path)
   const name = file?.name ?? path.split('/').pop() ?? path
-  if (!file) return { name, kind: 'other', mime: 'application/octet-stream' }
-  const kind: FilePreview['kind'] = file.type.startsWith('image/')
-    ? 'image'
-    : file.type === 'application/pdf'
-      ? 'pdf'
-      : file.type.startsWith('text/')
-        ? 'text'
-        : 'other'
-  if (kind === 'other') return { name, kind, mime: file.type }
-  return { name, kind, mime: file.type, data: new Uint8Array(await file.arrayBuffer()) }
+  // 系统选择器给的 type 常常是空串（Office 文件尤其如此），按文件名分类
+  const [kind, mime] = previewKind(name)
+  if (!file || kind === 'other' || file.size > PREVIEW_LIMIT) return { name, kind: 'other', mime }
+  return { name, kind, mime, data: new Uint8Array(await file.arrayBuffer()) }
+}
+
+async function previewUrl(url: string, name: string): Promise<FilePreview> {
+  const [kind, mime] = previewKind(name)
+  if (kind === 'other') return { name, kind, mime }
+  const headers: Record<string, string> = new URL(url).hostname.endsWith('cmc.zju.edu.cn') ? { Referer: 'https://classroom.zju.edu.cn/' } : {}
+  const data = await nativeBytes(url, headers)
+  return data.length > PREVIEW_LIMIT ? { name, kind: 'other', mime } : { name, kind, mime, data }
 }
 
 const MCP_OFF: McpState = { enabled: false, url: null, token: '', tools: { query: false, download: false, app: false, transcribe: false, submit: false }, error: null }
@@ -160,6 +163,7 @@ const handlers: Handlers = {
   },
   'file:reveal': (path) => native.open({ uri: path }),
   'file:preview': (path) => previewFile(path),
+  'file:previewUrl': (url, name) => previewUrl(url, name),
   'file:open': (path) => native.open({ uri: path }),
 
   'homework:detail': (activityId) => getAssignmentDetail(activityId),
@@ -203,7 +207,8 @@ const handlers: Handlers = {
   ...xkHandlers,
   'xk:watches': async () => [],
   'xk:watch': unsupported,
-  'xk:unwatch': unsupported,
+  'xk:unwatch': unsupported
+,
   ...libraryHandlers,
   'lib:watches': async () => [],
   'lib:watch': unsupported,

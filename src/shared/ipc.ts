@@ -59,8 +59,10 @@ export interface ZjuApi extends XkApi, FormsApi, LibraryApi {
   'file:download': (url: string, name: string) => Promise<string | null>
   /** 在资源管理器中显示文件 */
   'file:reveal': (path: string) => Promise<void>
-  /** 读取本机文件供应用内预览（图片 / PDF / 文本） */
+  /** 读取本机文件供应用内预览（图片 / PDF / 文本 / Office） */
   'file:preview': (path: string) => Promise<FilePreview>
+  /** 用登录会话取回校内文件（作业附件、已交文件）供应用内预览，不落盘 */
+  'file:previewUrl': (url: string, name: string) => Promise<FilePreview>
   /** 用系统默认程序打开本机文件 */
   'file:open': (path: string) => Promise<void>
 
@@ -123,6 +125,7 @@ export const ZJU_CHANNELS = [
   'file:download',
   'file:reveal',
   'file:preview',
+  'file:previewUrl',
   'file:open',
   'homework:detail',
   'homework:pick',
@@ -146,7 +149,8 @@ export const ZJU_CHANNELS = [
   'mcp:state',
   'mcp:set',
   'mcp:answer',
-  ...XK_CHANNELS,
+  ...XK_CHANNELS
+,
   ...FORMS_CHANNELS,
   ...LIBRARY_CHANNELS
 ] as const satisfies readonly ZjuChannel[]

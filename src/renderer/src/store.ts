@@ -6,6 +6,8 @@ import { applySettings, initialSettings, type Settings } from './lib/settings'
 export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
 /** 工具页里打开的工具（见 tools/index.ts） */
 export type ToolId = 'graduation' | 'course' | 'forms' | 'library'
+/** 应用内预览的对象：本机文件路径，或校内文件 */
+export type PreviewTarget = string | { url: string; name: string }
 
 /** 课表上点开的一节课：课程详情上拉面板 */
 export interface CourseOpen {
@@ -64,9 +66,9 @@ interface AppStore {
   notify: (text: string, action?: { label: string; run: () => void }) => void
   toggleTheme: () => void
   refreshAuth: () => Promise<void>
-  /** 正在预览的本机文件路径 */
-  preview: string | null
-  openPreview: (path: string | null) => void
+  /** 正在预览的文件：本机路径，或校内文件的地址与文件名（作业附件、已交文件） */
+  preview: PreviewTarget | null
+  openPreview: (target: PreviewTarget | null) => void
   /** 待用户确认的 Agent 提交 / 撤回，排队逐个显示 */
   confirms: ConfirmRequest[]
   answerConfirm: (id: string, approve: boolean) => void
