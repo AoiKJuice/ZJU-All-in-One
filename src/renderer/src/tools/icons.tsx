@@ -65,3 +65,19 @@ export function LibraryIcon() {
     </svg>
   )
 }
+
+/** 校园资讯：一张对折的小报，主题色的头条块；悬停时右上角的电波一圈圈发出去，头条块往上一跳 */
+export function NewsIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path className="ti-ink" d="M9 13h24a2 2 0 0 1 2 2v23a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3V14a1 1 0 0 1 1-1Z" />
+      <path className="ti-ink" d="M35 21h3a2 2 0 0 1 2 2v15a3 3 0 0 1-3 3" />
+      <rect className="ti-accent ti-fill ti-headline" x="13" y="18" width="9" height="7" rx="1.4" />
+      <path className="ti-ink" d="M25.5 19h5M25.5 23.5h5M13 30h17.5M13 35h12" />
+      <g className="ti-waves">
+        <path className="ti-accent ti-wave1" d="M39.5 9.5a4 4 0 0 1 2.5 3.7" />
+        <path className="ti-accent ti-wave2" d="M40.5 4.8a9 9 0 0 1 5.8 8.4" />
+      </g>
+    </svg>
+  )
+}

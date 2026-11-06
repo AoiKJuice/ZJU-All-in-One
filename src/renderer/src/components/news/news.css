@@ -1,0 +1,601 @@
+/* 工具「校园资讯」（components/news/）。只用主题变量，三种风格经 .panel 与变量自动适配 */
+/* 本文件随组件引入，注入顺序可能早于 styles.css：覆盖通用类时选择器多一级 */
+
+.news {
+  --news-on-shu: #fff;
+  --news-layer: color-mix(in srgb, var(--surface-2) 70%, color-mix(in srgb, var(--ink) 6%, transparent));
+}
+html[data-style='material'][data-theme='dark'] .news,
+html[data-style='material'][data-theme='dark'] .news-sheet {
+  --news-on-shu: color-mix(in srgb, var(--shu) 22%, #000);
+}
+html[data-style='glass'][data-theme='dark'] .news,
+html[data-style='glass'][data-theme='dark'] .news-sheet {
+  --news-on-shu: #0b0e15;
+}
+.news-sheet {
+  --news-on-shu: #fff;
+  --news-layer: color-mix(in srgb, var(--surface-2) 70%, color-mix(in srgb, var(--ink) 6%, transparent));
+}
+
+/* 一屏：左通知、右活动，各自滚动 */
+.tools-page:has(.news) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 36rem;
+  padding-bottom: clamp(1rem, 3vh, 2rem);
+}
+.tools-page:has(.news) > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.news {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: clamp(1rem, 3vh, 1.75rem);
+}
+.news-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+}
+.news-col {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.news-panel.panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.875rem 0.625rem 0.375rem;
+}
+.news-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.375rem 0.5rem;
+}
+.news-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.news-head-tools {
+  display: flex;
+  gap: 0.125rem;
+  margin-left: auto;
+}
+.news-title {
+  margin: 0 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+.news-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0.125rem;
+}
+
+/* 搜索框：放大镜在框内左侧 */
+.news-search {
+  position: relative;
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+.news-search svg {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  translate: 0 -50%;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.news .field,
+.news-sheet .field {
+  min-height: 0;
+  height: 2.375rem;
+  padding: 0 0.875rem;
+  resize: none;
+  font-size: 0.9375rem;
+}
+.news .news-search .field,
+.news-sheet .news-search .field {
+  width: 100%;
+  padding-left: 2.25rem;
+}
+.news-sheet .news-search {
+  margin: 0 0 0.75rem;
+}
+
+/* 未取到的来源：一行可展开的小字 */
+.news-failed {
+  padding: 0 0.75rem 0.375rem;
+}
+.news-failed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.625rem 0.125rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.news-failed-toggle .news-chevron {
+  width: 1rem;
+  height: 1rem;
+  transition: rotate calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.news-failed-toggle[data-open] .news-chevron,
+.news-org-more[data-open] .news-chevron {
+  rotate: 180deg;
+}
+.news-failed-list {
+  overflow: hidden;
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem 0 0;
+}
+.news-failed-list li {
+  display: flex;
+  gap: 1em;
+  padding: 0.125rem 0;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+.news-failed-why {
+  color: var(--ink-3);
+}
+
+/* 通知条目：日期 · 标题 + 出处 */
+.news .rows > li > .row.news-row {
+  display: grid;
+  grid-template-columns: 4.75em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.875rem;
+  padding: 0.5625rem 0.75rem;
+}
+.news-row .row-time {
+  font-size: 0.875rem;
+}
+.news-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.news-row .row-title {
+  font-size: 1rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.news-row-from {
+  display: flex;
+  column-gap: 0.875em;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0 0.75rem;
+}
+.news-empty .quiet {
+  padding: 1rem 0 0.25rem;
+}
+
+/* 活动卡片：浅底圆角块，标题 + 至多一个状态胶囊，两行无底色元信息 */
+.news-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.125rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.news-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--r-md);
+  text-align: left;
+  background: var(--news-layer);
+  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.news-card:hover {
+  background: color-mix(in srgb, var(--news-layer) 70%, rgba(var(--shu-rgb), 0.12));
+}
+.news-card[data-stage='over'] {
+  opacity: 0.55;
+}
+.news-card-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.news-card-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.news-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.875em;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.news-pill {
+  flex: none;
+  padding: 0.05rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.news-pill[data-tone='solid'] {
+  color: var(--news-on-shu);
+  background: var(--shu);
+}
+
+/* ---- 侧页 ---- */
+.local-sheet .news-sheet-close {
+  position: absolute;
+  top: calc(var(--mast-h) + 1.5rem);
+  right: 2.5rem;
+}
+.news-sheet .sheet-title {
+  padding-right: 3.5rem;
+  text-wrap: balance;
+}
+.news-reader-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding-right: 3rem;
+}
+.news-reader-head .sheet-title {
+  padding-right: 0;
+}
+.news-sheet .sheet-body {
+  overflow-y: auto;
+}
+.news-text {
+  margin: 0 0 0.75em;
+  font-size: 0.9375rem;
+  line-height: 1.85;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  user-select: text;
+  text-wrap: pretty;
+}
+.news-facts {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--r-md);
+  background: var(--news-layer);
+}
+.news-facts > div {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.25rem 0;
+  font-size: 0.9375rem;
+}
+.news-facts dt {
+  color: var(--ink-3);
+}
+.news-facts dd {
+  margin: 0;
+  color: var(--ink);
+}
+.news-block {
+  margin-top: 1.5rem;
+}
+.news-block .group-title {
+  padding: 0;
+}
+.news-block-hot {
+  padding: 0.75rem 1rem 0.25rem;
+  border-radius: var(--r-md);
+  background: rgba(var(--shu-rgb), 0.08);
+}
+.news-block-hot .group-title {
+  color: var(--shu);
+}
+.news-sheet-acts {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.5rem 0 1rem;
+}
+
+/* 来源侧页 */
+.news-sources .news-block:first-child {
+  margin-top: 0.25rem;
+}
+.news-choices {
+  display: flex;
+  gap: 0.25rem;
+}
+.news-org-group + .news-org-group {
+  margin-top: 0.75rem;
+}
+.news-org-head {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.news-orgs,
+.news-cols,
+.news-accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.news-cols {
+  overflow: hidden;
+  padding-left: 1.75rem;
+}
+.news-org-row {
+  display: flex;
+  align-items: center;
+}
+.news-org-hit,
+.news-col-hit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4375rem 0.5rem;
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: background-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.news-org-hit:hover,
+.news-col-hit:hover {
+  background: var(--surface-2);
+}
+.news-org-name,
+.news-col-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9375rem;
+  letter-spacing: 0.03em;
+}
+.news-col-name {
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+.news-org-count {
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.news-org-more {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: var(--ink-3);
+  transition: background-color calc(0.25s * var(--speed, 1)) var(--ease), color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.news-org-more:hover {
+  color: var(--shu);
+  background: var(--surface-2);
+}
+.news-org-more .news-chevron {
+  width: 1.125rem;
+  height: 1.125rem;
+  transition: rotate calc(0.3s * var(--speed, 1)) var(--ease);
+}
+
+/* 勾选框：圆角方框，勾上为主题色实底，部分为横线 */
+.news-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 0.35rem;
+  border: 1.6px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  transition: background-color calc(0.25s * var(--speed, 1)) var(--ease), border-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.news-box svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  stroke: var(--news-on-shu);
+}
+button:hover > .news-box {
+  border-color: var(--shu);
+}
+.news-box[data-mark] {
+  border-color: var(--shu);
+  background: var(--shu);
+}
+
+.news-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+.news-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.news-sheet .news-grow {
+  flex: 1;
+  min-width: 10rem;
+}
+.news-sheet .act.news-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3125rem 0.875rem 0.3125rem 0.5rem;
+  border-radius: 999px;
+  background-image: none;
+  background-color: var(--news-layer);
+  color: var(--ink-2);
+}
+.news-sheet .act.news-toggle:hover:not(:disabled) {
+  color: var(--shu);
+}
+.news-sheet .act.news-toggle[data-on] {
+  color: var(--shu);
+  background-color: rgba(var(--shu-rgb), 0.12);
+}
+/* 开关：小圆轨道，开时圆点滑到右侧并转主题色 */
+.news-knob {
+  position: relative;
+  flex: none;
+  width: 1.75rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  transition: background-color calc(0.25s * var(--speed, 1)) var(--ease);
+}
+.news-knob::after {
+  content: '';
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: translate calc(0.25s * var(--speed, 1)) var(--ease);
+}
+[data-on] > .news-knob {
+  background: var(--shu);
+}
+[data-on] > .news-knob::after {
+  translate: 0.75rem 0;
+}
+.news-tag {
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.news-warn {
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  color: var(--shu);
+}
+.news-account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0 0.25rem 0.5rem;
+  border-radius: var(--r-md);
+}
+.news-account:hover {
+  background: var(--surface-2);
+}
+.news-account-name {
+  flex: 1;
+  font-size: 0.9375rem;
+}
+
+/* 窄窗口：上下排、整页滚动 */
+@media (max-width: 860px) {
+  html:not([data-platform='android']) .tools-page:has(.news) {
+    height: auto;
+  }
+  html:not([data-platform='android']) .news-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html:not([data-platform='android']) .news-panel.panel {
+    height: 70vh;
+  }
+}
+
+/* ---- 手机：顶部 通知 / 活动 切换，整页滚动 ---- */
+.news-switch {
+  position: sticky;
+  top: calc(var(--mast-h) + var(--sat, 0px) + 0.375rem);
+  z-index: 6;
+  display: flex;
+  width: fit-content;
+  gap: 0.25rem;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+html[data-platform='android'] .tools-page:has(.news) {
+  display: block;
+  height: auto;
+  min-height: 0;
+  padding-bottom: calc(var(--tab-h) + var(--sab) + 3.5rem);
+}
+html[data-platform='android'] .news {
+  display: block;
+  margin-top: 0.75rem;
+}
+html[data-platform='android'] .news-main {
+  display: block;
+}
+html[data-platform='android'] .news-scroll {
+  overflow: visible;
+}
+html[data-platform='android'] .news-head {
+  flex-wrap: wrap;
+}
+html[data-platform='android'] .news .rows > li > .row.news-row {
+  grid-template-columns: 4em minmax(0, 1fr);
+  gap: 0.625rem;
+  padding: 0.5rem 0.5rem;
+}
+html[data-platform='android'] .local-sheet .news-sheet-close {
+  top: calc(var(--sat) + 1rem);
+  right: var(--gutter);
+}
+html[data-platform='android'] .news-sheet-acts .btn {
+  flex: 1;
+  justify-content: center;
+  text-align: center;
+}
+html[data-platform='android'] .news-title {
+  display: none;
+}

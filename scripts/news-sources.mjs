@@ -25,7 +25,7 @@ const EXTRA = [
 ]
 
 // ---- 栏目取舍规则（依据写进输出） ----
-const KEEP = /通知|公告|公示|教务|教学|评奖|评优|奖助|资助|奖学金|助学|就业|实习|学工|学生|本科|研究生|学术报告|报告会|讲座|学术活动|论坛|竞赛|第二课堂|培养|重要提示|重点提示|办事指南|招聘信息|选调|心理|活动/
+const KEEP = /通知|公告|公示|预告|奖励|荣誉|学籍|选课|考试|创新创业|教务|教学|评奖|评优|奖助|资助|奖学金|助学|就业|实习|学工|学生|本科|研究生|学术报告|报告会|讲座|学术活动|论坛|竞赛|第二课堂|培养|重要提示|重点提示|办事指南|招聘信息|选调|心理|活动/
 const DROP = /培养方案|教学成果|成果|教学研究|教改|文件资料|资料|出国|出境|系友|院友|浙江大学|办事指南|流程|人事|招聘|师资|博士后|校友|工会|科研|学科建设|党务|党建|纪检|新闻|动态|风采|招生|下载|教工|离退休|采购|招标|简介|概况|领导|机构|沿革|联系|名录|学者|视频|图片|媒体|专题|宣传|年鉴|会议纪要|制度|文件|规章|English/i
 /** 挂在学生名下的仍保留（「学生党建」「学生就业」） */
 const STUDENT = /学生/
@@ -155,6 +155,22 @@ function select(site, columns) {
   return decided
 }
 
+/** 审计记录：保留的栏目逐条写依据，去掉的按原因归并成栏目名列表 */
+export function compact(site) {
+  const dropped = {}
+  for (const c of site.columns.filter((x) => !x.keep)) {
+    const why = c.why.replace(/「[^」]*」/, '「…」').replace(/（最近[^）]*）/, '').replace(/\d+\/\d+/, 'n')
+    ;(dropped[why] ??= []).push(c.name)
+  }
+  return {
+    org: site.org,
+    url: site.url,
+    home: site.home,
+    kept: site.columns.filter((x) => x.keep).map((c) => ({ column: c.name, url: c.url, basis: c.why, count: c.count, latest: c.latest })),
+    dropped: Object.fromEntries(Object.entries(dropped).map(([k, v]) => [k, [...new Set(v)]]))
+  }
+}
+
 async function main() {
   const dir = await get(DIRECTORY)
   const colleges = [...dir.html.matchAll(/title\s*:\s*'([^']*)'[\s,]*link\s*:\s*'([^']*)'/g)]
@@ -178,7 +194,7 @@ async function main() {
       console.log(`${site.org}  打不开：${r?.error}`)
       return
     }
-    report.push({ org: site.org, url: site.url, home: r.home, charset: r.charset, columns: r.decided.map(({ entries, ...c }) => ({ ...c, count: entries.length })) })
+    report.push(compact({ org: site.org, url: site.url, home: r.home, columns: r.decided.map(({ entries, ...c }) => ({ ...c, count: entries.length })) }))
     const keptCols = r.decided.filter((x) => x.keep)
     // 同一单位里重名的栏目（几个「最新通知」）带上上级栏目名区分
     const count = (n) => keptCols.filter((x) => x.name === n).length
@@ -233,4 +249,4 @@ ${kept.map((k) => '  ' + JSON.stringify(k)).join(',\n')}
   console.log(`保留 ${kept.length} 个栏目`)
 }
 
-await main()
+if (!process.env.NEWS_SOURCES_NO_RUN) await main()
