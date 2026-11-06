@@ -30,6 +30,7 @@ interface Context {
   xkzys: string
   ylxs: string
   categories: XkCategory[]
+  round: XkContext['round']
 }
 
 type Row = Record<string, string | number | null | undefined>
@@ -95,9 +96,21 @@ async function loadContext(fresh = false): Promise<Context> {
     zydm: inputs['zydm'] ?? '',
     xkzys: inputs['xkzys'],
     ylxs: inputs['ylxs'] ?? '',
-    categories: parseCategories(html)
+    categories: parseCategories(html),
+    round: parseRound(html)
   }
   return context
+}
+
+// 推测：选课首页的提示文字里写着当前轮次与起止时间（如「第一轮选课 2026-11-05 09:00 至 2026-11-12 17:00」），
+// 未以登录态核对；认不出就为 null，界面不显示轮次
+function parseRound(html: string): XkContext['round'] {
+  const plain = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+  const name = /(第[一二三四五六]轮|低学分定点|补退选|补选)/.exec(plain)?.[1]
+  if (!name) return null
+  const time = String.raw`(\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?\s*\d{1,2}[:：]\d{2})`
+  const range = new RegExp(String.raw`${time}(?::\d{2})?\s*(?:至|到|~|～|—|-)\s*${time}`).exec(plain.slice(Math.max(0, plain.indexOf(name) - 200)))
+  return { name, lowCredit: name === '低学分定点', until: range?.[2]?.replace(/[年月/]/g, '-').replace(/日/, '').replace('：', ':') ?? null }
 }
 
 const searchForm = (c: Context, keyword: string, onlyAvailable: boolean): Record<string, string> => ({
@@ -207,7 +220,8 @@ export async function getContext(): Promise<XkContext> {
     credits: result.status === 'success' && v
       ? { total: Number(v['xf9']) || 0, regular: Number(v['xf91']) || 0, short: Number(v['xf92']) || 0 }
       : null,
-    categories: c.categories
+    categories: c.categories,
+    round: c.round
   }
 }
 

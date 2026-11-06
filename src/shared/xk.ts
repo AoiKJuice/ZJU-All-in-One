@@ -9,6 +9,8 @@ export interface XkContext {
   /** 每门课（通识为每个时间组）可填志愿数，教务首页的 xkzys，逐学期可能变（有时只有 1） */
   maxChoices: number
   credits: { total: number; regular: number; short: number } | null
+  /** 当前轮次（常规第几轮 / 低学分定点 / 补退选）与截止时刻，取自选课首页的文字（推测，取不到为 null） */
+  round: { name: string; lowCredit: boolean; until: string | null } | null
   /** 选课首页的课程类别页签（本专业 / 通识 / 体育 / 全部课程…），搜索另走 xk:search */
   categories: XkCategory[]
 }

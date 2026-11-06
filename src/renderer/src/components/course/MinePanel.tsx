@@ -128,7 +128,7 @@ export function WatchList({
               <Joined parts={[(w.section.slots ?? []).map(slotLabel).join('  ') || w.section.times.join(' '), halfOf(w.section.semesterPart ?? '')]} />
             </span>
           </button>
-          <span className="xk-tag" data-tone={w.remaining ? 'hot' : undefined}>
+          <span className="xk-note" data-hot={w.remaining ? true : undefined}>
             {w.done ?? (w.remaining === null ? '…' : `余量 ${w.remaining}`)}
           </span>
           <span className="xk-pref-acts">

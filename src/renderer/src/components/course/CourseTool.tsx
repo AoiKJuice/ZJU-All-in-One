@@ -4,7 +4,7 @@ import { useApp } from '@renderer/store'
 import { useZju } from '@renderer/hooks/useZju'
 import { Choice, Joined, Reveal } from '@renderer/components/Type'
 import { MOBILE } from '@renderer/lib/platform'
-import { fmt } from './bits'
+import { XkStatus, fmt } from './bits'
 import { FindPanel } from './FindPanel'
 import { PrefBlock, WatchList } from './MinePanel'
 import { XkEnvContext, type XkEnv } from './SectionCard'
@@ -18,6 +18,14 @@ import { groupCategories, groupChosen, groupFor, groupTitle } from './xkLogic'
 import './course.css'
 
 const TERM: Record<string, string> = { '1': '秋冬', '2': '春夏' }
+/** 低学分定点的资格线：已选、待定、补选申请合计不超过 22 学分 */
+const LOW_CREDIT = 22
+
+/** 2026-11-12 17:00 → 11.12 17:00 */
+const untilLabel = (t: string): string => {
+  const m = /\d{4}-(\d{1,2})-(\d{1,2})\s*(\d{1,2}:\d{2})/.exec(t)
+  return m ? `${Number(m[1])}.${Number(m[2])} ${m[3]}` : t
+}
 
 /**
  * 工具「选课」：三块面板。左边找课（搜索与筛选控件、课程列表，课程就地展开成教学班）；
@@ -43,6 +51,7 @@ export function CourseTool() {
   const [busy, setBusy] = useState<string | null>(null)
   const [teacher, setTeacher] = useState<{ name: string; college: string } | null>(null)
   const [detail, setDetail] = useState<XkCourse | null>(null)
+  const [focusToken, setFocusToken] = useState(0)
   const split = useSplit()
   const right = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -123,6 +132,17 @@ export function CourseTool() {
       )
       .finally(() => listLoading.current.delete(key))
   }, [])
+
+  /** 重来一遍：选课首页、志愿、已取的列表（出错、不在选课时间时的「重试」「刷新」） */
+  const retry = useCallback(() => {
+    setCtx(null)
+    setChosen(null)
+    setLists({})
+    listLoading.current.clear()
+    resetXkData()
+    void refreshContext()
+    void refreshChosen()
+  }, [refreshContext, refreshChosen])
 
   useEffect(() => {
     setLists({})
@@ -276,6 +296,8 @@ export function CourseTool() {
             plan={plan}
             planError={planError}
             contextError={ctx && 'error' in ctx ? ctx.error : null}
+            onRetry={retry}
+            focusToken={focusToken}
             reveal={reveal}
             onRevealed={() => setReveal(null)}
             onDetail={setDetail}
@@ -303,6 +325,23 @@ export function CourseTool() {
                 if (!same) setView('find')
               }}
             />
+            {/* 图例：小色块 + 两三个字；右边是这张课表的学期 */}
+            <div className="xk-tt-legend">
+              <span>
+                <i data-k="lead" />第 1 志愿
+              </span>
+              <span>
+                <i data-k="backup" />后续志愿
+              </span>
+              <span>
+                <i data-k="clash" />冲突
+              </span>
+              {context && (
+                <span className="xk-tt-term">
+                  {context.xn} {TERM[context.xq] ?? ''}学期
+                </span>
+              )}
+            </div>
           </Reveal>
 
           <Splitter axis="y" container={right} onMove={(y) => split.set({ top: y })} onEnd={split.save} onReset={() => split.reset('top')} />
@@ -310,7 +349,8 @@ export function CourseTool() {
           <Reveal i={3} flat className="panel xk-mine">
             <div className="xk-mine-head">
               <span className="xk-mine-tabs">
-                {/* 订阅只在桌面端 */}
+                {/* 订阅只在桌面端；手机上这块没有页签，写个标题 */}
+                {MOBILE && <h3 className="xk-mine-title">我的志愿</h3>}
                 {!MOBILE && (
                   <>
                     <Choice group="xk-side" active={side === 'prefs'} onClick={() => setSide('prefs')}>
@@ -332,7 +372,22 @@ export function CourseTool() {
               </span>
               {context && (
                 <span className="xk-mine-meta">
-                  <Joined parts={[TERM[context.xq] ?? '', context.credits && `${fmt(context.credits.total)} 学分`]} />
+                  <Joined
+                    parts={[
+                      context.round && (
+                        <span data-hot={context.round.lowCredit || undefined}>
+                          {context.round.name}
+                          {context.round.until && ` 至 ${untilLabel(context.round.until)}`}
+                        </span>
+                      ),
+                      context.credits && (
+                        <span data-hot={(context.round?.lowCredit && context.credits.total > LOW_CREDIT) || undefined}>
+                          已选 {fmt(context.credits.total)}
+                          {context.round?.lowCredit ? ` / ${LOW_CREDIT}` : ''} 学分
+                        </span>
+                      )
+                    ]}
+                  />
                 </span>
               )}
             </div>
@@ -342,9 +397,20 @@ export function CourseTool() {
               ) : !chosen ? (
                 <p className="quiet">…</p>
               ) : 'error' in chosen ? (
-                <p className="quiet">{chosen.error}</p>
+                <XkStatus error={chosen.error} onRetry={retry} />
               ) : shownGroups.length === 0 ? (
-                <p className="quiet">无</p>
+                <div className="xk-empty">
+                  <p className="quiet">无</p>
+                  <button
+                    className="btn btn-solid"
+                    onClick={() => {
+                      setView('find')
+                      setFocusToken((n) => n + 1)
+                    }}
+                  >
+                    去找课
+                  </button>
+                </div>
               ) : (
                 shownGroups.map((g) => (
                   <PrefBlock
