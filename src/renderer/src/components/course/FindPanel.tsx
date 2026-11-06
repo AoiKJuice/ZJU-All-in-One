@@ -4,7 +4,7 @@ import type { AuditNode } from '@shared/types'
 import type { XkCourse, XkSection } from '@shared/xk'
 import { Joined } from '@renderer/components/Type'
 import { dur } from '@renderer/lib/motion'
-import { Chevron, Dropdown, Option, Toggle, fmt } from './bits'
+import { Chevron, Dropdown, IconButton, Option, Toggle, XkStatus, fmt } from './bits'
 import { SectionCard, useXkEnv } from './SectionCard'
 import { courseKey, percent, ratingKey, requestSections, useXkData, type Loaded } from './xkData'
 import {
@@ -64,6 +64,9 @@ interface Props {
   plan: { todo: AuditNode[]; done: Set<string>; todoSet: Set<string> } | null
   planError: string | null
   contextError: string | null
+  onRetry: () => void
+  /** 变化时把焦点放进搜索框（志愿为空时的「去找课」） */
+  focusToken: number
   /** 要展开的课（从志愿、培养方案跳过来时），按名称认 */
   reveal: string | null
   onRevealed: () => void
@@ -81,6 +84,9 @@ export function FindPanel(props: Props) {
   const [limit, setLimit] = useState(STEP)
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (props.focusToken) input.current?.focus()
+  }, [props.focusToken])
 
   const keys = useMemo(() => scopeKeys(f.scope, groups, props.search), [f.scope, groups, props.search])
   useEffect(() => {
@@ -309,11 +315,11 @@ export function FindPanel(props: Props) {
       </div>
 
       <div ref={scroller} className="pane-scroll xk-list">
-        {props.contextError && !searching ? (
-          <p className="quiet">{props.contextError}</p>
+        {props.contextError ? (
+          <XkStatus error={props.contextError} onRetry={props.onRetry} />
         ) : f.scope?.kind === 'plan' ? (
           !props.plan ? (
-            <p className="quiet">{props.planError ?? '…'}</p>
+            props.planError ? <XkStatus error={props.planError} onRetry={props.onRetry} /> : <p className="quiet">…</p>
           ) : planList.length === 0 ? (
             <p className="quiet">无</p>
           ) : (
@@ -338,7 +344,7 @@ export function FindPanel(props: Props) {
         ) : !f.scope || (listLoading && views.length === 0) ? (
           <p className="quiet">{searching && !f.keyword.trim() ? '无' : '…'}</p>
         ) : listError && views.length === 0 ? (
-          <p className="quiet">{listError}</p>
+          <XkStatus error={listError} onRetry={props.onRetry} />
         ) : views.length === 0 ? (
           full && queued > 0 ? (
             <p className="quiet">…</p>
@@ -366,6 +372,7 @@ export function FindPanel(props: Props) {
                 open={open === courseKey(v.course)}
                 plan={props.plan}
                 observe={observer}
+                showChance={f.sort === 'chance'}
                 onToggle={() => toggle(v.course)}
                 onDetail={() => props.onDetail(v.course)}
               />
@@ -396,6 +403,7 @@ function CourseRow({
   open,
   plan,
   observe,
+  showChance,
   onToggle,
   onDetail
 }: {
@@ -403,6 +411,8 @@ function CourseRow({
   open: boolean
   plan: Props['plan']
   observe: IntersectionObserver | null
+  /** 按选中概率排序时，写出这门课各教学班里最高的概率 */
+  showChance: boolean
   onToggle: () => void
   onDetail: () => void
 }) {
@@ -426,6 +436,7 @@ function CourseRow({
   return (
     <li ref={ref} data-key={courseKey(c)} data-open={open || undefined}>
       <div className="xk-course">
+        {/* 点整行展开教学班；箭头只表示展开与否；课程详情是行尾的图标按钮 */}
         <button className="xk-course-main" onClick={onToggle} aria-expanded={open}>
           <span className="xk-course-head">
             <span className="row-title">{c.name}</span>
@@ -444,33 +455,30 @@ function CourseRow({
             {todo && <span className="xk-tag" data-tone="line">培养方案</span>}
             {done && <span className="xk-tag">已修</span>}
           </span>
-          <span className="xk-course-sub">
-            <Joined parts={[c.credit !== null && `${fmt(c.credit)} 学分`, c.nature, c.category, c.college, half]} />
-            {v.sections && v.sections.length > 0 && <Teachers sections={v.matching} college={c.college} />}
-          </span>
-        </button>
-        <span className="xk-course-side">
-          {v.sections && (
-            <span className="xk-course-stats">
+          <span className="xk-course-stats">
+            {v.sections && (
               <span data-zero={v.remaining === 0 || undefined}>
                 <small>余量</small>
                 {v.remaining ?? '—'}
               </span>
-              {v.chance !== null && (
-                <span data-hot={v.chance < 1 || undefined}>
-                  <small>概率</small>
-                  {percent(v.chance)}
-                </span>
-              )}
-            </span>
-          )}
-          <button className="act xk-detail" onClick={onDetail}>
-            详情
-          </button>
-        </span>
-        <button className="xk-course-chev" onClick={onToggle} aria-label={open ? '收起' : '展开'} tabIndex={-1}>
+            )}
+            {showChance && v.chance !== null && (
+              <span data-hot={v.chance < 1 || undefined}>
+                <small>最高概率</small>
+                {percent(v.chance)}
+              </span>
+            )}
+          </span>
+          <span className="xk-course-sub">
+            <Joined parts={[c.credit !== null && `${fmt(c.credit)} 学分`, c.nature, c.category, c.college, half]} />
+            {v.sections && v.sections.length > 0 && <Teachers sections={v.matching} college={c.college} />}
+          </span>
           <Chevron />
         </button>
+        <IconButton label="课程详情" onClick={onDetail}>
+          <rect x="4" y="5" width="16" height="14" rx="2.5" />
+          <path d="M13.5 5v14M16 9h1.5M16 12h1.5" />
+        </IconButton>
       </div>
       <AnimatePresence initial={false}>
         {open && (

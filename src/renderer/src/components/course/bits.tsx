@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { XkSection, XkSlot } from '@shared/xk'
+import { useApp } from '@renderer/store'
 import { halfOf, parityLabel, slotLabel } from './xkLogic'
 
 export function Chevron({ className = 'xk-chevron' }: { className?: string }) {
@@ -179,5 +180,29 @@ export function Option({ active, onClick, children }: { active: boolean; onClick
     <button className="xk-opt" data-active={active || undefined} onClick={onClick}>
       {children}
     </button>
+  )
+}
+
+/**
+ * 出错时的一行状态，每种都给能直接做的下一步：未登录 → 登录；选课首页没有选课参数 → 不在选课时间、刷新；其余 → 原因、重试
+ */
+export function XkStatus({ error, onRetry }: { error: string; onRetry: () => void }) {
+  const setLoginOpen = useApp((s) => s.setLoginOpen)
+  if (/未登录/.test(error))
+    return (
+      <div className="xk-empty">
+        <p className="quiet">未登录</p>
+        <button className="btn btn-solid" onClick={() => setLoginOpen(true)}>
+          登录
+        </button>
+      </div>
+    )
+  return (
+    <div className="xk-empty">
+      <p className="quiet">{/未开放/.test(error) ? '不在选课时间' : error}</p>
+      <button className="btn" onClick={onRetry}>
+        {/未开放/.test(error) ? '刷新' : '重试'}
+      </button>
+    </div>
   )
 }

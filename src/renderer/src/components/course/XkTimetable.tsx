@@ -104,8 +104,13 @@ export function XkTimetable({
             style={{ gridRow: `${row(a)} / ${row(b) + 1}`, gridColumn: `${2 + i * 2} / span 2` }}
             aria-label={`周${d}${DAY_PART_NAMES[part]}`}
             tabIndex={-1}
+            title={`按周${d}${DAY_PART_NAMES[part]}找课`}
             onClick={() => onCell(i + 1, part)}
-          />
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+              <path d="M12 7v10M7 12h10" />
+            </svg>
+          </button>
         ))
       )}
       {blocks
@@ -125,7 +130,7 @@ export function XkTimetable({
               data-focus={(focus !== null && b.kind !== 'preview' && (b.section.group ?? b.section.courseCode) === focus) || undefined}
               onClick={() => onPick(b.section)}
             >
-              {b.kind === 'lead' && tall && <span>{b.section.courseName}</span>}
+              {b.kind !== 'preview' && (tall || b.kind === 'lead') && <span>{b.section.courseName}</span>}
             </button>
           )
         })}

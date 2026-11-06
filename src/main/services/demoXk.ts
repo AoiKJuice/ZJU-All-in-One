@@ -366,7 +366,7 @@ const credit = (code: string): number => byCode(code)?.credit ?? 0
 export const demoXk: Omit<XkHandlers, 'xk:watches' | 'xk:watch' | 'xk:unwatch'> = {
   'xk:context': async () => {
     const total = [...new Set(chosen.map((s) => s.courseCode))].reduce((n, code) => n + credit(code), 9)
-    return { xn: '2026-2027', xq: '1', maxChoices: MAX, credits: { total, regular: total, short: 0 }, categories: CATEGORIES }
+    return { xn: '2026-2027', xq: '1', maxChoices: MAX, credits: { total, regular: total, short: 0 }, categories: CATEGORIES, round: { name: '第一轮', lowCredit: false, until: '2026-11-12 17:00' } }
   },
   'xk:courses': async (key) => {
     const id = key.split('|')[0]
