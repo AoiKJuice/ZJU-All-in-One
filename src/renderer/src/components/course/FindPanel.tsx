@@ -452,8 +452,12 @@ function CourseRow({
                 </span>
               )
             )}
-            {todo && <span className="xk-tag" data-tone="line">培养方案</span>}
-            {done && <span className="xk-tag">已修</span>}
+            {todo && (
+              <span className="xk-note" data-hot>
+                培养方案
+              </span>
+            )}
+            {done && <span className="xk-note">已修</span>}
           </span>
           <span className="xk-course-stats">
             {v.sections && (

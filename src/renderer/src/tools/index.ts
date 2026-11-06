@@ -24,7 +24,7 @@ export interface ToolDef {
 
 const ALL: ToolDef[] = [
   { id: 'graduation', name: '毕业自审', version: 'v0.4', Icon: GraduationIcon, View: Graduation },
-  { id: 'course', name: '选课', version: 'v0.4', Icon: CourseIcon, View: CourseTool },
+  { id: 'course', name: '选课', version: 'v0.5', Icon: CourseIcon, View: CourseTool },
   { id: 'forms', name: '问卷填写', version: 'v0.3', Icon: FormIcon, View: FormFill, desktop: true },
   { id: 'library', name: '图书馆预约', version: 'v0.3', Icon: LibraryIcon, View: LibraryTool }
 ]
