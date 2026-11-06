@@ -76,9 +76,9 @@
 - 安卓端没有：微信读书登录要弹网页窗口扫码，安卓壳暂无这个能力。
 - **以上全部未以登录态实测**（接口字段按 JSON 里带 `title` 与 `doc_url / url / reviewId` 的对象宽松提取）。
 
-### 备选：本机微信数据库（未实现，待用户拍板）
+### 备选：本机微信数据库（用户决定不做，2026-11-06）
 
-`biz_message_0.db` 为 SQLCipher 4（PBKDF2-HMAC-SHA512 256000 轮、AES-256-CBC、每页 HMAC），库里只有公众号文章的标题与链接。解密本身可以纯 TS 完成，但密钥只能从微信进程内存里扫出来：Node 做不到，要么带原生模块，要么用 PowerShell 内联 C# 调 `ReadProcessMemory`——后者正是杀软报毒的特征。按需求它只是 Windows 上默认关闭的备选，这一步要不要做、用哪种方式取密钥，需要用户决定，本次没有实现，界面也没有开关。
+`biz_message_0.db` 为 SQLCipher 4（PBKDF2-HMAC-SHA512 256000 轮、AES-256-CBC、每页 HMAC），库里只有公众号文章的标题与链接。解密本身可以纯 TS 完成，但密钥只能从微信进程内存里扫出来：Node 做不到，要么带原生模块，要么用 PowerShell 内联 C# 调 `ReadProcessMemory`——后者正是杀软报毒的特征。按需求它只是 Windows 上默认关闭的备选，用户权衡后决定不做，界面也没有开关。
 
 ## D 钉钉群（实验，默认关，仅 Windows 桌面，`main/news/dingtalk.ts`）
 
