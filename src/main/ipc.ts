@@ -7,7 +7,6 @@ import {
   type OpenDialogOptions,
   type SaveDialogOptions
 } from 'electron'
-import { resetWebvpn } from './services/newsWebvpn'
 import { readFile, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -74,7 +73,6 @@ function resetServices(): void {
   graduation.reset()
   resetXk()
   resetLibrary()
-  resetWebvpn()
 }
 
 // 课表以 ETA 为主（返回干净、少出错），ETA 失败或为空（选课排课期间）时退回教务

@@ -2,7 +2,7 @@ import type { NewsArticle, NewsFeed, NewsItem, NewsSettings, WebSource } from '@
 import { zjuFetch } from '../http'
 import { logDiagnostic } from '../diagnostics'
 import { parseArticle, parseList } from './newsWebplus'
-import { isCampusHost, unwebvpn, webvpnLogin, webvpnUrl } from './newsWebvpn'
+import { isCampusHost, unwebvpn, webvpnUrl } from './newsWebvpn'
 import { judgeByRules } from './newsFilter'
 import { WEB_SOURCES } from './newsSources'
 
@@ -22,45 +22,52 @@ const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
 
 const HEADERS = { Accept: 'text/html,application/xhtml+xml,*/*' }
 
-/** 经 WebVPN 取校内页面（校外时多数部处网站只有 WebVPN 进得去）。没登录就用保存的账号登录 WebVPN 后再取一次 */
+/** 经 WebVPN 取校内页面（校外时多数部处网站只有 WebVPN 进得去）。WebVPN 与统一身份认证是两套账号，应用不替用户登录 */
 async function viaWebvpn(url: string): Promise<string> {
-  const target = await webvpnUrl(url)
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await withTimeout(zjuFetch(target, { headers: HEADERS, relogin: false }), TIMEOUT)
-    const landed = new URL(r.url)
-    if (landed.hostname === 'zjuam.zju.edu.cn' || /^\/login/.test(landed.pathname)) {
-      if (attempt) break
-      await webvpnLogin()
-      continue
-    }
-    if (r.status >= 400) throw new Error(`WebVPN HTTP ${r.status}`)
-    return unwebvpn(await r.text())
-  }
-  throw new Error('WebVPN 未登录')
+  const r = await withTimeout(zjuFetch(await webvpnUrl(url), { headers: HEADERS, relogin: false }), TIMEOUT)
+  const landed = new URL(r.url)
+  if (landed.hostname === 'zjuam.zju.edu.cn' || /^\/login/.test(landed.pathname)) throw new Error('WebVPN 未登录')
+  if (r.status >= 400) throw new Error(`WebVPN HTTP ${r.status}`)
+  return unwebvpn(await r.text())
+}
+
+/** 校内专用网站对校外来的请求回的页面（403，「该网站仅限校内,请使用webvpn访问」） */
+const OFF_CAMPUS = /仅限校内|accessible by campus/
+
+/** 直连失败的原因说成人话：界面按原因归组，用户据此能看出是网络没走校内，而不是笼统的"没读到" */
+function reasonOf(error: unknown): string {
+  const m = error instanceof Error ? error.message : String(error)
+  if (/resolve host|NAME_NOT_RESOLVED|No address associated|ENOTFOUND/i.test(m)) return '解析不到域名'
+  if (m === '超时' || /timed? ?out|TIMED_OUT/i.test(m)) return '连接超时'
+  if (/refused|unreachable|CONNECTION_|ENETUNREACH|ECONNRESET/i.test(m)) return '连不上'
+  return m
 }
 
 /** 直连；校内域名直连失败，或取到的不是这个页面（校外时被解析到 WebVPN 或别处，判断交给 usable）时走 WebVPN */
 async function loadPage(url: string, usable: (html: string) => boolean = () => true): Promise<{ url: string; html: string }> {
   let direct: { url: string; html: string } | null = null
-  let error: unknown = null
+  let reason = ''
   try {
     const r = await withTimeout(zjuFetch(url, { headers: HEADERS, relogin: false }), DIRECT_TIMEOUT)
+    const html = await r.text()
+    if (OFF_CAMPUS.test(html)) throw new Error('仅限校内访问')
     if (r.status >= 400) throw new Error(`HTTP ${r.status}`)
-    direct = { url: r.url, html: await r.text() }
-    if (usable(direct.html)) return direct
+    direct = { url: r.url, html }
+    if (usable(html)) return direct
+    if (new URL(r.url).hostname === 'webvpn.zju.edu.cn') reason = '被转到 WebVPN 登录页'
   } catch (e) {
-    error = e
+    reason = reasonOf(e)
   }
   if (!isCampusHost(url)) {
     if (direct) return direct
-    throw error
+    throw new Error(reason)
   }
   try {
     return { url, html: await viaWebvpn(url) }
   } catch (e) {
-    // WebVPN 也不行：直连拿到过页面就用它（让上层照常判断），否则报 WebVPN 的原因
-    if (direct) return direct
-    throw e
+    // WebVPN 也不行：直连拿到过正常页面就交给上层照常判断，否则直连与 WebVPN 的原因一起报
+    if (direct && !reason) return direct
+    throw new Error(`${reason || '页面里没有列表'}（${reasonOf(e)}）`)
   }
 }
 

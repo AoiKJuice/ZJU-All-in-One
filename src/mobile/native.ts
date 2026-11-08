@@ -97,7 +97,8 @@ export async function nativeFetch(url: string, init: FetchInit = {}): Promise<Fe
   }
   // 只记主机与路径（不含票据），下次据此看是哪两站在来回跳
   logDiagnostic('redirect-loop', { hops: hops.slice(-8).join(' > ') })
-  throw new Error('跳转次数过多')
+  // 界面上也写出最后几跳（主机与路径，不含票据），一张截图就能看出是哪两站在来回跳
+  throw new Error(`跳转次数过多：${hops.slice(-4).join(' → ')}`)
 }
 
 /** 二进制文件（预览用）：同样逐跳跟随跳转，大文件经缓存文件读回，不走 base64 字符串 */

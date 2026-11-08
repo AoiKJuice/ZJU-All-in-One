@@ -62,7 +62,7 @@
 
 **校外为什么要它**（2026-11-08 用户手机 5G 上 12 个栏目取不到）：公网 DNS 下 `bksy`、`zjutw` 没有 A 记录，`zhfw` 是 `webvpn.zju.edu.cn` 的 CNAME（直连拿到的是 WebVPN 登录页，200 但没有列表，旧版报「页面结构变了」），`xgb` 在校外也取不到列表。所以 `loadPage` 对校内域名：直连失败、超时（8 秒）或取到的页面解析不出列表时都改走 WebVPN。
 
-**登录**：浙大的 WebVPN（网瑞达 Wengine）不接统一身份认证，登录页只有「上网账号登录」一个页签：`GET /login` 取隐藏域 `_csrf` 与 `captcha_id`，`POST /do-login`（表单：`_csrf`、`auth_type=local`、`username`、`sms_code=`、`password`、`captcha=`、`needCaptcha=false`、`captcha_id`），密码按页面脚本加密：AES-128-CFB（段长 128 位），密钥与 IV 都是 `wrdvpnisawesome!`，明文补 `'0'` 到 16 的倍数后加密再截回原长，结果为 `hex(IV) + hex(密文)`；回 `{success, url}` 或 `{error, message}`（`INVALID_ACCOUNT`、`CAPTCHA_FAILED`、`TOO_MANY_ATTEMPTS`、`NEED_TWO_STEP` 等）。`webvpnLogin` 用应用保存的统一身份认证账号试一次，被拒后 30 分钟内不再试（免得把账号锁了），退出登录时清掉。**上网账号与统一身份认证是否同一套密码、要不要验证码，都未实测**，只能由用户在校外验证。
+**登录**：WebVPN 是另一套账号（「上网账号」，与统一身份认证无关，用户 2026-11-08 确认）。曾按 `/do-login` 用保存的统一身份认证账号自动登录，已删掉（账号不对，而且会累计失败次数）；应用不替用户登录。
 
 ### 条目级过滤（`services/newsFilter.ts`）
 
@@ -114,7 +114,8 @@ v0.1 的全局库拼法、uid 与 salt 来源是猜的，在真实数据上一�
 ## 未实测清单
 
 - 素拓 `getXmList` / `tzgg/ajaxList` 的登录态返回（字段按前端代码推出）。
-- WebVPN 的地址改写与 `/do-login` 登录（上网账号是否即统一身份认证账号、是否要验证码）。
+- WebVPN 的地址改写（应用里没有 WebVPN 登录）。
+- 2026-11-08 本机安卓模拟器（校园网出口）实测官网栏目全部取到；用户手机 5G 上的失败等同于请求没从校内出去，原因待用户确认手机的网络方式。
 - 微信读书全部接口与状态码。
 - 钉钉库位置、密钥派生、表结构。
 - 教务网「各院系通知公告」的入口（召回校验未做）。

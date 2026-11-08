@@ -1,5 +1,4 @@
 import type { ZjuApi, ZjuBridge, ZjuChannel } from '@shared/ipc'
-import { resetWebvpn } from '../main/services/newsWebvpn'
 import type { AuthState, FilePreview, McpState, OpenRequest } from '@shared/types'
 import { hasCasCookie, logout } from './zjuam'
 import { onCasExpired } from './http'
@@ -40,7 +39,6 @@ function resetServices(): void {
   graduation.reset()
   resetXk()
   resetLibrary()
-  resetWebvpn()
 }
 
 const authListeners = new Set<() => void>()
