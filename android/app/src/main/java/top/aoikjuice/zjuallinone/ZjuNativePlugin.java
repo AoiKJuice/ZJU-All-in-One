@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -43,10 +42,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 /**
  * 安卓端的"主进程"能力（对应 src/mobile/native.ts）：
@@ -66,31 +70,39 @@ public class ZjuNativePlugin extends Plugin {
 
     private final ExecutorService pool = Executors.newFixedThreadPool(6);
 
-    private HttpURLConnection open(String url, String method, JSObject headers) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setInstanceFollowRedirects(false);
-        c.setConnectTimeout(20000);
-        c.setReadTimeout(60000);
-        c.setRequestMethod(method);
-        c.setRequestProperty("User-Agent", UA);
+    // 不自动跟随跳转（由 JS 逐跳处理并记下落点），不用 cookie 罐（cookie 由下面手动读写 CookieManager），
+    // 校内域名先问学校的 DNS（CampusDns：校园 5G 专网下系统 DNS 给的是公网答案）
+    private static final OkHttpClient HTTP = new OkHttpClient.Builder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .dns(CampusDns.INSTANCE)
+        .build();
+
+    private Response send(String url, String method, JSObject headers, byte[] body) throws Exception {
+        Request.Builder b = new Request.Builder().url(url).header("User-Agent", UA);
         String cookie = CookieManager.getInstance().getCookie(url);
-        if (cookie != null) c.setRequestProperty("Cookie", cookie);
+        if (cookie != null) b.header("Cookie", cookie);
         if (headers != null) {
             Iterator<String> keys = headers.keys();
             while (keys.hasNext()) {
                 String k = keys.next();
-                c.setRequestProperty(k, headers.getString(k));
+                b.header(k, headers.getString(k));
             }
         }
-        return c;
+        // 不给 MediaType：Content-Type 用调用方给的那个头
+        boolean needsBody = !method.equals("GET") && !method.equals("HEAD");
+        RequestBody rb = body != null ? RequestBody.create(body, null) : needsBody ? RequestBody.create(new byte[0], null) : null;
+        b.method(method, rb);
+        return HTTP.newCall(b.build()).execute();
     }
 
     /** 读响应头：Set-Cookie 写进 CookieManager，其余以小写键返回 */
-    private JSObject headersOf(HttpURLConnection c, String url) {
+    private JSObject headersOf(Response r, String url) {
         JSObject h = new JSObject();
         CookieManager cm = CookieManager.getInstance();
-        for (Map.Entry<String, List<String>> e : c.getHeaderFields().entrySet()) {
-            if (e.getKey() == null) continue;
+        for (Map.Entry<String, List<String>> e : r.headers().toMultimap().entrySet()) {
             String k = e.getKey().toLowerCase(Locale.ROOT);
             if (k.equals("set-cookie")) {
                 for (String v : e.getValue()) cm.setCookie(url, v);
@@ -102,25 +114,6 @@ public class ZjuNativePlugin extends Plugin {
         return h;
     }
 
-    private static byte[] readAll(InputStream in) throws Exception {
-        if (in == null) return new byte[0];
-        try (InputStream s = in) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[16384];
-            int n;
-            while ((n = s.read(buf)) > 0) out.write(buf, 0, n);
-            return out.toByteArray();
-        }
-    }
-
-    private static InputStream bodyOf(HttpURLConnection c, int status) {
-        try {
-            return status >= 400 ? c.getErrorStream() : c.getInputStream();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     private static String message(Exception e) {
         return e.getMessage() == null ? e.toString() : e.getMessage();
     }
@@ -130,22 +123,16 @@ public class ZjuNativePlugin extends Plugin {
         pool.execute(() -> {
             try {
                 String url = call.getString("url");
-                HttpURLConnection c = open(url, call.getString("method", "GET"), call.getObject("headers"));
                 byte[] body = null;
                 if (call.getString("bodyBase64") != null) body = Base64.decode(call.getString("bodyBase64"), Base64.DEFAULT);
                 else if (call.getString("body") != null) body = call.getString("body").getBytes(StandardCharsets.UTF_8);
-                if (body != null) {
-                    c.setDoOutput(true);
-                    c.setFixedLengthStreamingMode(body.length);
-                    try (OutputStream o = c.getOutputStream()) {
-                        o.write(body);
-                    }
-                }
-                int status = c.getResponseCode();
                 JSObject out = new JSObject();
-                out.put("status", status);
-                out.put("headers", headersOf(c, url));
-                byte[] data = readAll(bodyOf(c, status));
+                byte[] data;
+                try (Response r = send(url, call.getString("method", "GET"), call.getObject("headers"), body)) {
+                    out.put("status", r.code());
+                    out.put("headers", headersOf(r, url));
+                    data = r.body() == null ? new byte[0] : r.body().bytes();
+                }
                 boolean binary = call.getBoolean("binary", false);
                 if (binary && data.length <= LARGE_BODY) {
                     out.put("base64", Base64.encodeToString(data, Base64.NO_WRAP));
@@ -159,7 +146,6 @@ public class ZjuNativePlugin extends Plugin {
                 } else {
                     out.put("body", new String(data, StandardCharsets.UTF_8));
                 }
-                c.disconnect();
                 call.resolve(out);
             } catch (Exception e) {
                 call.reject(message(e));
@@ -283,24 +269,31 @@ public class ZjuNativePlugin extends Plugin {
             try {
                 String url = call.getString("url");
                 String name = call.getString("name", "download");
-                HttpURLConnection c = null;
-                for (int hop = 0; hop < 15; hop++) {
-                    c = open(url, "GET", call.getObject("headers"));
-                    int status = c.getResponseCode();
-                    headersOf(c, url);
-                    String location = c.getHeaderField("Location");
+                Uri uri;
+                Response c = null;
+                for (int hop = 0; hop < 15 && c == null; hop++) {
+                    Response r = send(url, "GET", call.getObject("headers"), null);
+                    int status = r.code();
+                    headersOf(r, url);
+                    String location = r.header("Location");
                     if (status >= 300 && status < 400 && location != null) {
                         url = new URL(new URL(url), location).toString().replaceFirst("^http://([^/]*\\.zju\\.edu\\.cn)", "https://$1");
-                        c.disconnect();
+                        r.close();
                         continue;
                     }
-                    if (status >= 400) throw new Exception("下载失败（" + status + "）");
-                    break;
+                    if (status >= 400) {
+                        r.close();
+                        throw new Exception("下载失败（" + status + "）");
+                    }
+                    c = r;
                 }
-                String mime = URLConnection.guessContentTypeFromName(name);
-                if (mime == null) mime = c.getContentType() != null ? c.getContentType().split(";")[0] : "application/octet-stream";
-                Uri uri = save(name, mime, c.getInputStream());
-                c.disconnect();
+                if (c == null) throw new Exception("跳转次数过多");
+                try (Response r = c) {
+                    String mime = URLConnection.guessContentTypeFromName(name);
+                    String type = r.header("Content-Type");
+                    if (mime == null) mime = type != null ? type.split(";")[0] : "application/octet-stream";
+                    uri = save(name, mime, r.body().byteStream());
+                }
                 JSObject out = new JSObject();
                 out.put("uri", uri.toString());
                 call.resolve(out);
