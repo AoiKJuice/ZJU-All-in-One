@@ -30,7 +30,7 @@ export function Home() {
     MOBILE &&
     list.length > LIMIT[name] && (
       <button className="pane-more" data-open={unfolded[name] || undefined} onClick={() => setUnfolded((u) => ({ ...u, [name]: !u[name] }))}>
-        {unfolded[name] ? '收起' : '展开'}
+        {unfolded[name] ? '收起' : `另外 ${list.length - LIMIT[name]} 条`}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M6 9.5l6 6 6-6" />
         </svg>

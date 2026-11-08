@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 // 液态玻璃只用在悬浮的导航与控件层（照 Apple 的用法：内容层不做玻璃）：标签栏、刊头导航与右侧按钮、翻周、轻提示、右键菜单
-const TARGETS = '.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu'
+const TARGETS = '.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu, .xk-switch, .news-switch'
 const NS = 'http://www.w3.org/2000/svg'
 // 透镜边缘宽度上限与最大位移（px）；色散：蓝、绿通道的位移比红通道略大
 const BEZEL = 22

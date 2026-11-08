@@ -53,7 +53,9 @@ export function today(): string {
 
 async function login(): Promise<string> {
   await ensureCas()
-  const landed = await zjuFetch(`https://zjuam.zju.edu.cn/cas/login?service=${encodeURIComponent(SERVICE)}`, { upgradeHttp: true })
+  // 与网页一样从图书馆自己的 CAS 入口进：先领到 PHPSESSID，再去统一身份认证换票据、带票据回来。
+  // 原先直接从 zjuam 进，安卓上报「跳转次数过多」（2026-11-08 用户手机，未查明是哪两跳，native.ts 现在会记下跳转链）
+  const landed = await zjuFetch(SERVICE, { upgradeHttp: true })
   const cas = /[?&]cas=([^&#]+)/.exec(landed.url)?.[1]
   if (!cas) {
     if (new URL(landed.url).hostname === 'zjuam.zju.edu.cn') throw new Error('未登录')

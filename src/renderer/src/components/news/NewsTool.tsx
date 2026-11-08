@@ -11,6 +11,7 @@ import { SourcesSheet, type DingChat } from './SourcesSheet'
 import { Chevron, SourcePick, dayText, whenText } from './bits'
 import { Markdown } from './Markdown'
 import './news.css'
+import { swipeToClose } from '@renderer/lib/swipe'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -111,12 +112,12 @@ export function NewsTool() {
   // 先在界面上改（连着勾几项时，下一项按已改的状态算），回来的结果只认最后一次的，免得早回来的把后面的勾选冲掉
   const saving = useRef(0)
   const updateSettings = async (patch: Parameters<(typeof window.zju)['news:setSettings']>[0]): Promise<void> => {
-    const { llmKey: _, ...local } = patch
+    const local = patch
     setSettings((s) => (s ? { ...s, ...local } : s))
     const mine = ++saving.current
     const next = await window.zju['news:setSettings'](patch)
     if (mine === saving.current) setSettings(next)
-    if ('sources' in patch || 'audience' in patch || 'llm' in patch || 'llmKey' in patch) load('web', true)
+    if ('sources' in patch || 'audience' in patch) load('web', true)
   }
 
   const tabs = TABS.filter((t) => !(MOBILE && t.desktop) && !(t.kind === 'dingtalk' && !settings?.dingtalk))
@@ -267,10 +268,14 @@ export function NewsTool() {
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: dur(0.35), ease: EASE }}
               >
-                {failed.map((f, i) => (
-                  <li key={i}>
-                    <span>{f.from}</span>
-                    <span className="news-failed-why">{f.message}</span>
+                {/* 同一原因的归在一起：原因一行，下面列出是哪些栏目 */}
+                {byReason(failed).map(([why, list]) => (
+                  <li key={why}>
+                    <span className="news-failed-why">
+                      {why}
+                      <span className="news-failed-n">{list.length}</span>
+                    </span>
+                    <span className="news-failed-from">{list.map((f) => f.from).join('、')}</span>
                   </li>
                 ))}
               </motion.ul>
@@ -282,17 +287,13 @@ export function NewsTool() {
         {loading && !items.length ? (
           <p className="quiet">…</p>
         ) : shown.length ? (
-          <ul className="rows news-rows">
-            {shown.slice(0, limit).map((item, i, list) => (
+          <ul className="news-cards">
+            {shown.slice(0, limit).map((item) => (
               <li key={item.id}>
-                <button className="row news-row" onClick={() => setReading(item)}>
-                  {/* 同一天连着的只在第一条写日期 */}
-                  <span className="row-time">{i > 0 && dayText(list[i - 1]!.time) === dayText(item.time) ? '' : dayText(item.time)}</span>
-                  <span className="news-row-main">
-                    <span className="row-title">{item.title}</span>
-                    <span className="news-row-from">
-                      <Joined parts={item.from.split(' · ')} />
-                    </span>
+                <button className="news-card news-note" onClick={() => setReading(item)}>
+                  <span className="news-card-title">{item.title}</span>
+                  <span className="news-card-meta">
+                    <Joined parts={[item.time && dayText(item.time), ...item.from.split(' · ')]} />
                   </span>
                 </button>
               </li>
@@ -403,6 +404,13 @@ export function NewsTool() {
       </Sheet>
     </div>
   )
+}
+
+/** 未取到的来源按原因归组，多的在前 */
+function byReason(failed: { from: string; message: string }[]): [string, { from: string; message: string }[]][] {
+  const groups = new Map<string, { from: string; message: string }[]>()
+  for (const f of failed) groups.set(f.message, [...(groups.get(f.message) ?? []), f])
+  return [...groups].sort((a, b) => b[1].length - a[1].length)
 }
 
 /** 长列表分批画：先画 200 条，滚到底再加 200 条；换页签、换出处时从头来 */
@@ -598,7 +606,7 @@ function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void
       {open && (
         <>
           <motion.div key="veil" className="sheet-veil" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
-          <motion.aside key="sheet" className="sheet local-sheet news-sheet" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ duration: dur(0.6), ease: EASE }}>
+          <motion.aside key="sheet" className="sheet local-sheet news-sheet" {...swipeToClose(onClose)} initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ duration: dur(0.6), ease: EASE }}>
             <CloseButton className="news-sheet-close" onClick={onClose} />
             {children}
           </motion.aside>

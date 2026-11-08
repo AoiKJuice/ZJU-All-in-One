@@ -8,6 +8,7 @@ import { DownloadRow, downloadFile } from './Download'
 import { clock, dotDate, relativeTo } from '@renderer/lib/format'
 import { dur } from '@renderer/lib/motion'
 import { CloseButton } from '@renderer/components/IconButton'
+import { swipeToClose } from '@renderer/lib/swipe'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -48,6 +49,7 @@ export function AssignmentSheet() {
           <motion.aside
             key="sheet"
             className="sheet"
+            {...swipeToClose(() => openAssignment(null))}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

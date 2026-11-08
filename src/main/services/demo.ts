@@ -153,7 +153,14 @@ export const mockGraduation: GraduationAudit = {
     course('c41', 'm4', '劳动教育', '031E0030', 1, 'none'),
     { id: 'm5', parentId: null, name: '通识选修课程', kind: '选修课程', status: 'failed', requiredCredits: '12', earnedCredits: '10' },
     { id: 'm51', parentId: 'm5', name: '美育类', kind: '选修课程', status: 'passed', requiredCredits: '1', earnedCredits: '1.5' },
-    { id: 'm52', parentId: 'm5', name: '科学研究与创新创业类', kind: '选修课程', status: 'failed', requiredCredits: '2', earnedCredits: '0' }
+    { id: 'm52', parentId: 'm5', name: '科学研究与创新创业类', kind: '选修课程', status: 'failed', requiredCredits: '2', earnedCredits: '0' },
+    { id: 'm53', parentId: 'm5', name: '至少修读1门“博雅技艺”类课程', kind: '选修课程', status: 'none', requiredCourses: '1', completedCourses: '0' },
+    { id: 'm6', parentId: null, name: '个性修读课程', kind: '选修课程', status: 'none', requiredCredits: '15', earnedCredits: '0' },
+    { id: 'm61', parentId: 'm6', name: '学生自主修读模块', kind: '选修课程', status: 'none', requiredCredits: '15', earnedCredits: '0' },
+    { id: 'm62', parentId: 'm61', name: '跨专业课程至少1门', kind: '选修课程', status: 'none', requiredCourses: '1', completedCourses: '0' },
+    { id: 'm7', parentId: null, name: '形势与政策', kind: '必修课程', status: 'passed', requiredCredits: '2', earnedCredits: '2' },
+    course('c71', 'm7', '形势与政策Ⅰ', '551E0070', 1, 'passed', '优秀'),
+    course('c72', 'm7', '形势与政策Ⅱ', '551E0080', 1, 'passed', '良好')
   ],
   classrooms: {
     second: { points: 6.5, credits: 2, grade: '优秀', passed: true },

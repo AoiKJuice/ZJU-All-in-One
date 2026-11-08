@@ -5,6 +5,7 @@ import type { ClsComment, ClsTeacher } from '@shared/xk'
 import { Choice, Joined } from '@renderer/components/Type'
 import { dur } from '@renderer/lib/motion'
 import { CloseButton } from '@renderer/components/IconButton'
+import { swipeToClose } from '@renderer/lib/swipe'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -60,6 +61,7 @@ export function XkSheet({ open, onClose, actions, children }: { open: boolean; o
           <motion.aside
             key="sheet"
             className="sheet xk-sheet"
+            {...swipeToClose(onClose)}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

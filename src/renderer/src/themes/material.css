@@ -14,6 +14,8 @@ html[data-style='material'][data-theme] {
   --tint: color-mix(in srgb, var(--shu) 8%, transparent);
   --surface: color-mix(in srgb, var(--shu) 7%, #f7f7fb);
   --surface-2: color-mix(in srgb, var(--shu) 9%, transparent);
+  --card: color-mix(in srgb, var(--shu) 9%, #eeeef3);
+  --card-hover: color-mix(in srgb, var(--shu) 14%, #e8e8ef);
   --shadow: none;
   --shadow-pop: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 12px 2px rgba(0, 0, 0, 0.08);
   /* secondary container：选中滑块、次按钮 */
@@ -36,6 +38,8 @@ html[data-style='material'][data-theme='dark'] {
   --rule: rgba(227, 226, 233, 0.12);
   --surface: color-mix(in srgb, var(--shu) 7%, #1a1c21);
   --surface-2: color-mix(in srgb, var(--shu) 12%, transparent);
+  --card: color-mix(in srgb, var(--shu) 9%, #22252b);
+  --card-hover: color-mix(in srgb, var(--shu) 14%, #262930);
   --shadow-pop: 0 1px 3px rgba(0, 0, 0, 0.4), 0 6px 16px 3px rgba(0, 0, 0, 0.3);
   --m3-secondary: color-mix(in srgb, var(--shu) 26%, #23252b);
   --m3-high: color-mix(in srgb, var(--shu) 12%, #25272d);

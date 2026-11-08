@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { AuditNode, AuditStatus, ClassroomCredit, EducationCredit, GraduationAudit, PracticeRecord } from '@shared/types'
 import { useZju } from '@renderer/hooks/useZju'
-import { Choice, Joined, Quiet, Reveal, SectionHead } from '@renderer/components/Type'
+import { Choice, Joined, Quiet, Reveal } from '@renderer/components/Type'
 import { dotDate } from '@renderer/lib/format'
 import { dur } from '@renderer/lib/motion'
-import { MOBILE } from '@renderer/lib/platform'
+import { swipeToClose } from '@renderer/lib/swipe'
 import './graduation.css'
 import { CloseButton } from '@renderer/components/IconButton'
 
@@ -23,285 +23,334 @@ type Room = 'second' | 'third' | 'fourth'
 type Edu = 'aesthetic' | 'labor'
 const ROOM: Record<Room, string> = { second: '第二课堂', third: '第三课堂', fourth: '第四课堂' }
 const EDU: Record<Edu, string> = { aesthetic: '美育', labor: '劳育' }
-const ROOM_SHORT: Record<Room, string> = { second: '二课', third: '三课', fourth: '四课' }
 
 type Open = { kind: 'room'; room: Room } | { kind: 'edu'; edu: Edu }
 
-/** 一个模块的完成情况：学分差额、门数差额、其下（含下级）没完成的必修课 */
-interface Progress {
+/** 一项要求（自审树里的一个模块）算出来的完成情况 */
+interface Req {
   node: AuditNode
-  depth: number
+  /** 名称相同的兄弟模块靠选必修区分（「美育类 · 选修」） */
+  label: string
+  /** 有要求门数时按门数，否则按学分 */
+  byCourses: boolean
   required: number
   earned: number
-  creditGap: number
-  courseGap: number
-  /** 有要求门数时按门数算进度，否则按学分 */
-  byCourses: boolean
-  open: AuditNode[]
-  /** 本模块直接挂的课 */
-  courses: AuditNode[]
+  /** 还差多少（门或学分）；0 为够了 */
+  gap: number
+  /** 下级与本级的课都算上、要求本身也够了 */
   done: boolean
+  /** 下一级要求（逐级递归） */
+  subs: Req[]
+  /** 本模块及下级的全部课 */
+  courses: AuditNode[]
 }
 
-interface Plan {
-  /** 「毕业总学分」这类没有下级的顶层汇总 */
-  total?: Progress
-  /** 按自审树原有顺序与层级平铺的模块 */
-  rows: Progress[]
-  /** 模块或其任一下级没完成 */
-  pending: (p: Progress) => boolean
-}
-
-function analyze(nodes: AuditNode[]): Plan {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
+/**
+ * 把教务的自审树整理成「一项项要求」：顶层模块一张卡，下级模块是卡里的一条条小要求。
+ * 「毕业总学分」这种没有下级的顶层汇总单独拿出来放在最上面
+ */
+function analyze(nodes: AuditNode[]): { total?: AuditNode; reqs: Req[] } {
   const kids = new Map<string | null, AuditNode[]>()
   for (const n of nodes) kids.set(n.parentId, [...(kids.get(n.parentId) ?? []), n])
   const children = (id: string | null): AuditNode[] => kids.get(id) ?? []
-  // 本身或任一上级标为必修（选必修字段或名称）
-  const required = (n: AuditNode): boolean => {
-    for (let cur: AuditNode | undefined = n; cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+  const isRequired = (id: string): boolean => {
+    for (let cur = nodes.find((n) => n.id === id); cur; cur = cur.parentId ? nodes.find((n) => n.id === cur!.parentId) : undefined) {
       if (cur.kind?.includes('必修') || (!cur.code && cur.name.includes('必修'))) return true
     }
     return false
   }
   const allCourses = (id: string): AuditNode[] => children(id).flatMap((n) => (n.code ? [n] : allCourses(n.id)))
 
-  const measure = (n: AuditNode, depth: number): Progress => {
-    const req = lead(n.requiredCredits)
-    const got = lead(n.earnedCredits)
-    const creditGap = req > 0 ? Math.max(0, req - got) : 0
-    const courseGap = n.requiredCourses ? Math.max(0, lead(n.requiredCourses) - lead(n.completedCourses)) : 0
-    const open = allCourses(n.id).filter((c) => required(c) && unfinished(c))
+  const build = (n: AuditNode, siblings: AuditNode[]): Req => {
+    const mods = children(n.id).filter((c) => !c.code)
+    const subs = mods.map((m) => build(m, mods))
+    const byCourses = lead(n.requiredCourses) > 0
+    const required = byCourses ? lead(n.requiredCourses) : lead(n.requiredCredits)
+    const earned = byCourses ? lead(n.completedCourses) : lead(n.earnedCredits)
+    const courses = allCourses(n.id)
+    // 必修模块里还有没修完的课，即使学分够了也不算完成
+    const openRequired = courses.some((c) => unfinished(c) && isRequired(c.id))
+    const gap = Math.max(0, required - earned)
+    const twin = siblings.filter((s) => s.name === n.name).length > 1
+    const kind = n.kind?.replace(/课程$/, '')
     return {
       node: n,
-      depth,
-      required: req,
-      earned: got,
-      creditGap,
-      courseGap,
-      byCourses: lead(n.requiredCourses) > 0,
-      open,
-      courses: children(n.id).filter((c) => c.code),
-      done: creditGap === 0 && courseGap === 0 && open.length === 0
+      label: twin && kind ? `${n.name} · ${kind}` : n.name,
+      byCourses,
+      required,
+      earned,
+      gap,
+      done: gap === 0 && !openRequired && subs.every((s) => s.done),
+      subs,
+      courses
     }
   }
-
   const top = children(null).filter((n) => !n.code)
-  const totalNode = top.find((n) => children(n.id).length === 0 && n.requiredCredits)
-  const rows: Progress[] = []
-  const sub = new Map<string, Progress[]>()
-  const walk = (list: AuditNode[], depth: number): Progress[] =>
-    list.map((n) => {
-      const p = measure(n, depth)
-      rows.push(p)
-      sub.set(n.id, walk(children(n.id).filter((c) => !c.code), depth + 1))
-      return p
-    })
-  walk(top.filter((n) => n !== totalNode), 0)
-  const pending = (p: Progress): boolean => !p.done || (sub.get(p.node.id) ?? []).some(pending)
-  return { total: totalNode && measure(totalNode, 0), rows, pending }
+  const total = top.find((n) => children(n.id).length === 0 && n.requiredCredits)
+  const rest = top.filter((n) => n !== total)
+  // 没有要求也没有课的空模块不列
+  const reqs = rest.map((n) => build(n, rest)).filter((r) => r.required > 0 || r.courses.length > 0 || r.subs.length > 0)
+  return { total, reqs }
 }
 
-/** 还差什么，只写一项：按门数算的写差几门，按学分算的写差几学分，指标够了但还有必修课没完成的写几门未完成 */
-function gap(p: Progress): string | false {
-  if (p.byCourses && p.courseGap > 0) return `差 ${p.courseGap} 门`
-  if (!p.byCourses && p.creditGap > 0) return `差 ${fmt(p.creditGap)} 学分`
-  if (p.open.length > 0) return `${p.open.length} 门未完成`
-  if (p.creditGap > 0) return `差 ${fmt(p.creditGap)} 学分`
-  return false
+/** 「差 4.5 学分」「差 1 门」；够了但必修课没修完时写还有几门没修完 */
+function gapText(r: Req): string {
+  if (r.gap > 0) return r.byCourses ? `差 ${fmt(r.gap)} 门` : `差 ${fmt(r.gap)} 学分`
+  const open = r.courses.filter(unfinished).length
+  if (!r.done && open) return `${open} 门未修完`
+  return r.done ? '已完成' : '下级未完成'
 }
 
-/** 选必修小标签：名称里已经写了（如「通识必修课程」）就不再标 */
-function kindTag(n: AuditNode): string | null {
-  const kind = n.kind?.replace(/课程$/, '')
-  return kind && !n.name.includes(kind) ? kind : null
-}
+const unit = (r: Req): string => (r.byCourses ? '门' : '学分')
 
-/** 工具「毕业自审」：上面一条总览（总学分 + 二三四课堂、美育、劳育），下面培养方案按自审树逐行列出，点模块就地展开课程 */
+/** 工具「毕业自审」：最上面毕业总学分与第二课堂五项；下面「还没完成」每项要求一张卡，写清差多少、下面哪几条没达到、还要修哪些课；完成了的收在最后一张卡里 */
 export function Graduation() {
   const { data, loading, error } = useZju('data:graduation')
   const [open, setOpen] = useState<Open | null>(null)
-  const [all, setAll] = useState(false)
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const plan = data?.nodes ? analyze(data.nodes) : null
-  const quiet = (part?: string) => <Quiet loading={loading} error={error ?? part ?? null} empty="无" />
-  const rows = plan ? plan.rows.filter((p) => all || plan.pending(p)) : []
-  const toggle = (id: string): void =>
-    setExpanded((s) => {
-      const next = new Set(s)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
+  const pending = plan?.reqs.filter((r) => !r.done) ?? []
+  const done = plan?.reqs.filter((r) => r.done) ?? []
+
+  if (!data) return <Quiet loading={loading} error={error} empty="无" />
 
   return (
-    <>
-      <Reveal i={1} flat className="panel grad-summary">
-        {plan?.total && (
-          <div className="grad-total">
-            <span className="grad-label">{plan.total.node.name}</span>
-            <span className="grad-figure">
-              {plan.total.node.earnedCredits ?? 0}
-              <small>/ {plan.total.node.requiredCredits}</small>
-            </span>
-            <Meter value={plan.total.earned} max={plan.total.required} />
-          </div>
-        )}
-        {data ? (
-          <div className="grad-stats">
-            {(['second', 'third', 'fourth'] as Room[]).map((r) => {
-              const c = data.classrooms?.[r]
-              return (
-                <Stat
-                  key={r}
-                  name={MOBILE ? ROOM_SHORT[r] : ROOM[r]}
-                  value={c ? fmt(c.points) : '—'}
-                  passed={c?.passed ?? null}
-                  sub={c && <Joined parts={[c.credits !== null && `${fmt(c.credits)} 学分`, c.grade]} />}
-                  onOpen={() => setOpen({ kind: 'room', room: r })}
-                />
-              )
-            })}
-            {(['aesthetic', 'labor'] as Edu[]).map((e) => {
-              const points = data[e].points
-              return <Stat key={e} name={EDU[e]} value={points === null ? '—' : fmt(points)} passed={data[e].passed} onOpen={() => setOpen({ kind: 'edu', edu: e })} />
-            })}
-          </div>
-        ) : (
-          quiet()
-        )}
-        {data && !data.classrooms && <p className="quiet grad-note">{data.practiceError ?? '第二课堂无数据'}</p>}
+    <div className="grad">
+      <Reveal i={1} flat className="panel grad-hero">
+        {plan?.total ? <Total node={plan.total} /> : !plan && <p className="quiet">{data.nodesError ?? '培养方案无数据'}</p>}
+        <div className="grad-stats">
+          {(['second', 'third', 'fourth'] as Room[]).map((r) => {
+            const c = data.classrooms?.[r]
+            return <Stat key={r} name={ROOM[r]} value={c ? fmt(c.points) : null} passed={c?.passed ?? null} onOpen={() => setOpen({ kind: 'room', room: r })} />
+          })}
+          {(['aesthetic', 'labor'] as Edu[]).map((e) => (
+            <Stat key={e} name={EDU[e]} value={data[e].points === null ? null : fmt(data[e].points!)} passed={data[e].passed} onOpen={() => setOpen({ kind: 'edu', edu: e })} />
+          ))}
+        </div>
+        {!data.classrooms && <p className="quiet grad-note">{data.practiceError ?? '第二课堂无数据'}</p>}
       </Reveal>
 
-      <Reveal i={2} flat className="panel grad-plan">
-        <SectionHead
-          title="培养方案"
-          note={
-            plan && (
-              <span className="grad-filter">
-                <Choice group="grad-filter" className="small" active={!all} onClick={() => setAll(false)}>
-                  未完成
-                </Choice>
-                <Choice group="grad-filter" className="small" active={all} onClick={() => setAll(true)}>
-                  全部
-                </Choice>
-              </span>
-            )
-          }
-        />
-        {!plan ? (
-          quiet(data?.nodesError)
-        ) : rows.length === 0 ? (
-          <p className="quiet">无</p>
-        ) : (
-          <ul className="rows grad-rows">
-            {rows.map((p) => {
-              const shown = all ? p.courses : p.courses.filter(unfinished)
-              const isOpen = shown.length > 0 && expanded.has(p.node.id)
-              return (
-                <li key={p.node.id}>
-                  <ModuleRow p={p} canOpen={shown.length > 0} isOpen={isOpen} onToggle={() => toggle(p.node.id)} />
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.ul
-                        key="courses"
-                        className="grad-courses"
-                        style={{ marginLeft: `${p.depth * 1.125}rem` }}
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: dur(0.35), ease: EASE }}
-                      >
-                        {shown.map((n) => (
-                          <li key={n.id} className="grad-course" data-past={!unfinished(n) || undefined}>
-                            <span className="grad-course-name">
-                              {n.name}
-                              {n.note && <span className="grad-course-note">{n.note}</span>}
-                            </span>
-                            <span className="grad-num">{n.credits !== undefined && `${fmt(n.credits)} 学分`}</span>
-                            <span className="grad-num grad-grade">{n.grade}</span>
-                            <span className="grad-chip" data-s={n.status}>
-                              {STATUS[n.status]}
-                            </span>
-                          </li>
-                        ))}
-                      </motion.ul>
-                    )}
-                  </AnimatePresence>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Reveal>
+      {plan && (
+        <>
+          <Reveal i={2} flat>
+            <h2 className="grad-heading">
+              还没完成<span className="grad-heading-count">{pending.length}</span>
+            </h2>
+          </Reveal>
+          {pending.length === 0 ? (
+            <Reveal i={3} flat className="panel grad-clear">
+              全部达到
+            </Reveal>
+          ) : (
+            <div className="grad-cards">
+              {pending.map((r, i) => (
+                <Reveal key={r.node.id} i={3 + Math.min(i, 6)} flat className="panel grad-card">
+                  <ReqCard r={r} />
+                </Reveal>
+              ))}
+            </div>
+          )}
+          {done.length > 0 && (
+            <Reveal i={10} flat className="panel grad-done">
+              <DoneList reqs={done} />
+            </Reveal>
+          )}
+        </>
+      )}
 
       <Sheet open={open !== null} onClose={() => setOpen(null)}>
-        {open?.kind === 'room' && data && <RecordsDetail title={ROOM[open.room]} data={data} pick={(r) => r.classroom === open.room} credit={data.classrooms?.[open.room]} />}
-        {open?.kind === 'edu' && data && <RecordsDetail title={EDU[open.edu]} data={data} pick={(r) => r[open.edu]} edu={data[open.edu]} />}
+        {open?.kind === 'room' && <RecordsDetail title={ROOM[open.room]} data={data} pick={(r) => r.classroom === open.room} credit={data.classrooms?.[open.room]} />}
+        {open?.kind === 'edu' && <RecordsDetail title={EDU[open.edu]} data={data} pick={(r) => r[open.edu]} edu={data[open.edu]} />}
       </Sheet>
-    </>
+    </div>
+  )
+}
+
+/** 毕业总学分：大数字 / 要求，还差多少，一道进度条 */
+function Total({ node }: { node: AuditNode }) {
+  const earned = lead(node.earnedCredits)
+  const required = lead(node.requiredCredits)
+  const gap = Math.max(0, required - earned)
+  return (
+    <div className="grad-total">
+      <div className="grad-total-line">
+        <span className="grad-label">{node.name}</span>
+        <span className="grad-total-gap" data-done={gap === 0 || undefined}>
+          {gap > 0 ? `还差 ${fmt(gap)} 学分` : '已达到'}
+        </span>
+      </div>
+      <span className="grad-figure">
+        {node.earnedCredits ?? 0}
+        <small>/ {node.requiredCredits}</small>
+      </span>
+      <Meter value={earned} max={required} />
+    </div>
   )
 }
 
 function Meter({ value, max }: { value: number; max: number }) {
   const ratio = max > 0 ? Math.min(value / max, 1) : 0
   return (
-    <span className="grad-meter" data-empty={max <= 0 || undefined} data-full={ratio >= 1 || undefined}>
+    <span className="grad-meter" data-full={ratio >= 1 || undefined}>
       <span style={{ width: `${ratio * 100}%` }} />
     </span>
   )
 }
 
-/** 总览里的一格：名称、记点、达标与否（桌面端另写学分与等级）；点开看第二课堂记录 */
-function Stat({ name, value, passed, sub, onOpen }: { name: string; value: string; passed: boolean | null; sub?: ReactNode; onOpen: () => void }) {
+/** 第二课堂一项：名称、记点、达标与否；整格是按钮，点开看记录 */
+function Stat({ name, value, passed, onOpen }: { name: string; value: string | null; passed: boolean | null; onOpen: () => void }) {
   return (
     <button className="grad-stat" data-short={passed === false || undefined} onClick={onOpen}>
       <span className="grad-stat-name">{name}</span>
       <span className="grad-stat-value">
-        {value}
-        <small>记点</small>
+        {value ?? '—'}
+        {value !== null && <small>记点</small>}
       </span>
-      <span className="grad-stat-sub">
-        {passed !== null && <span className="grad-stat-pass">{passed ? '达标' : '未达标'}</span>}
-        {!MOBILE && sub}
+      <span className="grad-stat-pass">
+        {passed !== null && <Mark ok={passed} />}
+        {passed === null ? '查看记录' : passed ? '达标' : '未达标'}
       </span>
     </button>
   )
 }
 
-/** 培养方案的一行：名称（同名模块靠选必修小标签区分）、进度条、学分、门数、还差什么；有课可看的能展开 */
-function ModuleRow({ p, canOpen, isOpen, onToggle }: { p: Progress; canOpen: boolean; isOpen: boolean; onToggle: () => void }) {
-  const n = p.node
-  const kind = kindTag(n)
-  const missing = gap(p)
-  const body = (
+/** 勾（达到）与空圈（没达到） */
+function Mark({ ok }: { ok: boolean }) {
+  return (
+    <svg className="grad-mark" data-ok={ok || undefined} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {ok ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <circle cx="12" cy="12" r="7.5" />}
+    </svg>
+  )
+}
+
+/** 一项没完成的要求：标题与还差多少，进度，下面一条条小要求（达到的打勾），再往下是这项要求里的课（没修完的在前） */
+function ReqCard({ r }: { r: Req }) {
+  const [showCourses, setShowCourses] = useState(false)
+  const todo = r.courses.filter(unfinished)
+  const passed = r.courses.filter((c) => !unfinished(c))
+  const courses = [...todo, ...passed]
+  return (
     <>
-      <span className="grad-row-name" style={{ paddingLeft: `${p.depth * 1.125}rem` }}>
-        <span className="row-title">{n.name}</span>
-        {kind && <span className="grad-kind">{kind}</span>}
-      </span>
-      {p.byCourses ? <Meter value={lead(n.completedCourses)} max={lead(n.requiredCourses)} /> : <Meter value={p.earned} max={p.required} />}
-      <span className="grad-num grad-credits">{n.requiredCredits && `${n.earnedCredits ?? 0} / ${n.requiredCredits}`}</span>
-      <span className="grad-num grad-count">{n.requiredCourses && `${n.completedCourses ?? 0} / ${n.requiredCourses} 门`}</span>
-      <span className="grad-gap" data-done={!missing || undefined}>
-        {missing || '完成'}
-      </span>
-      <span className="grad-chevron" aria-hidden>
-        {canOpen && (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 9.5l6 6 6-6" />
-          </svg>
-        )}
-      </span>
+      <div className="grad-card-head">
+        <h3 className="grad-card-title">{r.label}</h3>
+        <span className="grad-card-gap">{gapText(r)}</span>
+      </div>
+      {r.required > 0 && (
+        <div className="grad-card-progress">
+          <Meter value={r.earned} max={r.required} />
+          <span className="grad-card-figure">
+            已修 {fmt(r.earned)} / {fmt(r.required)} {unit(r)}
+          </span>
+        </div>
+      )}
+      {r.subs.length > 0 && (
+        <ul className="grad-subs">
+          {flatSubs(r.subs).map(({ req, depth }) => (
+            <li key={req.node.id} className="grad-sub" data-done={req.done || undefined} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+              <Mark ok={req.done} />
+              <span className="grad-sub-name">{req.label}</span>
+              <span className="grad-sub-gap">{req.done ? `${fmt(req.earned)} / ${fmt(req.required)} ${unit(req)}` : gapText(req)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {courses.length > 0 && (
+        <>
+          <button className="grad-courses-toggle" aria-expanded={showCourses} onClick={() => setShowCourses((x) => !x)}>
+            课程<span className="grad-courses-count">{courses.length} 门</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M6 9.5l6 6 6-6" />
+            </svg>
+          </button>
+          <AnimatePresence initial={false}>
+            {showCourses && (
+              <motion.ul
+                key="courses"
+                className="grad-courses"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: dur(0.35), ease: EASE }}
+              >
+                {courses.map((n) => (
+                  <CourseLine key={n.id} n={n} />
+                ))}
+              </motion.ul>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </>
   )
-  return canOpen ? (
-    <button className="row grad-row" data-depth={p.depth} data-done={p.done || undefined} data-open={isOpen || undefined} aria-expanded={isOpen} onClick={onToggle}>
-      {body}
-    </button>
-  ) : (
-    <div className="row grad-row" data-depth={p.depth} data-done={p.done || undefined}>
-      {body}
-    </div>
+}
+
+/** 小要求逐级摊平（第二级起缩进） */
+function flatSubs(subs: Req[], depth = 0): { req: Req; depth: number }[] {
+  return subs.flatMap((s) => [{ req: s, depth }, ...flatSubs(s.subs, depth + 1)])
+}
+
+/** 一门课：课名（替代说明）在左，学分与成绩或状态在右；没修完的状态主题色 */
+function CourseLine({ n }: { n: AuditNode }) {
+  const open = unfinished(n)
+  return (
+    <li className="grad-course" data-open={open || undefined}>
+      <span className="grad-course-name">
+        {n.name}
+        {n.note && <span className="grad-course-note">{n.note}</span>}
+      </span>
+      <span className="grad-course-credit">{n.credits !== undefined && `${fmt(n.credits)} 学分`}</span>
+      <span className="grad-course-state" data-s={n.status}>
+        {n.status === 'passed' && n.grade ? n.grade : STATUS[n.status]}
+      </span>
+    </li>
+  )
+}
+
+/** 已完成的要求：一行一项（勾 + 名称 + 学分），点开看课 */
+function DoneList({ reqs }: { reqs: Req[] }) {
+  const [open, setOpen] = useState<string | null>(null)
+  return (
+    <>
+      <h3 className="grad-done-title">
+        已完成<span className="grad-heading-count">{reqs.length}</span>
+      </h3>
+      <ul className="grad-done-list">
+        {reqs.map((r) => {
+          const isOpen = open === r.node.id
+          return (
+            <li key={r.node.id}>
+              <button className="grad-done-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.node.id)} disabled={r.courses.length === 0}>
+                <Mark ok />
+                <span className="grad-sub-name">{r.label}</span>
+                <span className="grad-sub-gap">
+                  {r.required > 0 ? `${fmt(r.earned)} / ${fmt(r.required)} ${unit(r)}` : `${r.courses.length} 门`}
+                </span>
+                {r.courses.length > 0 && (
+                  <svg className="grad-done-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M6 9.5l6 6 6-6" />
+                  </svg>
+                )}
+              </button>
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.ul
+                    key="courses"
+                    className="grad-courses"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: dur(0.35), ease: EASE }}
+                  >
+                    {r.courses.map((n) => (
+                      <CourseLine key={n.id} n={n} />
+                    ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </li>
+          )
+        })}
+      </ul>
+    </>
   )
 }
 
@@ -337,6 +386,7 @@ function RecordsDetail({ title, data, pick, credit, edu }: { title: string; data
         {RECORD_TABS.map((t) => (
           <Choice key={t.id} group="grad-record-tab" className="small" active={tab === t.id} onClick={() => setTab(t.id)}>
             {t.label}
+            <span className="grad-tab-count">{list.filter((r) => r.status === t.id).length}</span>
           </Choice>
         ))}
       </div>
@@ -346,17 +396,16 @@ function RecordsDetail({ title, data, pick, credit, edu }: { title: string; data
         ) : shown.length === 0 ? (
           <p className="quiet">无</p>
         ) : (
-          <ul className="rows">
+          <ul className="grad-records">
             {shown.map((r) => (
-              <li key={r.id} className="row grad-record">
-                <span className="row-time">{r.time ? dotDate(r.time) : ''}</span>
-                <span>
-                  <span className="row-title">{r.name}</span>
-                  <span className="row-sub">
-                    <Joined parts={[r.category, r.type, r.status !== 'done' && r.statusLabel]} />
+              <li key={r.id} className="grad-record">
+                <span className="grad-record-main">
+                  <span className="grad-record-name">{r.name}</span>
+                  <span className="grad-record-sub">
+                    <Joined parts={[r.time && dotDate(r.time), r.category, r.type, r.status !== 'done' && r.statusLabel]} />
                   </span>
                 </span>
-                <span className="row-end">{r.points !== null && `${fmt(r.points)} 记点`}</span>
+                <span className="grad-record-points">{r.points !== null && `${fmt(r.points)} 记点`}</span>
               </li>
             ))}
           </ul>
@@ -366,7 +415,7 @@ function RecordsDetail({ title, data, pick, credit, edu }: { title: string; data
   )
 }
 
-/** 毕业自审自己的侧页（右侧滑出）；Esc、点遮罩、「关闭」都能收起，安卓返回键经 Esc 收起 */
+/** 毕业自审自己的侧页（右侧滑出）；Esc、点遮罩、关闭按钮、手机上往右划都能收起，安卓返回键经 Esc 收起 */
 function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
     if (!open) return
@@ -386,6 +435,7 @@ function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void
           <motion.aside
             key="sheet"
             className="sheet local-sheet"
+            {...swipeToClose(onClose)}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

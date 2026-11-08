@@ -2,15 +2,17 @@ import type { NewsArticle, NewsFeed, NewsItem, NewsSettings, WebSource } from '@
 import { zjuFetch } from '../http'
 import { logDiagnostic } from '../diagnostics'
 import { parseArticle, parseList } from './newsWebplus'
-import { isCampusHost, webvpnUrl } from './newsWebvpn'
-import { filterTitles } from './newsFilter'
+import { isCampusHost, unwebvpn, webvpnLogin, webvpnUrl } from './newsWebvpn'
+import { judgeByRules } from './newsFilter'
 import { WEB_SOURCES } from './newsSources'
 
 // 校园资讯 · 来源 B：部处与学院官网栏目。来源表见 newsSources.ts（scripts/news-sources.mjs 生成，部处手工整理），
-// 列表页按 newsWebplus 的通用规则解析；直连失败的校内域名改走 WebVPN（未以登录态实测）。
-// 每个栏目只取第一页（最近十几条），合并后按日期排序、按地址去重，再做条目级过滤（newsFilter）
+// 列表页按 newsWebplus 的通用规则解析；校内域名直连失败或取到的不是列表页（校外）时改走 WebVPN（用保存的账号登录，未实测）。
+// 每个栏目只取第一页（最近十几条），合并后按日期排序、按地址去重，再按规则去掉面向教职工的（newsFilter）
 
 const TIMEOUT = 15_000
+/** 直连等得短些：校外连校内专用地址时常一直挂着，早点改走 WebVPN */
+const DIRECT_TIMEOUT = 8_000
 const FRESH = 10 * 60_000
 /** 只看近 120 天的条目 */
 const RECENT_DAYS = 120
@@ -18,20 +20,47 @@ const RECENT_DAYS = 120
 const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
   Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('超时')), ms))])
 
-async function loadPage(url: string): Promise<{ url: string; html: string }> {
-  const headers = { Accept: 'text/html,application/xhtml+xml,*/*' }
-  try {
-    const r = await withTimeout(zjuFetch(url, { headers, relogin: false }), TIMEOUT)
-    if (r.status >= 400) throw new Error(`HTTP ${r.status}`)
-    return { url: r.url, html: await r.text() }
-  } catch (error) {
-    if (!isCampusHost(url)) throw error
-    // 校内专用域名：经 WebVPN 再试（会话在 persist:zju，需已登录统一身份认证）
-    const r = await withTimeout(zjuFetch(await webvpnUrl(url), { headers }), TIMEOUT)
+const HEADERS = { Accept: 'text/html,application/xhtml+xml,*/*' }
+
+/** 经 WebVPN 取校内页面（校外时多数部处网站只有 WebVPN 进得去）。没登录就用保存的账号登录 WebVPN 后再取一次 */
+async function viaWebvpn(url: string): Promise<string> {
+  const target = await webvpnUrl(url)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await withTimeout(zjuFetch(target, { headers: HEADERS, relogin: false }), TIMEOUT)
     const landed = new URL(r.url)
-    if (landed.hostname === 'zjuam.zju.edu.cn' || /\/login/.test(landed.pathname)) throw new Error('WebVPN 未登录')
+    if (landed.hostname === 'zjuam.zju.edu.cn' || /^\/login/.test(landed.pathname)) {
+      if (attempt) break
+      await webvpnLogin()
+      continue
+    }
     if (r.status >= 400) throw new Error(`WebVPN HTTP ${r.status}`)
-    return { url, html: await r.text() }
+    return unwebvpn(await r.text())
+  }
+  throw new Error('WebVPN 未登录')
+}
+
+/** 直连；校内域名直连失败，或取到的不是这个页面（校外时被解析到 WebVPN 或别处，判断交给 usable）时走 WebVPN */
+async function loadPage(url: string, usable: (html: string) => boolean = () => true): Promise<{ url: string; html: string }> {
+  let direct: { url: string; html: string } | null = null
+  let error: unknown = null
+  try {
+    const r = await withTimeout(zjuFetch(url, { headers: HEADERS, relogin: false }), DIRECT_TIMEOUT)
+    if (r.status >= 400) throw new Error(`HTTP ${r.status}`)
+    direct = { url: r.url, html: await r.text() }
+    if (usable(direct.html)) return direct
+  } catch (e) {
+    error = e
+  }
+  if (!isCampusHost(url)) {
+    if (direct) return direct
+    throw error
+  }
+  try {
+    return { url, html: await viaWebvpn(url) }
+  } catch (e) {
+    // WebVPN 也不行：直连拿到过页面就用它（让上层照常判断），否则报 WebVPN 的原因
+    if (direct) return direct
+    throw e
   }
 }
 
@@ -78,11 +107,11 @@ export async function fetchWebFeed(settings: NewsSettings, force = false): Promi
   const chosen = WEB_SOURCES.filter(
     (s) => settings.sources.includes(s.id) && (settings.audience === 'all' || s.audience === 'all' || s.audience === settings.audience)
   )
-  const key = `${chosen.map((s) => s.id).join(',')}|${settings.llm}`
+  const key = chosen.map((s) => s.id).join(',')
   if (!force && cached && cached.key === key && Date.now() - cached.feed.fetchedAt < FRESH) return cached.feed
 
   const results = await pool(chosen, 6, async (s) => {
-    const page = await loadPage(s.url)
+    const page = await loadPage(s.url, (html) => parseList(html, s.url).entries.length > 0)
     return { source: s, entries: parseList(page.html, page.url).entries }
   })
   const failed: NewsFeed['failed'] = []
@@ -106,13 +135,8 @@ export async function fetchWebFeed(settings: NewsSettings, force = false): Promi
   })
   if (failed.length) logDiagnostic('news-web', { failed: failed.length, sources: chosen.length })
 
-  const verdict = await filterTitles(
-    items.map((i) => i.title),
-    settings.llm && settings.llmKey
-  )
   const kept = items
-    .filter((_, i) => verdict.keep[i])
-    .map((item) => ({ ...item, judged: verdict.judged[items.indexOf(item)] || undefined }))
+    .filter((item) => judgeByRules(item.title) !== 'drop')
     .sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''))
     .filter(sameTitleOnce())
   const feed: NewsFeed = { items: kept, failed, hidden: items.length - kept.length, fetchedAt: Date.now() }
@@ -124,6 +148,6 @@ export async function fetchWebFeed(settings: NewsSettings, force = false): Promi
 export async function fetchArticle(url: string): Promise<NewsArticle> {
   const host = new URL(url).hostname
   if (!host.endsWith('.zju.edu.cn') && host !== 'mp.weixin.qq.com') throw new Error('只能打开校内网页与公众号文章')
-  const page = await loadPage(url)
+  const page = await loadPage(url, (html) => parseArticle(html).text.length > 40)
   return parseArticle(page.html)
 }

@@ -3,7 +3,7 @@
 
 .news {
   --news-on-shu: #fff;
-  --news-layer: color-mix(in srgb, var(--surface-2) 70%, color-mix(in srgb, var(--ink) 6%, transparent));
+  --news-layer: var(--card);
 }
 html[data-style='material'][data-theme='dark'] .news,
 html[data-style='material'][data-theme='dark'] .news-sheet {
@@ -15,7 +15,7 @@ html[data-style='glass'][data-theme='dark'] .news-sheet {
 }
 .news-sheet {
   --news-on-shu: #fff;
-  --news-layer: color-mix(in srgb, var(--surface-2) 70%, color-mix(in srgb, var(--ink) 6%, transparent));
+  --news-layer: var(--card);
 }
 
 /* 一屏：左通知、右活动，各自滚动 */
@@ -266,50 +266,41 @@ html[data-style='glass'][data-theme='dark'] .news-sheet {
   overflow: hidden;
   list-style: none;
   margin: 0;
-  padding: 0.375rem 0 0;
+  padding: 0.5rem 0 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
 }
 .news-failed-list li {
   display: flex;
-  gap: 1em;
-  padding: 0.125rem 0;
-  font-size: 0.8125rem;
-  color: var(--ink-2);
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--r-sm);
+  background: rgba(var(--shu-rgb), 0.07);
 }
 .news-failed-why {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+.news-failed-n {
+  font-size: 0.75rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ink-3);
+}
+.news-failed-from {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  letter-spacing: 0.03em;
   color: var(--ink-3);
 }
 
-/* 通知条目：日期 · 标题 + 出处 */
-.news .rows > li > .row.news-row {
-  display: grid;
-  grid-template-columns: 4.75em minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.875rem;
-  padding: 0.5625rem 0.75rem;
-}
-.news-row .row-time {
-  font-size: 0.875rem;
-}
-.news-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-.news-row .row-title {
-  font-size: 1rem;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
-.news-row-from {
-  display: flex;
-  column-gap: 0.875em;
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* 通知与活动一样是一张张卡片：标题，下面一行 日期 + 出处 */
+.news-note .news-card-title {
+  font-weight: 400;
 }
 
 .news-empty {
@@ -344,7 +335,7 @@ html[data-style='glass'][data-theme='dark'] .news-sheet {
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .news-card:hover {
-  background: color-mix(in srgb, var(--news-layer) 70%, rgba(var(--shu-rgb), 0.12));
+  background: var(--card-hover);
 }
 .news-card[data-stage='over'] {
   opacity: 0.55;

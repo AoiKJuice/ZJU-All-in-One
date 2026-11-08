@@ -4,7 +4,7 @@ import { Joined } from '@renderer/components/Type'
 import { MOBILE } from '@renderer/lib/platform'
 import { ArmedButton, When, examKey, examLabel } from './bits'
 import { useTeacher } from './TeacherSheet'
-import { chanceOf, enrolledOf, percent, ratingKey, useXkData } from './xkData'
+import { chanceOf, percent, ratingKey, useXkData } from './xkData'
 import { groupFor, halvesOverlap, isLead, slotsOverlap } from './xkLogic'
 
 /** 找课与课程详情共用的状态与操作 */
@@ -39,7 +39,7 @@ export function clashInfo(s: XkSection, chosen: XkSection[], general: boolean) {
   }
 }
 
-/** 教学班卡片：教师与评分、时间（撞课的那段主题色）、地点与考试；右边余量、选上 / 待定人数、选中概率；最右操作 */
+/** 教学班卡片：教师与评分（可点，看查老师）、时间（撞课的那段主题色）、地点与考试；右边余量、待定人数、选中概率；最右操作 */
 export function SectionCard({ course, section: s, dim, detailed }: { course: XkCourse; section: XkSection; dim?: boolean; detailed?: boolean }) {
   const env = useXkEnv()
   const mine = env.chosen.find((x) => x.id === s.id)
@@ -47,7 +47,6 @@ export function SectionCard({ course, section: s, dim, detailed }: { course: XkC
   const group = mine?.group ?? groupFor(s, env.chosen, general)
   const members = env.chosen.filter((x) => (x.group ?? x.courseCode) === group)
   const clash = clashInfo(s, env.chosen, general)
-  const enrolled = enrolledOf(s)
   const chance = mine?.state === 'selected' ? null : chanceOf(s)
   const watch = env.watchOf(s.id)
   const full = !mine && members.length >= env.max
@@ -85,7 +84,7 @@ export function SectionCard({ course, section: s, dim, detailed }: { course: XkC
           </div>
         )}
       </div>
-      {/* 余量 / 容量与选中概率一行，选上与待定人数一行 */}
+      {/* 余量 / 容量与选中概率一行，待定人数一行（选上的人数 = 容量 − 余量，不另写） */}
       <div className="xk-cap" data-full={s.remaining === 0 || undefined}>
         <span className="xk-cap-top">
           <span className="xk-cap-figure">
@@ -100,7 +99,7 @@ export function SectionCard({ course, section: s, dim, detailed }: { course: XkC
           )}
         </span>
         <span className="xk-cap-line">
-          <Joined parts={[enrolled !== null && `选上 ${enrolled}`, s.pending !== null && `待定 ${s.pending}`]} />
+          {s.pending !== null && `待定 ${s.pending}`}
         </span>
       </div>
       <div className="xk-sec-acts">
@@ -131,10 +130,13 @@ export function SectionCard({ course, section: s, dim, detailed }: { course: XkC
 function TeacherName({ name, college, courseName, onOpen }: { name: string; college: string; courseName?: string; onOpen: () => void }) {
   const rating = useXkData((d) => d.ratings[ratingKey(name, college)])
   return (
-    <button className="xk-teacher" onClick={onOpen}>
+    <button className="xk-teacher" onClick={onOpen} title="查老师">
       {name}
       {typeof rating === 'number' && <em data-high={rating >= 8.5 || undefined}>{rating.toFixed(1)}</em>}
       {courseName && <CourseGpa name={name} college={college} course={courseName} />}
+      <svg className="xk-teacher-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M9 6l6 6-6 6" />
+      </svg>
     </button>
   )
 }

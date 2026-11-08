@@ -154,7 +154,7 @@ const TITLES = [
 ]
 const WEB_ITEMS: NewsItem[] = TITLES.map((title, i) => {
   const s = pickSources[(i * 7) % pickSources.length]
-  return { id: `web:${s.id}:${i}`, kind: 'web', title, url: s.url, time: day(-i, '09:00').slice(0, 10), from: `${s.org} · ${s.column}`, sourceId: s.id, audience: s.audience, judged: i === 6 || undefined }
+  return { id: `web:${s.id}:${i}`, kind: 'web', title, url: s.url, time: day(-i, '09:00').slice(0, 10), from: `${s.org} · ${s.column}`, sourceId: s.id, audience: s.audience }
 })
 
 const WECHAT_ITEMS: NewsItem[] = [
@@ -234,8 +234,6 @@ const feed = (items: NewsItem[], failed: NewsFeed['failed'] = [], hidden = 0): N
 const settings: NewsSettings = {
   sources: WEB_SOURCES.filter((s) => s.kind === 'office').map((s) => s.id),
   audience: 'all',
-  llm: false,
-  llmKey: false,
   dingtalk: false,
   dingtalkHidden: [] as string[]
 }
@@ -252,14 +250,22 @@ const weread: WereadState = {
 export const demoNews: NewsHandlers = {
   'news:activities': async (keyword) => ACTIVITIES.filter((a) => !keyword || a.title.includes(keyword) || a.org.includes(keyword)),
   'news:sztzNotices': async () => feed(SZTZ_NOTICES),
-  'news:web': async () => feed(WEB_ITEMS, [{ from: '某学院 · 通知公告', message: '超时' }], 9),
+  'news:web': async () =>
+    feed(
+      WEB_ITEMS,
+      [
+        { from: '本科生院 · 通知公告', message: 'WebVPN 登录失败' },
+        { from: '团委 · 通知公告', message: 'WebVPN 登录失败' },
+        { from: '综合服务网 · 教育教学', message: 'WebVPN 登录失败' },
+        { from: '某学院 · 通知公告', message: '超时' }
+      ],
+      9
+    ),
   'news:sources': async () => WEB_SOURCES,
   'news:article': async () => ({ title: '演示文章', text: '这是演示模式下的正文。\n真实模式下这里显示校内网页的正文文字。' }),
   'news:settings': async () => ({ ...settings }),
   'news:setSettings': async (patch) => {
-    const { llmKey, ...rest } = patch
-    Object.assign(settings, rest)
-    if (llmKey !== undefined) settings.llmKey = Boolean(llmKey)
+    Object.assign(settings, patch)
     return { ...settings }
   },
   'news:weread': async () => ({ ...weread }),

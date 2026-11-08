@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
+import { logDiagnostic } from './diagnostics'
 
 // 安卓原生插件（android/app/src/main/java/top/aoikjuice/zjuallinone/ZjuNativePlugin.java）：
 // 请求不跟随跳转、cookie 与 WebView 共用 CookieManager、凭据用 Android Keystore 加密、下载写进系统"下载"目录
@@ -63,7 +64,10 @@ export async function nativeFetch(url: string, init: FetchInit = {}): Promise<Fe
   let current = url
   let method = init.method ?? 'GET'
   let body = init.body
+  const hops: string[] = []
   for (let hop = 0; hop < 20; hop++) {
+    const at = new URL(current)
+    hops.push(at.host + at.pathname)
     const response = await native.request({
       url: current,
       method,
@@ -91,6 +95,8 @@ export async function nativeFetch(url: string, init: FetchInit = {}): Promise<Fe
       json: async <T>() => JSON.parse(text) as T
     }
   }
+  // 只记主机与路径（不含票据），下次据此看是哪两站在来回跳
+  logDiagnostic('redirect-loop', { hops: hops.slice(-8).join(' > ') })
   throw new Error('跳转次数过多')
 }
 

@@ -307,32 +307,22 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
 .xk-list {
   margin-top: 0.25rem;
 }
+/* 课程是一张张卡片：比面板深一档的实底，卡片之间留空隙；展开后教学班卡片回到面板的颜色，层次一眼分得开 */
 .xk-courses {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
-.xk-courses > li {
+.xk-card {
   border-radius: var(--r-md);
+  background: var(--card);
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
-.xk-courses > li[data-open] {
-  background: var(--surface-2);
-}
-.xk-courses > li + li {
-  margin-top: 0.0625rem;
-}
-.xk-course {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.125rem;
-  padding-right: 0.25rem;
-  border-radius: var(--r-md);
-  transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
-}
-.xk-courses > li:not([data-open]) > .xk-course:hover {
-  background: var(--surface-2);
+.xk-card:not([data-open]):hover {
+  background: var(--card-hover);
 }
 .xk-course-main {
   display: grid;
@@ -340,9 +330,10 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
   grid-template-areas: 'head stats chev' 'sub sub chev';
   align-items: center;
   column-gap: 0.75rem;
-  row-gap: 0.0625rem;
+  row-gap: 0.125rem;
+  width: 100%;
   min-width: 0;
-  padding: 0.375rem 0.25rem 0.375rem 0.625rem;
+  padding: 0.625rem 0.625rem 0.625rem 0.875rem;
   text-align: left;
 }
 .xk-course-main:hover .row-title {
@@ -355,7 +346,7 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
   align-items: center;
   gap: 0.125rem 0.5rem;
 }
-.xk-course .row-title {
+.xk-card .row-title {
   font-size: 1rem;
   line-height: 1.45;
   transition: color calc(0.35s * var(--speed, 1)) var(--ease);
@@ -369,10 +360,9 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
 .xk-course-sub {
   grid-area: sub;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: baseline;
   min-width: 0;
-  white-space: nowrap;
   column-gap: 0.75em;
   font-size: 0.8125rem;
   line-height: 1.5;
@@ -382,25 +372,6 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
 .xk-course-sub > .part {
   flex: none;
 }
-.xk-course-teachers {
-  display: flex;
-  flex: 1;
-  min-width: 3rem;
-  gap: 0 0.75rem;
-  margin-left: 0.25em;
-  overflow: hidden;
-  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
-}
-.xk-mini-teacher {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.25em;
-  flex: none;
-  font-size: 0.8125rem;
-  letter-spacing: 0.03em;
-  color: var(--ink-2);
-}
-.xk-mini-teacher em,
 .xk-teacher em {
   font-size: 0.75rem;
   font-style: normal;
@@ -409,7 +380,6 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--ink-3);
 }
-.xk-mini-teacher em[data-high],
 .xk-teacher em[data-high] {
   color: var(--shu);
 }
@@ -458,7 +428,7 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
   color: var(--ink-3);
   transition: transform calc(0.4s * var(--speed, 1)) var(--ease);
 }
-.xk-courses > li[data-open] .xk-chevron {
+.xk-card[data-open] .xk-chevron {
   transform: rotate(180deg);
 }
 .xk-sentinel {
@@ -489,10 +459,26 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
 .xk-sections {
   list-style: none;
   margin: 0;
-  padding: 0 0.25rem 0.25rem;
+  padding: 0 0.375rem;
   display: flex;
   flex-direction: column;
+  gap: 0.375rem;
+}
+.xk-drawer-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0.5rem 0.5rem;
+}
+.xk-detail-btn.btn {
+  display: inline-flex;
+  align-items: center;
   gap: 0.25rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.875rem;
+  font-size: 0.8125rem;
+}
+.xk-detail-btn svg {
+  width: 1rem;
+  height: 1rem;
 }
 .xk-sec {
   display: grid;
@@ -518,18 +504,33 @@ html[data-style='glass'][data-theme='dark'] :is(.xk, .xk-sheet) {
   align-items: center;
   gap: 0.125rem 0.75rem;
 }
+/* 老师名可点（打开查老师）：浅底小胶囊 + 箭头，看得出是个按钮 */
 .xk-teacher {
   display: inline-flex;
   align-items: baseline;
   gap: 0.3em;
+  padding: 0.125rem 0.375rem 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--surface-2);
   font-size: 0.9375rem;
   font-weight: 500;
   letter-spacing: 0.05em;
   text-align: left;
-  transition: color calc(0.3s * var(--speed, 1)) var(--ease);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+span.xk-teacher {
+  padding: 0;
+  background: none;
 }
 button.xk-teacher:hover {
   color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.xk-teacher-go {
+  align-self: center;
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--ink-3);
 }
 .xk-teacher-gpa {
   font-size: 0.75rem;
@@ -882,14 +883,14 @@ button.xk-teacher:hover {
 .xk-mine-tabs .xk-ctl {
   margin-left: 0.5rem;
 }
+/* 每组志愿一张卡片，组与组之间留空隙 */
 .xk-group {
-  padding: 0.125rem 0.25rem 0.25rem;
+  padding: 0.5rem 0.375rem 0.375rem;
+  border-radius: var(--r-md);
+  background: var(--card);
 }
 .xk-group + .xk-group {
-  margin-top: 0.25rem;
-}
-.xk-group {
-  border-radius: var(--r-md);
+  margin-top: 0.5rem;
 }
 .xk-group-head {
   display: flex;
@@ -922,7 +923,7 @@ button.xk-teacher:hover {
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .xk-pref:not(.xk-free):hover {
-  background: var(--surface-2);
+  background: var(--card-hover);
 }
 .xk-pref-no {
   display: grid;
@@ -1039,7 +1040,10 @@ button.xk-teacher:hover {
 .xk-watches {
   list-style: none;
   margin: 0;
-  padding: 0 0.25rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 .xk-watch {
   display: grid;
@@ -1047,12 +1051,13 @@ button.xk-teacher:hover {
   text-align: left;
   align-items: center;
   gap: 0.875rem;
-  padding: 0.5rem 0.5rem;
+  padding: 0.625rem 0.75rem;
   border-radius: var(--r-md);
+  background: var(--card);
   transition: background-color calc(0.3s * var(--speed, 1)) var(--ease), opacity calc(0.3s * var(--speed, 1)) var(--ease);
 }
 .xk-watch:hover {
-  background: var(--surface-2);
+  background: var(--card-hover);
 }
 .xk-watch[data-done] {
   opacity: 0.45;
@@ -1082,13 +1087,6 @@ button.xk-teacher:hover {
     flex-direction: column;
     align-items: flex-end;
     gap: 0;
-  }
-  .xk-course-sub {
-    flex-wrap: wrap;
-  }
-  .xk-course-teachers {
-    flex-basis: 100%;
-    margin-left: 0;
   }
 }
 
@@ -1265,12 +1263,6 @@ html[data-platform='android'] .xk-tt-panel {
 html[data-platform='android'] .xk :is(.xk-list, .xk-groups) {
   overflow: visible;
   mask-image: none;
-}
-html[data-platform='android'] .xk-course-main {
-  padding-left: 0.5rem;
-}
-html[data-platform='android'] .xk-sections {
-  padding: 0 0.25rem 0.25rem;
 }
 html[data-platform='android'] .xk-sec {
   grid-template-columns: minmax(0, 1fr) auto;

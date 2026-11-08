@@ -433,57 +433,59 @@ function CourseRow({
   const todo = plan ? inPlan(c, plan.todoSet) : false
   const half = halfOf(c.semesterPart ?? '')
 
+  // 性质与类别常写成同一个词（「专业基础课程」两遍），相同时只写一次；课程代码、老师在展开后与详情里看
+  const kinds = [...new Set([c.nature, c.category].filter(Boolean))]
+
   return (
-    <li ref={ref} data-key={courseKey(c)} data-open={open || undefined}>
-      <div className="xk-course">
-        {/* 点整行展开教学班；箭头只表示展开与否；课程详情是行尾的图标按钮 */}
-        <button className="xk-course-main" onClick={onToggle} aria-expanded={open}>
-          <span className="xk-course-head">
-            <span className="row-title">{c.name}</span>
-            {(c.displayCode || c.code) && <span className="xk-code">{c.displayCode || c.code}</span>}
-            {selected ? (
-              <span className="xk-tag" data-tone="solid">
-                已选上
+    <li ref={ref} className="xk-card" data-key={courseKey(c)} data-open={open || undefined}>
+      <button className="xk-course-main" onClick={onToggle} aria-expanded={open}>
+        <span className="xk-course-head">
+          <span className="row-title">{c.name}</span>
+          {selected ? (
+            <span className="xk-tag" data-tone="solid">
+              已选上
+            </span>
+          ) : (
+            orders.length > 0 && (
+              <span className="xk-tag" data-tone="soft">
+                第 {orders.join('、')} 志愿
               </span>
-            ) : (
-              orders.length > 0 && (
-                <span className="xk-tag" data-tone="soft">
-                  第 {orders.join('、')} 志愿
-                </span>
-              )
-            )}
-            {todo && (
-              <span className="xk-note" data-hot>
-                培养方案
-              </span>
-            )}
-            {done && <span className="xk-note">已修</span>}
-          </span>
-          <span className="xk-course-stats">
-            {v.sections && (
+            )
+          )}
+        </span>
+        <span className="xk-course-stats">
+          {showChance && v.chance !== null ? (
+            <span data-hot={v.chance < 1 || undefined}>
+              <small>概率</small>
+              {percent(v.chance)}
+            </span>
+          ) : (
+            v.sections && (
               <span data-zero={v.remaining === 0 || undefined}>
                 <small>余量</small>
                 {v.remaining ?? '—'}
               </span>
-            )}
-            {showChance && v.chance !== null && (
-              <span data-hot={v.chance < 1 || undefined}>
-                <small>最高概率</small>
-                {percent(v.chance)}
-              </span>
-            )}
-          </span>
-          <span className="xk-course-sub">
-            <Joined parts={[c.credit !== null && `${fmt(c.credit)} 学分`, c.nature, c.category, c.college, half]} />
-            {v.sections && v.sections.length > 0 && <Teachers sections={v.matching} college={c.college} />}
-          </span>
-          <Chevron />
-        </button>
-        <IconButton label="课程详情" onClick={onDetail}>
-          <rect x="4" y="5" width="16" height="14" rx="2.5" />
-          <path d="M13.5 5v14M16 9h1.5M16 12h1.5" />
-        </IconButton>
-      </div>
+            )
+          )}
+        </span>
+        <span className="xk-course-sub">
+          <Joined
+            parts={[
+              c.credit !== null && `${fmt(c.credit)} 学分`,
+              ...kinds,
+              c.college,
+              half,
+              todo && (
+                <span className="xk-note" data-hot>
+                  培养方案
+                </span>
+              ),
+              done && <span className="xk-note">已修</span>
+            ]}
+          />
+        </span>
+        <Chevron />
+      </button>
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -495,28 +497,18 @@ function CourseRow({
             transition={{ duration: dur(0.4), ease: EASE }}
           >
             <Drawer view={v} />
+            <div className="xk-drawer-foot">
+              <button className="btn xk-detail-btn" onClick={onDetail}>
+                课程详情
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
     </li>
-  )
-}
-
-/** 去重后的老师，评分高的在前 */
-function Teachers({ sections, college }: { sections: XkSection[]; college: string }) {
-  const ratings = useXkData((d) => d.ratings)
-  const names = [...new Set(sections.flatMap((s) => s.teachers))]
-  const list = names.map((n) => ({ n, r: ratings[ratingKey(n, college)] })).sort((a, b) => (b.r ?? -1) - (a.r ?? -1))
-  if (!list.length) return null
-  return (
-    <span className="xk-course-teachers">
-      {list.map(({ n, r }) => (
-        <span key={n} className="xk-mini-teacher">
-          {n}
-          {typeof r === 'number' && <em data-high={r >= 8.5 || undefined}>{r.toFixed(1)}</em>}
-        </span>
-      ))}
-    </span>
   )
 }
 

@@ -80,15 +80,13 @@ export interface NewsItem {
   audience?: NewsAudience
   /** 正文开头或消息原文（素拓通知、钉钉消息；钉钉的可能是 Markdown） */
   text?: string
-  /** 规则判不准、交给模型判断后保留的 */
-  judged?: boolean
 }
 
 export interface NewsFeed {
   items: NewsItem[]
   /** 取不到的来源与原因 */
   failed: { from: string; message: string }[]
-  /** 按规则或模型过滤掉的条数 */
+  /** 按规则过滤掉的条数 */
   hidden: number
   fetchedAt: number
 }
@@ -98,20 +96,13 @@ export interface NewsSettings {
   sources: string[]
   /** 只看面向本科 / 研究生的（另加面向全体的）；all 不限 */
   audience: NewsAudience
-  /** 判不准的标题交给 DeepSeek Flash（只送标题），默认关 */
-  llm: boolean
-  /** 已保存 DeepSeek 密钥（密钥本身加密存放，不回传界面） */
-  llmKey: boolean
   /** 钉钉（实验，Windows，默认关） */
   dingtalk: boolean
   /** 不看的钉钉会话（cid）；新出现的会话默认看 */
   dingtalkHidden: string[]
 }
 
-export type NewsSettingsPatch = Partial<Omit<NewsSettings, 'llmKey'>> & {
-  /** 新密钥；null 清除 */
-  llmKey?: string | null
-}
+export type NewsSettingsPatch = Partial<NewsSettings>
 
 /**
  * 微信读书的登录与限制状态：未登录 / 正常 / 登录过期 / 被限制（添加频繁，24 小时）。

@@ -24,11 +24,11 @@ export interface ToolDef {
 }
 
 const ALL: ToolDef[] = [
-  { id: 'graduation', name: '毕业自审', version: 'v0.4', Icon: GraduationIcon, View: Graduation },
-  { id: 'course', name: '选课', version: 'v0.5', Icon: CourseIcon, View: CourseTool },
+  { id: 'graduation', name: '毕业自审', version: 'v0.5', Icon: GraduationIcon, View: Graduation },
+  { id: 'course', name: '选课', version: 'v0.6', Icon: CourseIcon, View: CourseTool },
   { id: 'forms', name: '问卷填写', version: 'v0.3', Icon: FormIcon, View: FormFill, desktop: true },
-  { id: 'library', name: '图书馆预约', version: 'v0.4', Icon: LibraryIcon, View: LibraryTool },
-  { id: 'news', name: '校园资讯', version: 'v0.3', Icon: NewsIcon, View: NewsTool }
+  { id: 'library', name: '图书馆预约', version: 'v0.5', Icon: LibraryIcon, View: LibraryTool },
+  { id: 'news', name: '校园资讯', version: 'v0.4', Icon: NewsIcon, View: NewsTool }
 ]
 
 export const TOOLS: ToolDef[] = ALL.filter((t) => !(MOBILE && t.desktop))

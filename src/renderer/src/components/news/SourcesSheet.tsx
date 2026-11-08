@@ -180,11 +180,6 @@ export function SourcesSheet(props: {
           </section>
         )}
 
-        <section className="news-block">
-          <h3 className="group-title">判断</h3>
-          <ModelSwitch settings={settings} onSettings={onSettings} />
-        </section>
-
         {!MOBILE && (
           <section className="news-block">
             <h3 className="group-title">钉钉</h3>
@@ -264,49 +259,6 @@ function DingChats({ chats, hidden, onSettings }: { chats: DingChat[]; hidden: s
         )
       })}
     </>
-  )
-}
-
-/** 判不准的标题交给 DeepSeek Flash：开关 + 密钥（只存本机加密） */
-function ModelSwitch({ settings, onSettings }: { settings: NewsSettings; onSettings: (patch: NewsSettingsPatch) => Promise<void> }) {
-  const [key, setKey] = useState('')
-  return (
-    <div className="news-stack">
-      <div className="news-line">
-        <button
-          className="act news-toggle"
-          role="switch"
-          aria-checked={settings.llm && settings.llmKey}
-          data-on={(settings.llm && settings.llmKey) || undefined}
-          disabled={!settings.llmKey}
-          onClick={() => void onSettings({ llm: !settings.llm })}
-        >
-          <span className="news-knob" aria-hidden />
-          DeepSeek 判断不确定的标题
-        </button>
-      </div>
-      {settings.llmKey ? (
-        <div className="news-line">
-          <span className="news-org-count">已存密钥</span>
-          <IconButton label="删除密钥" onClick={() => void onSettings({ llmKey: null, llm: false })}>
-            <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
-          </IconButton>
-        </div>
-      ) : (
-        <form
-          className="news-line"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (key.trim()) void onSettings({ llmKey: key.trim(), llm: true }).then(() => setKey(''))
-          }}
-        >
-          <input className="field news-grow" type="password" autoComplete="off" value={key} placeholder="DeepSeek API 密钥" onChange={(e) => setKey(e.target.value)} />
-          <button className="btn" type="submit" disabled={!key.trim()}>
-            保存并开启
-          </button>
-        </form>
-      )}
-    </div>
   )
 }
 

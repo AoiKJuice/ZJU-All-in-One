@@ -18,6 +18,8 @@ html[data-style='glass'][data-theme] {
   --tint: rgba(255, 255, 255, 0.4);
   --surface: rgba(255, 255, 255, 0.62);
   --surface-2: rgba(255, 255, 255, 0.55);
+  --card: rgba(255, 255, 255, 0.5);
+  --card-hover: rgba(255, 255, 255, 0.72);
   --glass-edge: rgba(255, 255, 255, 0.75);
   --glass-shine: rgba(255, 255, 255, 0.95);
   --glass-tint: rgba(255, 255, 255, 0.12);
@@ -43,6 +45,8 @@ html[data-style='glass'][data-theme='dark'] {
   --tint: rgba(255, 255, 255, 0.07);
   --surface: rgba(30, 34, 46, 0.62);
   --surface-2: rgba(255, 255, 255, 0.08);
+  --card: rgba(255, 255, 255, 0.07);
+  --card-hover: rgba(255, 255, 255, 0.11);
   --glass-edge: rgba(255, 255, 255, 0.12);
   --glass-shine: rgba(255, 255, 255, 0.2);
   --glass-tint: rgba(255, 255, 255, 0.05);
@@ -86,7 +90,8 @@ html[data-style='glass'] .masthead::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--paper) 92%, transparent), color-mix(in srgb, var(--paper) 55%, transparent) 60%, transparent);
+  /* 字标所在的上大半几乎不透明（原先中间只有一半，滚上来的文字和字标叠在一起，2026-11-08 用户截图），只在下沿淡出 */
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--paper) 96%, transparent), color-mix(in srgb, var(--paper) 90%, transparent) 72%, transparent);
   opacity: 0;
   transition: opacity calc(0.5s * var(--speed, 1)) var(--ease);
 }
@@ -95,12 +100,12 @@ html[data-style='glass'] .masthead[data-solid='true']::before {
 }
 
 /* 导航与控件层的玻璃：几乎不着色，靠折射与高光显形；--lg-filter 未生成时退回普通毛玻璃 */
-html[data-style='glass'] :is(.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu) {
+html[data-style='glass'] :is(.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu, .xk-switch, .news-switch) {
   background: var(--glass-tint);
   backdrop-filter: var(--lg-filter, blur(8px)) saturate(1.5);
   box-shadow: inset 0 0 0 0.5px var(--glass-edge), 0 8px 24px -8px rgba(20, 30, 60, 0.28), 0 1px 3px rgba(20, 30, 60, 0.1);
 }
-html[data-style='glass'][data-theme='dark'] :is(.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu) {
+html[data-style='glass'][data-theme='dark'] :is(.tabbar, .mast-nav, .mast-meta, .week-float, .toast, .context-menu, .xk-switch, .news-switch) {
   backdrop-filter: var(--lg-filter, blur(8px)) saturate(1.4) brightness(0.92);
   box-shadow: inset 0 0 0 0.5px var(--glass-edge), 0 8px 24px -8px rgba(0, 0, 0, 0.6);
 }

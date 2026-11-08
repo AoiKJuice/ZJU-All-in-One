@@ -76,6 +76,9 @@ html[data-theme='light'] {
   /* 面板：比纸面略浅，柔和投影；--surface-2 为面板内悬停 / 输入框的浅底 */
   --surface: #fbf8f2;
   --surface-2: rgba(38, 34, 29, 0.05);
+  /* 信息流里的一张张卡片（面板里的课程、通知、模块）：比面板深一档的实底，卡片之间留空隙 */
+  --card: #f1ece2;
+  --card-hover: #ebe5d9;
   --shadow: 0 1px 2px rgba(38, 34, 29, 0.05), 0 10px 28px -18px rgba(38, 34, 29, 0.28);
   --shadow-pop: 0 2px 6px rgba(38, 34, 29, 0.06), 0 18px 40px -16px rgba(38, 34, 29, 0.32);
   /* 钟鹰的鹰身：黛蓝 */
@@ -98,6 +101,8 @@ html[data-theme='dark'] {
   --outline: rgba(230, 223, 210, 0.14);
   --surface: #25211d;
   --surface-2: rgba(230, 223, 210, 0.07);
+  --card: #2f2a25;
+  --card-hover: #36312b;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 30px -18px rgba(0, 0, 0, 0.6);
   --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.3), 0 20px 44px -16px rgba(0, 0, 0, 0.7);
   --emblem: #aeb9cb;
@@ -516,8 +521,8 @@ button.row {
 }
 .acts {
   display: flex;
-  align-items: baseline;
-  gap: 1.25rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* 细进度线 */
@@ -1714,6 +1719,21 @@ button.row:hover,
 .row[role='button']:hover {
   background: var(--surface-2);
 }
+/* 主页各块里的条目是一张张浅底卡片，之间留空隙：只靠留白时条目连成一片，分不清哪行属于哪条（用户多次指出） */
+.pane .rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-bottom: 0.25rem;
+}
+.pane .rows > li > .row,
+.pane .rows > .row {
+  background: var(--card);
+}
+.pane .rows > li > :is(button.row, .row[role='button']):hover,
+.pane .rows > :is(button.row, .row[role='button']):hover {
+  background: var(--card-hover);
+}
 .settings-row {
   padding: 1rem 0.75rem;
 }
@@ -1823,20 +1843,6 @@ button.row:hover,
   right: 0.5rem;
 }
 
-/* 手机主页折叠长列表的「展开 / 收起」 */
-.pane-more {
-  display: block;
-  width: 100%;
-  margin: 0.25rem 0 0.375rem;
-  padding: 0.5rem 0;
-  border-radius: var(--r-md);
-  font-size: 0.875rem;
-  letter-spacing: 0.12em;
-  color: var(--ink-3);
-}
-.pane-more:active {
-  background: var(--surface-2);
-}
 
 /* ------------------------------------------------------------------
    选中态：不用下划线。选中文字转主题色，背后一块主题色浅底的圆角滑块，同组切换时滑块移动过去（Choice）
@@ -1911,20 +1917,29 @@ button.row:hover,
   padding-top: 0.3rem;
 }
 
-/* 文字按钮：悬停只变主题色；开关打开时同样是主题色浅底圆角（内边距用负外边距抵消，不挤动排版） */
+/* 次要动作按钮：浅底小胶囊，一眼看得出能点（原先只是一行字，悬停才变色，用户指出「把一行字当按钮用」）；
+   开关打开时主题色浅底 + 主题色字 */
 .act {
-  margin: -0.2rem -0.55rem;
-  padding: 0.2rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+  padding: 0.25rem 0.8rem;
   border-radius: 999px;
-  background: transparent;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  color: var(--ink-2);
+  background: var(--surface-2);
   transition: color calc(0.35s * var(--speed, 1)) var(--ease), background-color calc(0.35s * var(--speed, 1)) var(--ease);
 }
 .act:hover:not(:disabled) {
   color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
 }
 .act[data-on] {
   color: var(--shu);
-  background: rgba(var(--shu-rgb), 0.12);
+  background: rgba(var(--shu-rgb), 0.14);
 }
 a.row .row-title,
 button.row .row-title,
@@ -3022,9 +3037,9 @@ html[data-platform='android'] .settings-row .opt {
 .status-chip {
   white-space: nowrap;
 }
-/* 元信息行末的「原页面 ↗」等链接整体换行，不留一两个字到下一行 */
+/* 链接形式的动作同样是胶囊 */
 a.act {
-  display: inline-block;
+  display: inline-flex;
 }
 
 /* 并列信息（Joined）：段间留白代替分隔线；侧页、课程详情、回放页顶部的元信息同样是不带底色的次要文字 */
