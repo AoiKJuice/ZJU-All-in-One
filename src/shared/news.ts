@@ -78,7 +78,7 @@ export interface NewsItem {
   /** 官网来源的单位 id，用于按单位筛选 */
   sourceId?: string
   audience?: NewsAudience
-  /** 正文开头或消息原文（素拓通知、钉钉消息） */
+  /** 正文开头或消息原文（素拓通知、钉钉消息；钉钉的可能是 Markdown） */
   text?: string
   /** 规则判不准、交给模型判断后保留的 */
   judged?: boolean
@@ -102,8 +102,10 @@ export interface NewsSettings {
   llm: boolean
   /** 已保存 DeepSeek 密钥（密钥本身加密存放，不回传界面） */
   llmKey: boolean
-  /** 钉钉群（实验，Windows，默认关） */
+  /** 钉钉（实验，Windows，默认关） */
   dingtalk: boolean
+  /** 不看的钉钉会话（cid）；新出现的会话默认看 */
+  dingtalkHidden: string[]
 }
 
 export type NewsSettingsPatch = Partial<Omit<NewsSettings, 'llmKey'>> & {
@@ -158,7 +160,7 @@ export interface NewsApi {
   'news:wereadAdd': (articleUrl: string) => Promise<WereadState>
   'news:wereadRemove': (id: string) => Promise<WereadState>
   'news:wechat': () => Promise<NewsFeed>
-  /** 本机钉钉库里像通知的群消息（实验，仅桌面；不落盘） */
+  /** 本机钉钉库里的全部消息（实验，仅桌面；不落盘）。按会话取舍由界面按 settings.dingtalkHidden 做 */
   'news:dingtalk': () => Promise<NewsFeed>
 }
 

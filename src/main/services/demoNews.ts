@@ -170,7 +170,62 @@ const DINGTALK_ITEMS: NewsItem[] = [
     title: '【通知】请各位同学周五 18:00 前填写实习意向',
     text: '【通知】请各位同学周五 18:00 前填写实习意向问卷，地点：东三教学楼 205 现场答疑。逾期不再补录。',
     time: day(0, '16:20'),
-    from: '2024 级专业群'
+    from: '2024 级专业群 · 王老师',
+    sourceId: 'demo-g1'
+  },
+  {
+    id: 'dingtalk:demo:2',
+    kind: 'dingtalk',
+    title: '关于期中教学检查的通知',
+    text: '### 关于期中教学检查的通知\n各位同学：\n\n学院将于**第 9 周**开展期中教学检查，请注意以下事项：\n1. 周三前在[教学评价系统](https://example.com/)提交意见；\n2. 座谈会时间：周四 14:00，地点：东三 205；\n3. 有问题联系 `教务办`。\n\n> 逾期不再受理。\n\n---\n教务办公室',
+    time: day(0, '10:05'),
+    from: '工作通知:演示学院',
+    sourceId: '10001:30003'
+  },
+  {
+    id: 'dingtalk:demo:3',
+    kind: 'dingtalk',
+    title: '收到，谢谢老师',
+    text: '收到，谢谢老师',
+    time: day(0, '16:25'),
+    from: '2024 级专业群 · 李同学',
+    sourceId: 'demo-g1'
+  },
+  {
+    id: 'dingtalk:demo:4',
+    kind: 'dingtalk',
+    title: '图片',
+    text: '',
+    time: day(-1, '09:12'),
+    from: '概率论答疑群 · 助教',
+    sourceId: 'demo-g2'
+  },
+  {
+    id: 'dingtalk:demo:7',
+    kind: 'dingtalk',
+    title: '群公告：第三次作业截止日期为下周二晚上 10 点',
+    text: '第三次作业截止日期为下周二晚上 10 点，请大家按时完成。答疑时间改到周四下午，地点不变。',
+    time: day(-1, '09:15'),
+    from: '概率论答疑群 · 王老师',
+    sourceId: 'demo-g2'
+  },
+  {
+    id: 'dingtalk:demo:5',
+    kind: 'dingtalk',
+    title: '第三次作业.pdf',
+    text: '文件：第三次作业.pdf',
+    time: day(-1, '09:10'),
+    from: '概率论答疑群 · 助教',
+    sourceId: 'demo-g2'
+  },
+  {
+    id: 'dingtalk:demo:6',
+    kind: 'dingtalk',
+    title: '周六还去图书馆吗',
+    text: '周六还去图书馆吗',
+    time: day(-2, '21:40'),
+    from: '张三 · 我',
+    sourceId: '10001:20002'
   }
 ]
 
@@ -181,7 +236,8 @@ const settings: NewsSettings = {
   audience: 'all',
   llm: false,
   llmKey: false,
-  dingtalk: false
+  dingtalk: false,
+  dingtalkHidden: [] as string[]
 }
 
 const weread: WereadState = {

@@ -142,7 +142,12 @@ export function parseList(html: string, base: string): WebListPage {
     for (const m of chunk.matchAll(ANCHOR)) {
       const url = absolute(attr(m[1], 'href') ?? '', base)
       if (!url || !ARTICLE.test(url)) continue
-      const title = (decodeEntities(attr(m[1], 'title') ?? '').trim() || oneLine(m[2])).replace(/\s+/g, ' ')
+      // 去零宽字符；有的站把发布日期写进了标题末尾（「…的通知 2026-11-06」）
+      const title = (decodeEntities(attr(m[1], 'title') ?? '').trim() || oneLine(m[2]))
+        .replace(/[​-‍﻿]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/, '')
+        .trim()
       if (title.length < 4) continue
       const listed = dateIn(chunk)
       const date = listed && future(listed) ? (urlDate(url) ?? listed) : (listed ?? urlDate(url))

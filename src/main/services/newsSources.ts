@@ -366,7 +366,6 @@ export const WEB_SOURCES: WebSource[] = [
   {"id":"ygb-tzgg","org":"党委研究生工作部","kind":"office","column":"通知公告","url":"http://ygb.zju.edu.cn/tzgg/list.htm","audience":"grad","basis":"研工部首页「通知公告」汇总思政、实践、奖助、党建各栏目的通知","updated":"2026-11-05"},
   {"id":"ygb-hdyg","org":"党委研究生工作部","kind":"office","column":"活动预告","url":"http://ygb.zju.edu.cn/31549/list.htm","audience":"grad","basis":"研工部首页「活动预告」","updated":"2026-11-06"},
   {"id":"tw-tzgg","org":"团委","kind":"office","column":"通知公告","url":"https://zjutw.zju.edu.cn/tzgg/list.htm","audience":"all","basis":"团委首页「通知公告」（第二课堂、志愿、竞赛）","updated":"2026-11-06"},
-  {"id":"tw-xshd","org":"团委","kind":"office","column":"学生活动","url":"https://zjutw.zju.edu.cn/xshd/list.htm","audience":"all","basis":"团委「学生活动」，含不记点的活动，补素拓平台的盲区","updated":"2026-11-06"},
   {"id":"zhfw-jyjx","org":"综合服务网","kind":"office","column":"教育教学","url":"https://zhfw.zju.edu.cn/zhfw_jyjx/list.htm","audience":"all","basis":"学校行政网只收「教育教学」与「重点提示」两栏：其余栏目（校务管理、科学研究、会议通知、招聘信息、学校文件）面向教职工","updated":"2026-11-05"},
   {"id":"zhfw-zdts","org":"综合服务网","kind":"office","column":"重点提示","url":"https://zhfw.zju.edu.cn/zhfw_zdts/list.htm","audience":"all","basis":"学校行政网只收「教育教学」与「重点提示」两栏：重点提示为全校性的提醒（停水停电、安全、放假）","updated":"2026-11-06"}
 ]

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { NewsArticle, NewsFeed, NewsItem, NewsKind, NewsSettings, SztzActivity, WebSource, WereadState } from '@shared/news'
@@ -7,8 +7,9 @@ import { Choice, Joined, Reveal } from '@renderer/components/Type'
 import { CloseButton, IconButton } from '@renderer/components/IconButton'
 import { MOBILE } from '@renderer/lib/platform'
 import { dur } from '@renderer/lib/motion'
-import { SourcesSheet } from './SourcesSheet'
-import { Chevron, dayText, whenText } from './bits'
+import { SourcesSheet, type DingChat } from './SourcesSheet'
+import { Chevron, SourcePick, dayText, whenText } from './bits'
+import { Markdown } from './Markdown'
 import './news.css'
 
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -29,6 +30,10 @@ export function stageOf(a: SztzActivity, now = Date.now()): Stage {
   if (a.quota !== null && a.signed >= a.quota) return 'full'
   return 'open'
 }
+
+/** 来源页签里再按出处分：官网按单位，公众号按号，钉钉按群（同名群按会话区分） */
+const sourceKey = (item: NewsItem): string => (item.kind === 'dingtalk' ? (item.sourceId ?? item.from) : item.from.split(' · ')[0]!)
+const sourceLabel = (item: NewsItem): string => item.from.split(' · ')[0]!
 
 const TABS: { kind: NewsKind | 'all'; label: string; desktop?: boolean }[] = [
   { kind: 'all', label: '全部' },
@@ -53,6 +58,7 @@ export function NewsTool() {
   const [activities, setActivities] = useState<Loaded<SztzActivity[]>>(null)
   const [keyword, setKeyword] = useState('')
   const [tab, setTab] = useState<NewsKind | 'all'>('all')
+  const [source, setSource] = useState<string | null>(null)
   const [view, setView] = useState<'notices' | 'activities'>('notices')
   const [reading, setReading] = useState<NewsItem | null>(null)
   const [activity, setActivity] = useState<SztzActivity | null>(null)
@@ -102,20 +108,57 @@ export function NewsTool() {
     return () => clearTimeout(timer)
   }, [keyword, loadActivities])
 
+  // 先在界面上改（连着勾几项时，下一项按已改的状态算），回来的结果只认最后一次的，免得早回来的把后面的勾选冲掉
+  const saving = useRef(0)
   const updateSettings = async (patch: Parameters<(typeof window.zju)['news:setSettings']>[0]): Promise<void> => {
+    const { llmKey: _, ...local } = patch
+    setSettings((s) => (s ? { ...s, ...local } : s))
+    const mine = ++saving.current
     const next = await window.zju['news:setSettings'](patch)
-    setSettings(next)
+    if (mine === saving.current) setSettings(next)
     if ('sources' in patch || 'audience' in patch || 'llm' in patch || 'llmKey' in patch) load('web', true)
   }
 
   const tabs = TABS.filter((t) => !(MOBILE && t.desktop) && !(t.kind === 'dingtalk' && !settings?.dingtalk))
 
+  // 钉钉：用户在来源里取消勾选的会话不看
+  const hiddenChats = useMemo(() => new Set(settings?.dingtalkHidden ?? []), [settings?.dingtalkHidden])
   const items = useMemo(() => {
     const kinds: NewsKind[] = tab === 'all' ? ['web', 'sztz', 'wechat', 'dingtalk'] : [tab]
     return kinds
       .flatMap((k) => dataOf(feeds[k])?.items ?? [])
+      .filter((item) => item.kind !== 'dingtalk' || !hiddenChats.has(item.sourceId ?? ''))
       .sort((a, b) => (b.time ?? '').slice(0, 10).localeCompare((a.time ?? '').slice(0, 10)) || (b.time ?? '').localeCompare(a.time ?? ''))
-  }, [feeds, tab])
+  }, [feeds, tab, hiddenChats])
+
+  // 本机钉钉的全部会话（含不看的），给来源侧页勾选；最近有消息的在前
+  const dingChats = useMemo<DingChat[]>(() => {
+    const map = new Map<string, DingChat>()
+    for (const item of dataOf(feeds.dingtalk)?.items ?? []) {
+      const id = item.sourceId ?? item.from
+      const chat = map.get(id) ?? { id, name: sourceLabel(item), count: 0, latest: '', single: id.includes(':') }
+      chat.count++
+      if ((item.time ?? '') > chat.latest) chat.latest = item.time ?? ''
+      map.set(id, chat)
+    }
+    return [...map.values()].sort((a, b) => b.latest.localeCompare(a.latest))
+  }, [feeds.dingtalk])
+
+  // 当前页签里的出处与条数（多的在前），给表头的出处下拉；全部页签不分
+  const sourceList = useMemo(() => {
+    if (tab === 'all') return []
+    const map = new Map<string, { key: string; label: string; count: number }>()
+    for (const item of items) {
+      const key = sourceKey(item)
+      const entry = map.get(key) ?? { key, label: sourceLabel(item), count: 0 }
+      entry.count++
+      map.set(key, entry)
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'zh'))
+  }, [items, tab])
+  const activeSource = source && sourceList.some((s) => s.key === source) ? source : null
+  const shown = activeSource ? items.filter((item) => sourceKey(item) === activeSource) : items
+  const { limit, sentinel } = useGrow(`${tab}/${activeSource ?? ''}`)
 
   const failed = useMemo(() => {
     const kinds: NewsKind[] = tab === 'all' ? ['web', 'sztz', 'wechat', 'dingtalk'] : [tab]
@@ -180,12 +223,23 @@ export function NewsTool() {
       <header className="news-head">
         <div className="news-tabs" role="tablist">
           {tabs.map((t) => (
-            <Choice key={t.kind} group="news-tab" active={tab === t.kind} onClick={() => setTab(t.kind)}>
+            <Choice
+              key={t.kind}
+              group="news-tab"
+              active={tab === t.kind}
+              onClick={() => {
+                setTab(t.kind)
+                setSource(null)
+              }}
+            >
               {t.label}
             </Choice>
           ))}
         </div>
         <span className="news-head-tools">
+          {sourceList.length > 1 && (
+            <SourcePick options={sourceList} total={items.length} value={activeSource} onChange={setSource} />
+          )}
           <IconButton label="刷新" onClick={refresh}>
             <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
             <path d="M19.5 4.5v4h-4" />
@@ -227,12 +281,13 @@ export function NewsTool() {
       <div className="pane-scroll news-scroll">
         {loading && !items.length ? (
           <p className="quiet">…</p>
-        ) : items.length ? (
+        ) : shown.length ? (
           <ul className="rows news-rows">
-            {items.slice(0, 300).map((item) => (
+            {shown.slice(0, limit).map((item, i, list) => (
               <li key={item.id}>
                 <button className="row news-row" onClick={() => setReading(item)}>
-                  <span className="row-time">{dayText(item.time)}</span>
+                  {/* 同一天连着的只在第一条写日期 */}
+                  <span className="row-time">{i > 0 && dayText(list[i - 1]!.time) === dayText(item.time) ? '' : dayText(item.time)}</span>
                   <span className="news-row-main">
                     <span className="row-title">{item.title}</span>
                     <span className="news-row-from">
@@ -242,6 +297,7 @@ export function NewsTool() {
                 </button>
               </li>
             ))}
+            {shown.length > limit && <li ref={sentinel} className="news-more" aria-hidden />}
           </ul>
         ) : (
           empty()
@@ -339,6 +395,7 @@ export function NewsTool() {
             settings={settings}
             sources={sources}
             weread={weread}
+            dingChats={dingChats}
             onSettings={updateSettings}
             onWeread={setWeread}
           />
@@ -346,6 +403,27 @@ export function NewsTool() {
       </Sheet>
     </div>
   )
+}
+
+/** 长列表分批画：先画 200 条，滚到底再加 200 条；换页签、换出处时从头来 */
+function useGrow(key: string): { limit: number; sentinel: (el: HTMLLIElement | null) => void } {
+  const STEP = 200
+  const [state, setState] = useState({ key, limit: STEP })
+  const limit = state.key === key ? state.limit : STEP
+  const observer = useRef<IntersectionObserver | null>(null)
+  const sentinel = useCallback(
+    (el: HTMLLIElement | null) => {
+      observer.current?.disconnect()
+      if (!el) return
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) setState((s) => ({ key, limit: (s.key === key ? s.limit : STEP) + STEP }))
+      }, { rootMargin: '400px' })
+      observer.current.observe(el)
+    },
+    [key]
+  )
+  useEffect(() => () => observer.current?.disconnect(), [])
+  return { limit, sentinel }
 }
 
 function Empty({ text = '无', children }: { text?: string; children?: ReactNode }) {
@@ -370,7 +448,7 @@ function ActivityCard({ activity: a, onOpen }: { activity: SztzActivity; onOpen:
         )}
       </span>
       <span className="news-card-meta">
-        <Joined parts={[whenText(a.start), a.place, a.org]} />
+        <Joined parts={[whenText(a.start), a.place && !a.org.includes(a.place) ? a.place : null, a.org]} />
       </span>
       <span className="news-card-meta">
         <Joined
@@ -449,6 +527,13 @@ function ActivityDetail({ activity: a }: { activity: SztzActivity }) {
   )
 }
 
+/** 消息第一行就是标题（Markdown 的 # 标题、加粗的一行）时，侧页标题已经写了，正文里去掉 */
+function withoutTitle(text: string, title: string): string {
+  const [first = '', ...rest] = text.split('\n')
+  const plain = first.replace(/^\s{0,3}#{1,6}\s+/, '').replace(/(\*\*|__)/g, '').trim()
+  return plain && plain === title.trim() ? rest.join('\n').replace(/^\s+/, '') : text
+}
+
 function Reader({ item }: { item: NewsItem }) {
   const [article, setArticle] = useState<Loaded<NewsArticle>>(item.text ? { data: { title: null, text: item.text } } : null)
   useEffect(() => {
@@ -477,13 +562,15 @@ function Reader({ item }: { item: NewsItem }) {
         )}
       </div>
       <p className="sheet-meta">
-        <Joined parts={[...item.from.split(' · '), dayText(item.time)]} />
+        <Joined parts={[...item.from.split(' · '), item.kind === 'dingtalk' ? whenText(item.time) : dayText(item.time)]} />
       </p>
       <div className="sheet-body pane-scroll">
         {article === null ? (
           <p className="quiet">…</p>
         ) : 'error' in article ? (
           <p className="quiet">{article.error}</p>
+        ) : item.kind === 'dingtalk' ? (
+          text && <Markdown text={withoutTitle(text, item.title)} className="news-md" />
         ) : (
           text?.split(/\n+/).map((p, i) => (
             <p key={i} className="news-text">

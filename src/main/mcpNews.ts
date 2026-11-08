@@ -28,7 +28,7 @@ export function registerNewsTools(mcp: McpServer, tools: Record<McpToolGroup, bo
 
   mcp.registerTool('get_campus_notices', {
     description:
-      '校园资讯：通知合并列表。source 选来源：sztz 素拓平台通知；web 用户关注的部处与学院官网栏目（已按规则过滤掉面向教职工的）；wechat 用户在应用里添加的公众号文章（需已登录微信读书）；dingtalk 本机钉钉群里像通知的消息（实验，用户开启时才有）',
+      '校园资讯：通知合并列表。source 选来源：sztz 素拓平台通知；web 用户关注的部处与学院官网栏目（已按规则过滤掉面向教职工的）；wechat 用户在应用里添加的公众号文章（需已登录微信读书）；dingtalk 本机钉钉里用户留着的群聊、单聊、工作通知的消息（实验，用户开启时才有；from 为「会话 · 发送人」，text 可能是 Markdown）',
     inputSchema: {
       source: z.enum(['sztz', 'web', 'wechat', 'dingtalk']).default('web'),
       limit: z.number().int().min(1).max(200).default(50)
@@ -36,7 +36,11 @@ export function registerNewsTools(mcp: McpServer, tools: Record<McpToolGroup, bo
     annotations: read
   }, async ({ source, limit }) => {
     const channel = { sztz: 'news:sztzNotices', web: 'news:web', wechat: 'news:wechat', dingtalk: 'news:dingtalk' } as const
-    return json(briefFeed(await call(channel[source]), limit))
+    const feed = await call(channel[source])
+    if (source !== 'dingtalk') return json(briefFeed(feed, limit))
+    // 钉钉只给用户在界面里留着的会话
+    const hidden = new Set((await call('news:settings')).dingtalkHidden)
+    return json(briefFeed({ ...feed, items: feed.items.filter((i) => !hidden.has(i.sourceId ?? '')) }, limit))
   })
 
   mcp.registerTool('get_campus_news_sources', {

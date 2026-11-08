@@ -80,15 +80,32 @@
 
 `biz_message_0.db` 为 SQLCipher 4（PBKDF2-HMAC-SHA512 256000 轮、AES-256-CBC、每页 HMAC），库里只有公众号文章的标题与链接。解密本身可以纯 TS 完成，但密钥只能从微信进程内存里扫出来：Node 做不到，要么带原生模块，要么用 PowerShell 内联 C# 调 `ReadProcessMemory`——后者正是杀软报毒的特征。按需求它只是 Windows 上默认关闭的备选，用户权衡后决定不做，界面也没有开关。
 
-## D 钉钉群（实验，默认关，仅 Windows 桌面，`main/news/dingtalk.ts`）
+## D 钉钉（实验，默认关，仅 Windows 桌面，`main/news/dingtalk.ts`）
 
-- 位置：`%APPDATA%\DingTalk` 下最多四层的 `*.db`；路径里带纯数字 uid 目录的是账号库，其余是全局库。
-- 全局库密钥：由 CPU 厂商字符串（`Win32_Processor.Manufacturer`，如 GenuineIntel / AuthenticAMD）拼出；具体拼法未知，枚举几种（原串、重复、加 DingTalk 前后缀、MD5 十六进制前 16 位、MD5 原始字节），用解密后的文件头 `SQLite format 3\0` 校验。从全局库的 `user_config` 里找 salt。
-- 账号库密钥：V3 为 `MD5(PBKDF2(uid + salt, 盐 "666DingT")) 十六进制前 16 位`，V2 为 `MD5(uid)` 十六进制前 16 位；PBKDF2 的轮数（1000 / 10000 / 4096 / 1）、摘要（SHA1 / SHA256）、长度（32 / 16）与口令拼法逐个尝试，按文件头校验。
-- 解密：AES-128-ECB 逐 16 字节块（与页无关）；`-wal` 文件的帧头明文、页数据同样加密，按盐值校验帧、只合并到最后一个提交帧，再把文件头第 18、19 字节改成 1（非 WAL），用 `node:sqlite` 的 `deserialize` 在内存里打开（Electron 45 自带 Node 24.22 才有，系统 Node 24.14 没有）。
-- 查询：`tbconversation`（会话名）与 `tblastmsg`、`tbmsg*`（消息），列名按 `PRAGMA table_info` 宽松匹配；内容是 JSON 的取 `text`。只保留像通知的消息（≥30 字且含 通知 / 报名 / 截止 / 提交 / 填写 / 会议 / 讲座 / 时间：/ 地点：/ @所有人 等）。
-- 解密后的库与消息只在内存里，不写盘、不缓存、不发给任何模型。
-- 回归：`ELECTRON_RUN_AS_NODE=1 npx electron scripts/test-dingtalk.mjs` 合成一个带 WAL 的库、按 V2 规则加密，再读回通知（通过）。**未在真实钉钉数据上验证**，全局库的拼法与 V3 的 PBKDF2 参数是猜测加校验。
+v0.1 的全局库拼法、uid 与 salt 来源是猜的，在真实数据上一条也读不到；2026-11-07 照公开的逆向结论重写（dsh-zju-assistant `core/dingtalk/lib/database.ts`、`content.ts`，GPL-3.0 只参考事实；NOBB2333/wechat-analysis-action `core-dingtalk/README.md`），在用户本机 v3 数据上按文件头校验通过（只看计数：12 个群、47 条通知，约 1.4 秒）。
+
+- 目录：`%APPDATA%\DingTalk\globalStorage\storage.db` 为全局库；账号目录名是十六进制串加 `_v3`（与 uid 无关），旧版为 `<uid>_v2`；主库在账号目录的 `DBFiles\dingtalk.db`，同目录还有 members.db、calendar_v2.db 等，都加密。
+- 全局库密钥：CPUID 0 号叶返回的 EAX（最大功能号，小整数）与厂商串的三个寄存器（厂商串第 0–3、8–11、4–7 字节按小端读成 int32）的十进制拼起来取前 16 字节；不调 CPUID，EAX 0–64 × 本机厂商串（取不到时 GenuineIntel / AuthenticAMD / HygonGenuine）逐个试，按文件头 `SQLite format 3 ` 校验。
+- uid：全局库 `GlobalStorage` 表里全是数字的键与 `last_login_user_uid` 的值；`DTLastUserData` 等其余值含登录令牌，不读。
+- salt：账号目录下的 `user_config` 文件，Base64 编码的 JSON，字段 `salt`。
+- 账号库密钥：v3 = `MD5(PBKDF2-HMAC-SHA1(uid + salt, "666DingT", 1000, 32))` 十六进制前 16 位（"666DingT" 是 "666DingTalk888" 的前 8 字节）；v2 = `MD5(uid)` 十六进制前 16 位。uid 逐个试，按文件头校验。
+- 解密：AES-128-ECB 逐 16 字节块；`-wal` 文件头与帧头明文、页数据加密，按盐值校验帧、只合并到最后一个提交帧，文件头第 18、19 字节改成 1（非 WAL），用 `node:sqlite` 的 `deserialize` 在内存打开（Electron 自带的 Node 才有）；明文缓冲 deserialize 后清零。
+- 表：`tbconversation`（cid、type：1 单聊 / 2 群、title、alias）；消息在 `tbmsg_000…tbmsg_127` 分表与最近消息缓存 `tblastmsg`（cid、mid〔64 位，要 CAST 成文本读〕、localId、type〔3 为系统消息〕、createdAt、lastModify、version、contentVersion、contentType、content / extension〔JSON〕、recallStatus、shieldStatus、isDecrypt〔1 才是已解密的正文〕），同一条消息可能在几张表里各有一版，按 lastModify、version、contentVersion、撤回状态取最新的；`msg_clear_info`（cid、clear_timestamp）为清空聊天记录的时刻。
+- contentType：1 文字、2 图片、102 链接、300 / 2900 / 2950 卡片、500 / 501 文件、1200–1202 / 1400 Markdown、1600 DING、3100 富文本。
+- 正文（2026-11-07 照用户本机真实库逐类核对结构，`parseMessage`）：
+  - 1 文字：`content.text`；@所有人存成 `@10`，@某人存成 `@<uid>`，换成群昵称（`tbuser_group_nick` 的 cid + uid → groupNick）或通讯录备注 / 昵称（`tbuser_profile_v2` 的 alias / nick）；钉钉表情 `[送花花]` 一类去掉。
+  - 系统提示也是 1：入群合并消息的 extension 带 `merge` 或 `memberUid` / `memberNick` / `mergeTemplateType`，直播开始结束带 `liveState`；移出群聊、改群名称、设管理员、通过搜索入群是 extension 里没有 `realmFlag` / `realmOrgid` 的系统消息（人发的文字消息都带这两个）。只在后者上按句式认，「请还没进群的同学尽快加入群聊」这类人发的不会被去掉。
+  - 2 图片：地址在 `down.dingtalk.com/ddmedia/…`，带 `authMedia`，要钉钉登录态，本机没有缓存文件；只记「图片」。
+  - 102 链接：`attachments[0].extension` 的 title / text，地址在 `attachments[0].url`（智云课堂「开始上课」提醒也是这种）。
+  - 500 / 501 文件：`f_name`；常标着 isDecrypt≠1，但 content 是明文 JSON、文件名可读，照收。
+  - 1200–1202 / 1400 Markdown：`attachments[0].extension.markdown` 与 title。引用回复（消息 extension 带 `sourceMessageId`）的 markdown 是「> 被引用的原文 + 分隔线 + 回复」，回复本身在第二个附件的 `replyContent`（三处都取会出现三遍），改成回复在前、原文作引用块。
+  - 1600 DING：`dingContent`。3100 富文本：`desc` 是完整纯文字，payload 是同样内容的富文本，只取 desc。
+  - 300 / 2900 / 2950 卡片：会话列表那一行在 `LastMessageI18n.zh_CN` / `interactiveCardLastMessage`（「[群公告]」「[投票]」「[钉钉文档] 名称」或整句，如直播回放、访客邀约）。**群公告全文在消息 extension 的 `biz_custom_desc`**（先前以为本机只有「[群公告]」几个字，判断错了），投票题目在 `biz_custom_title`，钉钉文档名在 `biz_custom_desc`（带「[分享] 」前缀）、链接在 `biz_custom_action_url`（alidocs.dingtalk.com）。标题写成「群公告：…」「投票：…」「钉钉文档：…」。
+  - 其余类型才按显示字段兜底取（text / markdown / title / desc / LastMessageI18n …，容器 attachments[].extension 等），去掉被别的片段包含的重复片段。
+- 取哪些：**不替用户分哪条是通知**（用户要求：只保证格式正确、信息完整，取舍交给用户；先前按字眼、发送人是不是群管理员判断，课程群里分不准）。全部会话——群聊、单聊、工作通知、钉钉云盘 / 直播助手一类系统账号——近 60 天的全部消息，最多 2000 条；只去掉系统提示、撤回与屏蔽、清空记录之前、本地没解开且读不出的。会话名：群名；单聊常没有标题或标题是对方 uid，按对方昵称。`from` 为「会话 · 发送人」（自己为「我」；单聊里对方发的、认不出的不写）。界面「来源」侧页按会话勾选（群聊 / 单聊两组，单聊的 cid 是「uid:uid」，组标题勾整组），不看的会话存 `NewsSettings.dingtalkHidden`（新出现的默认看），界面与 MCP `get_campus_notices` 都按它筛。
+- 2026-11-07 用户本机实测（只看计数，`lastStats`）：60 天 805 条消息（客户端没同步的读不到，这是上限），107 个会话里 36 个有消息；去掉 235 条系统提示（入群合并 133、其余 102）与 63 条撤回，留下 506 条。
+- 解密后的库与消息只在内存里，不写盘、不缓存、不发给任何模型；调试时只打印计数（按天统计内容会被权限分类器拦下）。
+- 回归：`ELECTRON_RUN_AS_NODE=1 npx electron scripts/test-dingtalk.mjs` 在临时目录合成一份 v3 结构（加密的全局库、user_config、带未合并 WAL 的分表主库、tblastmsg、通讯录与群昵称，内容全是编的），覆盖编辑过的文字取最新版、@10 与 @uid 换名字、发送人、群公告正文、投票题目、文档链接、引用回复、富文本、链接、标着没解开的文件、图片、只在 tblastmsg 的、两个按 JS 数字会撞的 64 位 mid、无标题单聊与标题是 uid 的系统账号；应去掉的撤回、清空前、系统提示，人发的「加入群聊」要留（通过）。
 
 ## 未实测清单
 

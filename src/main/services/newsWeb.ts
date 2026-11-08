@@ -60,6 +60,18 @@ export const defaultSources = (): string[] => WEB_SOURCES.filter((s) => s.kind =
 
 const label = (s: WebSource): string => `${s.org} · ${s.column}`
 
+/** 同一通知常同时挂在几个栏目、几个部处（学工部「最新通知」与「活动预告」、团委与研工部……）：
+ *  标题去掉空白与标点后相同的只留最新、排在前面的那条 */
+function sameTitleOnce(): (item: NewsItem) => boolean {
+  const seen = new Set<string>()
+  return (item) => {
+    const key = item.title.replace(/[\s\p{P}\p{S}]/gu, '')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  }
+}
+
 let cached: { key: string; feed: NewsFeed } | null = null
 
 export async function fetchWebFeed(settings: NewsSettings, force = false): Promise<NewsFeed> {
@@ -102,6 +114,7 @@ export async function fetchWebFeed(settings: NewsSettings, force = false): Promi
     .filter((_, i) => verdict.keep[i])
     .map((item) => ({ ...item, judged: verdict.judged[items.indexOf(item)] || undefined }))
     .sort((a, b) => (b.time ?? '').localeCompare(a.time ?? ''))
+    .filter(sameTitleOnce())
   const feed: NewsFeed = { items: kept, failed, hidden: items.length - kept.length, fetchedAt: Date.now() }
   cached = { key, feed }
   return feed

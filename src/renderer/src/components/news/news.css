@@ -70,9 +70,124 @@ html[data-style='glass'][data-theme='dark'] .news-sheet {
   gap: 0.125rem;
   min-width: 0;
 }
+.news-more {
+  height: 1px;
+}
+/* 出处下拉：与选课筛选条件同样的浅底胶囊，选了某一处时主题色 */
+.news-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  margin-right: 0.25rem;
+  padding: 0.3rem 0.625rem 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.news-pick:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--ink));
+}
+.news-pick[data-on] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.news-pick[data-on]:hover {
+  background: rgba(var(--shu-rgb), 0.18);
+}
+.news-pick-label {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+.news-pick[data-on] .news-pick-label {
+  color: inherit;
+  opacity: 0.7;
+}
+.news-pick-value {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.news-pick .news-chevron {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  opacity: 0.7;
+  transition: rotate calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.news-pick[data-open] .news-chevron {
+  rotate: 180deg;
+}
+.news-pop {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  width: min(20rem, calc(100vw - 2rem));
+  max-height: min(70vh, 30rem);
+  padding: 0.375rem;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+.news-pop-search {
+  flex: none;
+  margin: 0.125rem 0.125rem 0.375rem;
+}
+.news-pop-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.news-pop-opt {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--r-sm);
+  text-align: left;
+  font-size: 0.875rem;
+  letter-spacing: 0.03em;
+  color: var(--ink-2);
+  transition: background-color calc(0.2s * var(--speed, 1)) var(--ease), color calc(0.2s * var(--speed, 1)) var(--ease);
+}
+.news-pop-opt:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.news-pop-opt[data-active] {
+  color: var(--shu);
+  background: rgba(var(--shu-rgb), 0.1);
+}
+.news-pop-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.news-pop-count {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.news-pop-opt[data-active] .news-pop-count {
+  color: inherit;
+  opacity: 0.7;
+}
+.news-pop-empty {
+  padding: 0.375rem 0.625rem;
+}
 .news-head-tools {
   display: flex;
+  align-items: center;
   gap: 0.125rem;
+  min-width: 0;
   margin-left: auto;
 }
 .news-title {
@@ -353,6 +468,21 @@ html[data-style='glass'][data-theme='dark'] .news-sheet {
 .news-org-group + .news-org-group {
   margin-top: 0.75rem;
 }
+/* 钉钉会话：分组标题本身是整组的勾选框 */
+.news-org-hit.news-chat-head {
+  margin-top: 0.5rem;
+  padding-top: 0.3125rem;
+  padding-bottom: 0.3125rem;
+}
+.news-chat-head .news-org-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.news-line + .news-search {
+  margin-top: 0.75rem;
+}
 .news-org-head {
   margin: 0.5rem 0 0.25rem;
   font-size: 0.8125rem;
@@ -598,4 +728,73 @@ html[data-platform='android'] .news-sheet-acts .btn {
 }
 html[data-platform='android'] .news-title {
   display: none;
+}
+
+/* 钉钉消息的 Markdown：标题、列表、引用、代码都用底色分层，不画线 */
+.news-md {
+  line-height: 1.75;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.news-md > * + * {
+  margin-top: 0.75em;
+}
+.news-md :is(h3, h4, h5, h6) {
+  font-weight: 600;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+.news-md h3 {
+  font-size: 1.15em;
+}
+.news-md h4 {
+  font-size: 1.05em;
+}
+.news-md :is(h5, h6) {
+  font-size: 1em;
+}
+.news-md :is(ul, ol) {
+  padding-left: 1.4em;
+}
+.news-md ul {
+  list-style: disc;
+}
+.news-md ol {
+  list-style: decimal;
+}
+.news-md li + li {
+  margin-top: 0.25em;
+}
+.news-md blockquote {
+  padding: 0.5em 0.75em;
+  border-radius: var(--r-md, 0.5rem);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.news-md code {
+  padding: 0.05em 0.35em;
+  border-radius: 0.3em;
+  background: var(--surface-2);
+  font-size: 0.92em;
+}
+.news-md pre {
+  padding: 0.75em;
+  border-radius: var(--r-md, 0.5rem);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  font-size: 0.92em;
+}
+.news-md hr {
+  height: 0.5em;
+  border: 0;
+}
+.news-md a {
+  color: var(--shu);
+  text-decoration: none;
+}
+.news-md a:hover {
+  text-decoration: underline;
+}
+.news-md del {
+  color: var(--ink-3);
 }

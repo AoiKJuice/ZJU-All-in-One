@@ -24,6 +24,17 @@ const GROUPS: { kind: WebSource['kind'][]; label: string }[] = [
 
 type Mark = 'on' | 'partial' | undefined
 
+/** 本机钉钉的一个会话（由界面从取到的消息里归出来） */
+export interface DingChat {
+  id: string
+  name: string
+  count: number
+  /** 最近一条的时间 */
+  latest: string
+  /** 单聊（cid 是「uid:uid」） */
+  single: boolean
+}
+
 function Box({ mark }: { mark: Mark }) {
   return (
     <span className="news-box" data-mark={mark} aria-hidden>
@@ -41,12 +52,13 @@ function Box({ mark }: { mark: Mark }) {
   )
 }
 
-/** 来源侧页：面向对象、官网栏目（按单位勾选，展开到栏目）、公众号（桌面）、模型判断、钉钉（桌面实验） */
+/** 来源侧页：面向对象、官网栏目（按单位勾选，展开到栏目）、公众号（桌面）、模型判断、钉钉（桌面实验，按会话勾选） */
 export function SourcesSheet(props: {
   focus?: 'wechat'
   settings: NewsSettings
   sources: WebSource[]
   weread: WereadState | null
+  dingChats: DingChat[]
   onSettings: (patch: NewsSettingsPatch) => Promise<void>
   onWeread: (state: WereadState) => void
 }) {
@@ -175,17 +187,82 @@ export function SourcesSheet(props: {
 
         {!MOBILE && (
           <section className="news-block">
-            <h3 className="group-title">钉钉群</h3>
+            <h3 className="group-title">钉钉</h3>
             <div className="news-line">
               <button className="act news-toggle" role="switch" aria-checked={settings.dingtalk} data-on={settings.dingtalk || undefined} onClick={() => void onSettings({ dingtalk: !settings.dingtalk })}>
                 <span className="news-knob" aria-hidden />
-                读取本机钉钉群
+                读取本机钉钉
               </button>
               <span className="news-tag">实验</span>
             </div>
+            {settings.dingtalk && <DingChats chats={props.dingChats} hidden={settings.dingtalkHidden} onSettings={onSettings} />}
           </section>
         )}
       </div>
+    </>
+  )
+}
+
+/** 钉钉会话勾选：群聊、单聊各一组，组标题勾选整组；新出现的会话默认勾上 */
+function DingChats({ chats, hidden, onSettings }: { chats: DingChat[]; hidden: string[]; onSettings: (patch: NewsSettingsPatch) => Promise<void> }) {
+  const [query, setQuery] = useState('')
+  const off = useMemo(() => new Set(hidden), [hidden])
+  if (!chats.length) return null
+  const q = query.trim()
+  const groups = [
+    { label: '群聊', list: chats.filter((c) => !c.single) },
+    { label: '单聊', list: chats.filter((c) => c.single) }
+  ]
+  const markOf = (list: DingChat[]): Mark => {
+    const n = list.filter((c) => !off.has(c.id)).length
+    return n === 0 ? undefined : n === list.length ? 'on' : 'partial'
+  }
+  const setShown = (ids: string[], on: boolean): void => {
+    const next = new Set(off)
+    for (const id of ids) {
+      if (on) next.delete(id)
+      else next.add(id)
+    }
+    void onSettings({ dingtalkHidden: [...next] })
+  }
+  return (
+    <>
+      {chats.length > 12 && (
+        <label className="news-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+            <circle cx="11" cy="11" r="6" />
+            <path d="M20 20l-4.5-4.5" />
+          </svg>
+          <input className="field" value={query} placeholder="群聊、联系人" onChange={(e) => setQuery(e.target.value)} />
+        </label>
+      )}
+      {groups.map((g) => {
+        const list = g.list.filter((c) => !q || c.name.includes(q))
+        if (!list.length) return null
+        const mark = markOf(g.list)
+        return (
+          <div key={g.label} className="news-org-group">
+            <button className="news-org-hit news-chat-head" aria-pressed={mark !== undefined} onClick={() => setShown(g.list.map((c) => c.id), mark !== 'on')}>
+              <Box mark={mark} />
+              <span className="news-org-name">{g.label}</span>
+            </button>
+            <ul className="news-orgs">
+              {list.map((c) => {
+                const on = !off.has(c.id)
+                return (
+                  <li key={c.id} className="news-org">
+                    <button className="news-org-hit" aria-pressed={on} onClick={() => setShown([c.id], !on)}>
+                      <Box mark={on ? 'on' : undefined} />
+                      <span className="news-org-name">{c.name}</span>
+                      <span className="news-org-count">{c.count}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )
+      })}
     </>
   )
 }

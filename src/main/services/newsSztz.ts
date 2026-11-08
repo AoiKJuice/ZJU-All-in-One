@@ -7,15 +7,17 @@ import { plainText } from './newsWebplus'
 
 const MAX_PAGES = 6
 
-/** 平台时间「2026-11-06 14:00:00」→ ISO（北京时间） */
+/** 平台时间 → ISO 北京时间。带时区的（实测接口给的是 UTC，如「…T16:00:00.000+0000」）按时区换算；
+ *  不带时区的「2026-11-06 14:00:00」按北京时间。曾把前者的时区丢掉，所有时间早了 8 小时 */
 function iso(value?: string | null): string | null {
   if (!value) return null
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(value)
-  if (!m) {
-    const d = new Date(value)
-    return Number.isNaN(d.getTime()) ? null : d.toISOString()
-  }
-  return `${m[1]}-${m[2]}-${m[3]}T${m[4] ?? '00'}:${m[5] ?? '00'}:${m[6] ?? '00'}+08:00`
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value.trim())
+  const m = zoned ? null : /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(value)
+  if (m) return `${m[1]}-${m[2]}-${m[3]}T${m[4] ?? '00'}:${m[5] ?? '00'}:${m[6] ?? '00'}+08:00`
+  const d = new Date(value.trim().replace(/([+-]\d{2})(\d{2})$/, '$1:$2'))
+  if (Number.isNaN(d.getTime())) return null
+  const bj = new Date(d.getTime() + 8 * 3600_000).toISOString().slice(0, 19)
+  return `${bj}+08:00`
 }
 
 const text = (html?: string | null): string => (html ? plainText(html) : '')
@@ -43,7 +45,8 @@ export function toActivity(r: XmRecord): SztzActivity {
     signupStart: iso(r.bmkssj),
     signupEnd: iso(r.bmjssj),
     place: r.hddd?.trim() ?? '',
-    quota: r.zmrs ? Number(r.zmrs) : null,
+    // 9999 是平台上「不限人数」的写法
+    quota: r.zmrs && Number(r.zmrs) < 9999 ? Number(r.zmrs) : null,
     signed: Number(r.bmrs ?? 0),
     points: points(r.zxfs, r.zdfs),
     contact: [r.fzr, r.lxdh].filter(Boolean).join(' '),
@@ -56,7 +59,8 @@ export function toActivity(r: XmRecord): SztzActivity {
   }
 }
 
-/** 活动：逐页取到平台说的总页数（最多 6 页、120 个），未结束的按报名截止排前，已结束的放后 */
+/** 活动：逐页取到平台说的总页数（最多 6 页、120 个）。排序：正在报名（按截止早晚）→ 还没开始报名（按开始报名）
+ *  → 报名已截止但活动没结束（按活动开始）→ 已结束。真实数据里大半是报名已截止的，原先按截止时间排时它们全堆在最前面 */
 export async function fetchActivities(keyword = ''): Promise<SztzActivity[]> {
   const all: SztzActivity[] = []
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -65,12 +69,21 @@ export async function fetchActivities(keyword = ''): Promise<SztzActivity[]> {
     if (!data.length || page >= totalPages) break
   }
   const now = Date.now()
-  const over = (a: SztzActivity): boolean => (a.end ? Date.parse(a.end) < now : false)
-  const key = (a: SztzActivity): number => Date.parse(a.signupEnd ?? a.start ?? '') || Infinity
+  const t = (v: string | null): number => (v ? Date.parse(v) : NaN)
+  const rank = (a: SztzActivity): [number, number] => {
+    if (a.end && t(a.end) < now) return [3, -t(a.end)]
+    const open = Number.isNaN(t(a.signupStart)) || t(a.signupStart) <= now
+    const closed = !Number.isNaN(t(a.signupEnd)) && t(a.signupEnd) < now
+    if (open && !closed) return [0, t(a.signupEnd) || Infinity]
+    if (!open) return [1, t(a.signupStart)]
+    return [2, t(a.start) || Infinity]
+  }
   const seen = new Set<string>()
   return all
     .filter((a) => a.id && !seen.has(a.id) && seen.add(a.id))
-    .sort((a, b) => Number(over(a)) - Number(over(b)) || key(a) - key(b))
+    .map((a) => [a, rank(a)] as const)
+    .sort((x, y) => x[1][0] - y[1][0] || x[1][1] - y[1][1])
+    .map(([a]) => a)
 }
 
 function toNotice(r: TzggRecord, i: number): NewsItem {
@@ -80,7 +93,8 @@ function toNotice(r: TzggRecord, i: number): NewsItem {
     kind: 'sztz',
     title: r.mc?.trim() ?? '',
     time: iso(r.fbsj),
-    from: r.fbr ? `素拓平台 ${r.fbr}` : '素拓平台',
+    // fbr 是发布者的平台账号（如「STS261/某某」），不显示
+    from: '素拓平台',
     text: body.slice(0, 4000),
     // 附件只能在平台上下载
     url: 'https://sztz.zju.edu.cn/dekt/'
