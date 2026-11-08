@@ -23,9 +23,11 @@ export function Masthead({ scroller }: { scroller: HTMLElement | null }) {
     return () => scroller.removeEventListener('scroll', onScroll)
   }, [scroller])
 
+  // 数据统计是设置的二级页面
+  const current = page === 'usage' ? 'settings' : page
   const nav = NAV.map(({ id, label }) => (
-    <button key={id} className="mast-link" data-active={page === id || undefined} onClick={() => go(id)}>
-      {page === id && <motion.span layoutId="nav-pill" className="choice-pill" transition={{ duration: dur(0.55), ease: [0.22, 1, 0.36, 1] }} />}
+    <button key={id} className="mast-link" data-active={current === id || undefined} onClick={() => go(id)}>
+      {current === id && <motion.span layoutId="nav-pill" className="choice-pill" transition={{ duration: dur(0.55), ease: [0.22, 1, 0.36, 1] }} />}
       <span className="choice-label">{label}</span>
     </button>
   ))

@@ -277,6 +277,77 @@ body {
   color: var(--shu);
 }
 
+/* 设置页的多选项：一格一项，方框 + 勾，放不下自动换行，行列间距一致 */
+.check-list {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem;
+}
+.check-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-align: left;
+  color: var(--ink-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), background-color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.check-opt:hover {
+  color: var(--ink);
+}
+.check-opt[data-on] {
+  color: var(--ink);
+  background: rgba(var(--shu-rgb), 0.12);
+}
+.check-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1.5px solid var(--ink-3);
+  border-radius: 0.3125rem;
+  color: transparent;
+  transition: color calc(0.2s * var(--speed, 1)) var(--ease), background-color calc(0.2s * var(--speed, 1)) var(--ease), border-color calc(0.2s * var(--speed, 1)) var(--ease);
+}
+.check-box > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.check-opt[data-on] .check-box {
+  border-color: var(--shu);
+  background: var(--shu);
+  color: var(--paper);
+}
+
+/* 设置页里进入二级页面的整行按钮 */
+.panel.settings-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1.125rem 1.25rem;
+  color: var(--ink);
+  text-align: left;
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.settings-entry > svg {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--ink-2);
+  transition: color calc(0.3s * var(--speed, 1)) var(--ease), transform calc(0.3s * var(--speed, 1)) var(--ease);
+}
+.settings-entry:hover > svg {
+  color: var(--shu);
+  transform: translateX(0.1875rem);
+}
+
 /* ------------------------------------------------------------------
    页面与区块
    ------------------------------------------------------------------ */

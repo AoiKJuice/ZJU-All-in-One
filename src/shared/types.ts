@@ -20,7 +20,7 @@ export type McpToolGroup = 'query' | 'download' | 'app' | 'transcribe' | 'submit
 
 /** 主进程要界面打开的内容（MCP 的 open_in_app） */
 export type OpenRequest =
-  | { page: 'home' | 'schedule' | 'tools' | 'settings' }
+  | { page: 'home' | 'schedule' | 'tools' | 'settings' | 'usage' }
   | { login: true }
   | { assignment: Assignment }
   | { replay: LectureReplay }

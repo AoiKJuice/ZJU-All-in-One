@@ -8,6 +8,8 @@ import type {
   DataResult,
   PickedFile
 } from '@shared/types'
+import type { SubmissionCache, UsageSubmission } from '@shared/usage'
+import { logDiagnostic } from '../diagnostics'
 import { zjuSession } from '../auth/zjuam'
 import { ensureCas, zjuFetch, type ZjuFetchInit, type ZjuResponse } from '../http'
 
@@ -22,12 +24,20 @@ interface Course {
   name: string
 }
 
+interface HistoryCourse extends Course {
+  end_date?: string | null
+}
+
 // 课程作业列表（照 zju-learning-assistant 的 get_homework_uploads）。
 // 推测：提交状态字段名未经实测，以下几个任一为真即视为已交。
 interface HomeworkActivity {
   id: string | number
   title: string
   end_time: string | null
+  // 推测：开放时刻字段，见 getSubmissionHistory
+  start_time?: string | null
+  published_at?: string | null
+  created_at?: string | null
   submitted?: boolean
   is_submitted?: boolean
   submission_status?: string
@@ -297,6 +307,119 @@ const normalize = (name: string): string =>
     .replace(/Ⅱ/g, 'II')
     .replace(/Ⅲ/g, 'III')
 
+async function listHomeworkActivities(courseId: string | number): Promise<HomeworkActivity[]> {
+  const items: HomeworkActivity[] = []
+  for (let page = 1; ; page++) {
+    const json = await getJson<{ homework_activities: HomeworkActivity[]; pages: number }>(
+      `/api/courses/${courseId}/homework-activities?page=${page}&page_size=100`
+    )
+    items.push(...json.homework_activities)
+    if (page >= json.pages) return items
+  }
+}
+
+/** 全部课程，含已结束的（数据统计用）：status 与 fields 照 zju-learning-assistant 的课程列表 */
+async function listAllCourses(): Promise<HistoryCourse[]> {
+  const courses: HistoryCourse[] = []
+  for (let page = 1; ; page++) {
+    const response = await postJson('/api/my-courses', {
+      fields: 'id,name,end_date',
+      page,
+      page_size: 100,
+      conditions: { status: ['ongoing', 'notStarted', 'closed'], keyword: '', classify_type: 'recently_started', display_studio_list: false },
+      showScorePassedStatus: false
+    })
+    const json = await response.json<{ courses: HistoryCourse[]; pages: number }>()
+    courses.push(...json.courses)
+    if (page >= json.pages) return courses
+  }
+}
+
+/** 同时最多 limit 个；单项失败不连累其他项，全部失败时抛出第一个错误 */
+async function settled<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>): Promise<{ values: R[]; failed: number }> {
+  const values: R[] = []
+  let next = 0
+  let failed = 0
+  let first: unknown
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const item = items[next++]
+        try {
+          values.push(await run(item))
+        } catch (error) {
+          failed++
+          first ??= error
+        }
+      }
+    })
+  )
+  if (failed > 0 && values.length === 0) throw first
+  return { values, failed }
+}
+
+const stamp = (value: string | null | undefined): number | undefined => {
+  const ms = value ? Date.parse(value) : NaN
+  return Number.isNaN(ms) ? undefined : ms
+}
+
+const openedAt = (item: Pick<HomeworkActivity, 'start_time' | 'published_at' | 'created_at'>): number | undefined =>
+  stamp(item.start_time) ?? stamp(item.published_at) ?? stamp(item.created_at)
+
+/**
+ * 近一年每次提交的时刻与所属作业的开放、截止时刻（数据统计用，只读）。草稿不算（撤回的提交也会变成草稿），老师代交的不算；
+ * 开放时刻 start_time 不在已确认的字段里（推测）：没设开始时间时退回发布、创建时间，列表里都没有时才取作业详情。
+ * 取过的存在 cache 里（usage.ts 落盘），已结课的课程不再列作业，已截止且有定论的作业不再取提交记录
+ */
+export async function getSubmissionHistory(since: number, cache: SubmissionCache): Promise<UsageSubmission[]> {
+  await ensureLogin()
+  const userId = await getStudentId()
+  if (cache.owner !== String(userId)) {
+    cache.owner = String(userId)
+    cache.activities = {}
+    cache.doneCourses = []
+  }
+  const now = Date.now()
+  // 截止一个月后还补交的不多见，更早的作业不再逐项请求
+  const GRACE = 30 * 864e5
+  const earliest = since - GRACE
+  // 已截止：交过的算定论；没交的还可能补交，过了一个月才算
+  const decided = (rows: UsageSubmission[] | undefined, end: number | undefined): boolean =>
+    rows !== undefined && end !== undefined && end < now && (rows.length > 0 || end < now - GRACE)
+
+  const done = new Set(cache.doneCourses)
+  const courses = (await listAllCourses()).filter((c) => !done.has(String(c.id)) && (stamp(c.end_date) ?? Infinity) >= earliest)
+  const lists = await settled(courses, 4, (c) => listHomeworkActivities(c.id))
+  const activities = lists.values
+    .flat()
+    .filter((a) => (stamp(a.end_time) ?? Infinity) >= earliest && !decided(cache.activities[String(a.id)], stamp(a.end_time)))
+
+  const records = await settled(activities, 4, async (activity) => {
+    const key = String(activity.id)
+    const { list } = await getJson<{ list: Submission[] }>(`/api/activities/${activity.id}/students/${userId}/submission_list`)
+    const finished = list.filter((s) => !s.is_draft && !s.submit_by_instructor)
+    let open = openedAt(activity)
+    if (open === undefined && finished.length > 0) {
+      const detail = await getJson<Pick<HomeworkActivity, 'start_time' | 'published_at' | 'created_at'>>(`/api/activities/${activity.id}`).catch(() => undefined)
+      if (detail) open = openedAt(detail)
+    }
+    const end = stamp(activity.end_time)
+    cache.activities[key] = finished.flatMap((s): UsageSubmission[] => {
+      const at = stamp(s.submitted_at ?? s.created_at)
+      return at === undefined ? [] : [{ activityId: key, title: activity.title, at, open, end }]
+    })
+  })
+
+  // 全部取成功才把结课一个月以上的课标记完，否则下次还要补取失败的那些
+  if (lists.failed + records.failed === 0) {
+    cache.doneCourses = [...done, ...courses.filter((c) => (stamp(c.end_date) ?? Infinity) < now - GRACE).map((c) => String(c.id))]
+  } else {
+    // 只记条数：某些课或作业取不到时统计会偏少
+    logDiagnostic('usage-partial', { courses: lists.failed, activities: records.failed })
+  }
+  return Object.values(cache.activities).flat()
+}
+
 /** 按课表上的课名找到学在浙大课程，返回它的全部作业（含已交、已截止）；找不到课程时为空 */
 export async function fetchCourseHomework(courseName: string): Promise<Assignment[]> {
   await ensureLogin()
@@ -308,14 +431,7 @@ export async function fetchCourseHomework(courseName: string): Promise<Assignmen
     courses.find((c) => normalize(c.name).includes(target) || target.includes(normalize(c.name)))
   if (!course) return []
 
-  const items: HomeworkActivity[] = []
-  for (let page = 1; ; page++) {
-    const json = await getJson<{ homework_activities: HomeworkActivity[]; pages: number }>(
-      `/api/courses/${course.id}/homework-activities?page=${page}&page_size=100`
-    )
-    items.push(...json.homework_activities)
-    if (page >= json.pages) break
-  }
+  const items = await listHomeworkActivities(course.id)
 
   return items.map((item) => ({
     id: String(item.id),

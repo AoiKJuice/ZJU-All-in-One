@@ -136,6 +136,16 @@ function buildServer(tools: Config['tools']): McpServer {
       annotations: read
     }, async () => json((await call('data:exams')).data))
 
+    mcp.registerTool('get_library_usage', {
+      description: '数据统计：近一年图书馆座位预约的使用情况。days 为 日期 → 当天预约时长（小时，只算已生效 / 已完成的预约，按预约时段算，不是实际在馆时间），hours 总时长，visits 预约次数。设置页同一份数据',
+      annotations: read
+    }, async () => json((await call('data:libraryUsage')).data))
+
+    mcp.registerTool('get_homework_usage', {
+      description: '数据统计：近一年在学在浙大提交作业的情况（不含 PTA，草稿不算）。days 为 日期 → 当天提交次数，total 总次数；timing 为提交时刻在作业「开放 → 截止」区间里的位置：buckets 是 0–10% … 90–100% 十档的次数，late 是截止后才交的次数，median / mean 为 0–1（逾期的按 1 计），count 是算入的提交数（取不到开放或截止时刻的不算）',
+      annotations: read
+    }, async () => json((await call('data:homeworkUsage')).data))
+
     mcp.registerTool('get_graduation_audit', {
       description: '毕业自审：nodes 为教务「毕业资格自审」树（平铺，parentId 还原层级；没有 code 的是模块，带要求 / 已获学分与门数，kind 为选必修；有 code 的是课程，status 为 passed 通过 / failed 不通过 / replaced 被替代 / studying 在修 / none 无记录）；classrooms 为第二课堂系统的二、三、四课堂记点、学分、等级与是否达标；aesthetic / labor 为美育、劳育的达标、记点与自审里对应模块的学分。某一部分取不到时为 null，原因在 nodesError / practiceError',
       annotations: read
@@ -254,7 +264,7 @@ function buildServer(tools: Config['tools']): McpServer {
     mcp.registerTool('open_in_app', {
       description: '在应用窗口里打开内容给用户看：主页 / 课表 / 工具 / 设置、某节课的回放或直播页、某项作业的详情侧页，或登录面板（未登录时让用户自己输入账号密码）',
       inputSchema: {
-        target: z.enum(['home', 'schedule', 'tools', 'settings', 'login', 'lecture', 'assignment']),
+        target: z.enum(['home', 'schedule', 'tools', 'settings', 'usage', 'login', 'lecture', 'assignment']).describe('usage 为数据统计页'),
         course_id: z.string().optional().describe('target 为 lecture 时必填'),
         sub_id: z.string().optional().describe('target 为 lecture 时必填'),
         activity_id: z.string().optional().describe('target 为 assignment 时必填')

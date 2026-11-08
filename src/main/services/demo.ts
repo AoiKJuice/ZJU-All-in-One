@@ -1,4 +1,5 @@
 import type { Assignment, AuditNode, GraduationAudit, CourseSession, DataResult, Exam, LectureReplay, Slide, TranscriptSegment, AssignmentDetail, PickedFile, PtaState } from '@shared/types'
+import { beijingDay, summarizeHomework, summarizeLibrary, type HomeworkUsage, type LibraryUsage, type UsageBooking, type UsageSubmission } from '@shared/usage'
 
 // 演示数据：ZJU_DEMO=1 时替代全部数据通道，便于不登录调前端
 
@@ -38,6 +39,63 @@ export const mockAssignments: Assignment[] = [
   { id: 'a3', courseId: 'demo', type: 'homework', courseName: '数学分析（甲）Ⅰ', title: '作业 7', deadline: day(-1, 23, 59), submitted: true },
   { id: 'pta-demo', courseId: 'pta', type: 'pta', courseName: 'PTA', title: '第 6 周编程题：链表', deadline: day(2, 22), submitted: false, url: 'https://pintia.cn/problem-sets/dashboard', progress: { done: 3, total: 5 } }
 ]
+
+// 数据统计演示（全部虚构）：确定性的伪随机，学期中多、期末更多、寒暑假少；走与真实数据相同的汇总
+
+const seeded = (seed: number) => (): number => {
+  seed = (seed + 0x6d2b79f5) | 0
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+  return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32
+}
+
+/** 这一天的活跃程度：寒暑假 / 期中 / 期末周前后 */
+const activity = (date: string, term: number, finals: number, holiday: number): number => {
+  const month = Number(date.slice(5, 7))
+  if ([2, 7, 8].includes(month)) return holiday
+  return [1, 6, 11].includes(month) ? finals : term
+}
+
+export function mockLibraryUsage(): LibraryUsage {
+  const random = seeded(20261108)
+  const now = Date.now()
+  const bookings: UsageBooking[] = []
+  for (let back = 371; back >= 0; back--) {
+    const date = beijingDay(now - back * 864e5)
+    if (random() > activity(date, 0.38, 0.7, 0.06)) continue
+    const start = 8 + Math.floor(random() * 6)
+    const hours = 1 + Math.floor(random() * 10)
+    const end = Math.min(start + hours, 22)
+    const fate = random()
+    bookings.push({
+      begin: `${date} ${String(start).padStart(2, '0')}:30`,
+      end: `${date} ${String(end).padStart(2, '0')}:30`,
+      status: fate < 0.1 ? '已取消' : fate < 0.15 ? '已违约' : '已使用'
+    })
+  }
+  return summarizeLibrary(bookings, now)
+}
+
+const DEMO_HOMEWORK = ['第 4 章课后习题', '实验二报告', '期中小论文', '编程作业 3', '阅读札记']
+
+export function mockHomeworkUsage(): HomeworkUsage {
+  const random = seeded(61108)
+  const now = Date.now()
+  const submissions: UsageSubmission[] = []
+  for (let back = 371; back >= 0; back--) {
+    const date = beijingDay(now - back * 864e5)
+    if (random() > activity(date, 0.3, 0.42, 0.02)) continue
+    for (let n = 1 + Math.floor(random() ** 2 * 4); n > 0; n--) {
+      const at = Math.min(now, Date.parse(`${date}T${String(12 + Math.floor(random() * 11)).padStart(2, '0')}:00:00+08:00`))
+      const span = (5 + Math.floor(random() * 10)) * 864e5
+      // 大多数人临近截止才交；少数逾期
+      const position = random() < 0.07 ? 1.02 + random() * 0.3 : 1 - random() ** 1.8
+      const open = at - position * span
+      submissions.push({ activityId: `demo-${submissions.length}`, title: DEMO_HOMEWORK[submissions.length % DEMO_HOMEWORK.length], at, open, end: open + span })
+    }
+  }
+  return summarizeHomework(submissions, now)
+}
 
 /** 课程作业演示：待办里这门课的，加两项已交、一项已截止未交 */
 export function demoCourseHomework(courseName: string): Assignment[] {

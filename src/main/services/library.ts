@@ -292,6 +292,26 @@ export function parseBookings(data: unknown, oksign: Map<string, unknown> = new 
   })
 }
 
+/**
+ * 历史预约（数据统计用，只读）：逐页取到 since（YYYY-MM-DD）之前为止。分页参数照同济的同一系统 {page, limit: 50}（推测），
+ * 服务端可能把 limit 压小，所以不按「这页不满」判断到头，只看没有新记录或整页都早于 since。
+ * quiet：别处登录把这边顶掉时不重登，免得看一眼统计又把手机上的网页顶下去
+ */
+export async function getBookingHistory(since: string, known: (booking: LibBooking) => boolean = () => false): Promise<LibBooking[]> {
+  const seen = new Map<string, LibBooking>()
+  for (let page = 1; page <= 60; page++) {
+    const rows = parseBookings(await api('/api/Member/seat', { page, limit: 50 }, { quiet: true }))
+    const fresh = rows.filter((r) => !seen.has(r.id))
+    if (fresh.length === 0) break
+    for (const r of fresh) seen.set(r.id, r)
+    if (rows.every((r) => r.begin && r.begin.slice(0, 10) < since)) break
+    // 新的在前时（排序未实测，先看这一页），整页都已存好就不用往后翻了
+    const newestFirst = rows[0].begin >= rows[rows.length - 1].begin
+    if (newestFirst && rows.every(known)) break
+  }
+  return [...seen.values()]
+}
+
 export async function getBookings(): Promise<LibBooking[]> {
   const [records, cards] = await Promise.all([
     api('/api/Member/seat', { page: 1, limit: 20 }),

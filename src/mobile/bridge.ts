@@ -15,6 +15,7 @@ import { fetchAssignments, fetchCourseHomework, getAssignmentDetail, submitHomew
 import { fetchReplays, fetchLectures, listSlides, getPlaybackSource, getPlatformTranscript, reset as resetClassroom } from '../main/services/classroom'
 import { fetchCalendar } from '../main/services/calendar'
 import * as graduation from '../main/services/graduation'
+import * as usage from '../main/services/usage'
 import { resetXk, xkHandlers } from '../main/services/xkApi'
 import { demoXk } from '../main/services/demoXk'
 import { libraryHandlers, resetLibrary } from '../main/services/libraryApi'
@@ -22,7 +23,7 @@ import { demoLibrary } from '../main/services/demoLibrary'
 import { newsHandlers } from '../main/services/newsApi'
 import { demoNews } from '../main/services/demoNews'
 import * as pta from '../main/services/pta'
-import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
+import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockHomeworkUsage, mockLibraryUsage, mockReplays, mockSchedule, mockSlides, mockPlatformTranscript } from '../main/services/demo'
 
 // 安卓端的 window.zju：与桌面端 src/main/ipc.ts 同一套通道，services 原样复用（网络、cookie、凭据换成原生插件）。
 // 桌面专属的本地转写、导出、MCP 在这里不提供，界面按 platform 隐藏入口
@@ -37,6 +38,7 @@ function resetServices(): void {
   resetClassroom()
   eta.reset()
   graduation.reset()
+  usage.reset()
   resetXk()
   resetLibrary()
 }
@@ -134,6 +136,7 @@ const handlers: Handlers = {
   'auth:logout': async () => {
     await logout()
     await clearCredentials()
+    usage.clearHistory()
     resetServices()
     return SIGNED_OUT
   },
@@ -156,6 +159,8 @@ const handlers: Handlers = {
   'data:courseHomework': (courseName) => fetchCourseHomework(courseName),
   'data:lectures': (from, to) => fetchLectures(from, to),
   'data:graduation': () => graduation.fetchGraduation(),
+  'data:libraryUsage': () => usage.fetchLibraryUsage(),
+  'data:homeworkUsage': () => usage.fetchHomeworkUsage(getTodoState().ignored),
   'system:stats': async () => ({ cpu: 0, memory: { used: 0, total: 0 }, appMemory: 0 }),
 
   // 下到系统"下载/ZJU All in One"；返回的 content:// 地址交给 file:reveal / file:open 用其他应用打开
@@ -240,6 +245,8 @@ if (import.meta.env.VITE_ZJU_DEMO === '1') {
     'data:replays': async () => mock(mockReplays),
     'data:lectures': async () => mockReplays,
     'data:graduation': async () => mock(mockGraduation),
+    'data:libraryUsage': async () => mock(mockLibraryUsage()),
+    'data:homeworkUsage': async () => mock(mockHomeworkUsage()),
     'data:calendar': async () => demoCalendar(),
     'data:courseHomework': async (courseName: string) => demoCourseHomework(courseName),
     'replay:slides': async () => mockSlides,

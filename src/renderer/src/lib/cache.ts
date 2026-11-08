@@ -41,6 +41,12 @@ export function put(key: string, value: unknown, epoch: number, persist = false)
   }
 }
 
+/** 让这一项下次读取时重取（仍先显示旧值） */
+export function expire(key: string): void {
+  const entry = memory.get(key)
+  if (entry) entry.at = 0
+}
+
 export function clearCache(): void {
   memory.clear()
   try {

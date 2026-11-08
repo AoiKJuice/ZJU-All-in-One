@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 
 /** 细线图标按钮：24×24、线宽 1.8、圆头；悬停浅底主题色，aria-label / title 即文字说明 */
-export function IconButton({ label, onClick, className, children }: { label: string; onClick: () => void; className?: string; children: ReactNode }) {
+export function IconButton({ label, onClick, className, disabled, children }: { label: string; onClick: () => void; className?: string; disabled?: boolean; children: ReactNode }) {
   return (
-    <button className={`icon-btn${className ? ` ${className}` : ''}`} aria-label={label} title={label} onClick={onClick}>
+    <button className={`icon-btn${className ? ` ${className}` : ''}`} aria-label={label} title={label} disabled={disabled} onClick={onClick}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {children}
       </svg>

@@ -24,6 +24,7 @@ import type {
   TranscriptFormat,
   TranscriptSegment
 } from './types'
+import type { HomeworkUsage, LibraryUsage } from './usage'
 import { XK_CHANNELS, type XkApi } from './xk'
 import { FORMS_CHANNELS, type FormsApi } from './forms'
 import { LIBRARY_CHANNELS, type LibraryApi } from './library'
@@ -53,6 +54,10 @@ export interface ZjuApi extends XkApi, FormsApi, LibraryApi, NewsApi {
   'data:lectures': (from: string, to: string) => Promise<LectureReplay[]>
   /** 毕业自审：教务毕业资格自审树（必修课完成情况等）+ 第二课堂系统的二三四课堂、美育、劳育 */
   'data:graduation': () => Promise<DataResult<GraduationAudit>>
+  /** 数据统计：近一年每天的图书馆预约时长 */
+  'data:libraryUsage': () => Promise<DataResult<LibraryUsage>>
+  /** 数据统计：近一年每天提交的作业数与提交时点分布 */
+  'data:homeworkUsage': () => Promise<DataResult<HomeworkUsage>>
   /** 悬停转写进度时轮询 */
   'system:stats': () => Promise<SystemStats>
 
@@ -122,6 +127,8 @@ export const ZJU_CHANNELS = [
   'data:courseHomework',
   'data:lectures',
   'data:graduation',
+  'data:libraryUsage',
+  'data:homeworkUsage',
   'system:stats',
   'file:download',
   'file:reveal',

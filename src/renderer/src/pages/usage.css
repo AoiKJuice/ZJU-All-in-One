@@ -1,0 +1,243 @@
+/* 数据统计页：热图格子与柱子的颜色只用 --shu 的透明度档，叠在四种风格各自的面板底色上 */
+.page.usage-page {
+  /* 宽屏上热图要铺开，比其他页面的 80rem 宽 */
+  max-width: 120rem;
+}
+/* 周六周日的格子用另一种颜色：与主题色拉开色相，朱砂 / 求是红配青绿，求是蓝配琥珀 */
+.usage-list {
+  --heat-weekend: #1f7a6e;
+  --heat-gap: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+html[data-theme='dark'] .usage-list {
+  --heat-weekend: #6cc0b0;
+}
+html[data-accent='blue'] .usage-list {
+  --heat-weekend: #b7791f;
+}
+html[data-theme='dark'][data-accent='blue'] .usage-list {
+  --heat-weekend: #e0b060;
+}
+.usage-list[data-columns='2'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.usage-wide {
+  grid-column: 1 / -1;
+}
+.panel.usage-block {
+  /* 格子大小、柱高都按这一块的宽度算 */
+  container-type: inline-size;
+  padding: 1.125rem 1.25rem 1rem;
+}
+.usage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.usage-title {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.usage-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.usage-nav {
+  display: inline-flex;
+  flex: none;
+  gap: 0.125rem;
+}
+.usage-nav .icon-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+.usage-nav .icon-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+.panel.usage-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.125rem 1.25rem;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+.usage-summary b {
+  font-weight: 500;
+  color: var(--shu);
+}
+.usage-read {
+  display: inline-flex;
+  gap: 0.875rem;
+  min-height: 1.4em;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.usage-failed {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.usage-failed .quiet {
+  padding: 0.5rem 0;
+}
+
+/* 热图：--weeks 由 Usage.tsx 按宽度选（一年 / 三个月 / 一个月），格子是铺满宽度的正方形 */
+.usage-heat {
+  /* 星期列 1.25rem + 间距 0.5rem，其余按周数均分 */
+  --cell: calc((100cqw - 1.75rem - (var(--weeks) - 1) * var(--heat-gap)) / var(--weeks));
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  column-gap: 0.5rem;
+}
+.usage-weekdays {
+  display: grid;
+  /* 第一行与月份同高 */
+  grid-template-rows: 1.375rem repeat(7, var(--cell));
+  row-gap: var(--heat-gap);
+  align-content: start;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--ink-3);
+}
+.usage-weekdays > span {
+  display: flex;
+  align-items: center;
+}
+.usage-months,
+.usage-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--weeks), var(--cell));
+  column-gap: var(--heat-gap);
+}
+.usage-months {
+  height: 1.375rem;
+  margin-bottom: var(--heat-gap);
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.usage-cells {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, var(--cell));
+  row-gap: var(--heat-gap);
+}
+.usage-cells > i,
+.usage-legend > i {
+  display: block;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.usage-cells > i:hover {
+  outline: 1px solid var(--ink-2);
+}
+/* 第一格是周一，每 7 格的第 6、7 个就是周六、周日 */
+.usage-cells > i:is(:nth-child(7n + 6), :nth-child(7n)) {
+  --heat: var(--heat-weekend);
+  /* 同样的透明度下周末色显得淡，低档位要压得住周末空格的底色 */
+  --heat-1: 50%;
+  --heat-2: 66%;
+  --heat-3: 84%;
+}
+.usage-cells > i:is(:nth-child(7n + 6), :nth-child(7n))[data-l='0'] {
+  background: color-mix(in srgb, var(--heat-weekend) 12%, transparent);
+}
+:is(.usage-cells, .usage-legend) > i[data-l='1'] {
+  background: color-mix(in srgb, var(--heat, var(--shu)) var(--heat-1, 30%), transparent);
+}
+:is(.usage-cells, .usage-legend) > i[data-l='2'] {
+  background: color-mix(in srgb, var(--heat, var(--shu)) var(--heat-2, 52%), transparent);
+}
+:is(.usage-cells, .usage-legend) > i[data-l='3'] {
+  background: color-mix(in srgb, var(--heat, var(--shu)) var(--heat-3, 76%), transparent);
+}
+:is(.usage-cells, .usage-legend) > i[data-l='4'] {
+  background: var(--heat, var(--shu));
+}
+.usage-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--heat-gap);
+  margin-top: 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--ink-3);
+}
+.usage-legend > i {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0.1875rem;
+}
+.usage-legend > i:first-of-type {
+  margin-left: 0.25rem;
+}
+.usage-legend > i:last-of-type {
+  margin-right: 0.25rem;
+}
+
+/* 提交时点：十档 + 逾期一列，最后一列隔开 */
+.usage-bars,
+.usage-axis {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr)) minmax(0, 1.5fr);
+  column-gap: 2px;
+}
+.usage-bars {
+  height: clamp(6rem, 14cqw, 11rem);
+}
+.usage-bar {
+  display: flex;
+  align-items: flex-end;
+}
+.usage-bar[data-late] {
+  padding-left: 0.75rem;
+}
+.usage-bar > i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--shu) 42%, transparent);
+  transition: background-color calc(0.2s * var(--speed, 1)) var(--ease);
+}
+.usage-bar:hover > i {
+  background: color-mix(in srgb, var(--shu) 70%, transparent);
+}
+.usage-bar > i[data-median] {
+  background: var(--shu);
+}
+.usage-bar[data-late] > i {
+  background: var(--ink-3);
+}
+.usage-bar > i[data-zero] {
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.usage-axis {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--ink-3);
+}
+.usage-axis > span {
+  white-space: nowrap;
+  grid-row: 1;
+}
+.usage-axis-late {
+  grid-column: 11;
+  padding-left: 0.75rem;
+}

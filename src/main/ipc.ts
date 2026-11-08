@@ -45,6 +45,7 @@ import {
 } from './services/classroom'
 import { fetchCalendar } from './services/calendar'
 import * as graduation from './services/graduation'
+import * as usage from './services/usage'
 import { resetXk } from './services/xkApi'
 import { xkChannels } from './xkIpc'
 import { resetLibrary } from './services/libraryApi'
@@ -56,7 +57,7 @@ import { isTranscriptStale, transcribe, readTranscript } from './asr/whisper'
 import { logDiagnostic } from './diagnostics'
 import { exportSlidesPdf, writeTranscript } from './export'
 import { downloadToFile, fetchBytes } from './download'
-import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockReplays, mockSchedule, mockSlides, mockTranscript, mockPlatformTranscript } from './services/demo'
+import { demoCourseHomework, demoDetail, demoPta, demoRetract, demoSubmit, mock, mockAssignments, mockExams, mockGraduation, mockHomeworkUsage, mockLibraryUsage, mockReplays, mockSchedule, mockSlides, mockTranscript, mockPlatformTranscript } from './services/demo'
 
 type Handlers = {
   [K in ZjuChannel]: (
@@ -71,6 +72,7 @@ function resetServices(): void {
   resetClassroom()
   eta.reset()
   graduation.reset()
+  usage.reset()
   resetXk()
   resetLibrary()
 }
@@ -170,6 +172,7 @@ const handlers: Handlers = {
   'auth:logout': async () => {
     await logout()
     await clearCredentials()
+    usage.clearHistory()
     resetServices()
     return SIGNED_OUT
   },
@@ -192,6 +195,8 @@ const handlers: Handlers = {
   'data:courseHomework': (_win, courseName) => fetchCourseHomework(courseName),
   'data:lectures': (_win, from, to) => fetchLectures(from, to),
   'data:graduation': () => graduation.fetchGraduation(),
+  'data:libraryUsage': () => usage.fetchLibraryUsage(),
+  'data:homeworkUsage': () => usage.fetchHomeworkUsage(getTodoState().ignored),
   'system:stats': async () => getSystemStats(),
 
   'file:download': async (win, url, name) => {
@@ -323,6 +328,8 @@ if (process.env['ZJU_DEMO'] === '1') {
     'data:calendar': () => fetchCalendar(),
     'data:lectures': async () => mockReplays,
     'data:graduation': async () => mock(mockGraduation),
+    'data:libraryUsage': async () => mock(mockLibraryUsage()),
+    'data:homeworkUsage': async () => mock(mockHomeworkUsage()),
     'data:courseHomework': async (_win, courseName) => demoCourseHomework(courseName),
     'replay:slides': async () => mockSlides,
     'replay:transcript': async () => mockTranscript,

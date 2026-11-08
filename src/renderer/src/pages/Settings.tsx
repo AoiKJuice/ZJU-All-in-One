@@ -24,9 +24,9 @@ const MCP_TOOLS: { id: McpToolGroup; label: string }[] = [
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^.*Error: /, '')
 
-/** 设置：按 外观 / 待办 / 账号 / 本地 Agent 分组，每组一列细线条目 */
+/** 设置：按 外观 / 待办 / 账号 / 数据统计 / 本地 Agent 分组 */
 export function Settings() {
-  const { settings, setSetting, todos, setRemind } = useApp()
+  const { settings, setSetting, todos, setRemind, go } = useApp()
 
   return (
     <div className="page">
@@ -106,8 +106,17 @@ export function Settings() {
           </Section>
         </Reveal>
 
+        <Reveal i={3} flat>
+          <button className="panel settings-entry" onClick={() => go('usage')}>
+            <span className="section-title">数据统计</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9.5 6l6 6-6 6" />
+            </svg>
+          </button>
+        </Reveal>
+
         {!MOBILE && (
-          <Reveal i={3} flat>
+          <Reveal i={4} flat>
             <Section title="本地 Agent">
               <Mcp />
             </Section>
@@ -311,11 +320,13 @@ function Mcp() {
             )}
           </Row>
           <Row label="允许">
-            {MCP_TOOLS.map((t) => (
-              <Option key={t.id} multi active={mcp.tools[t.id]} onClick={() => void set({ tools: { [t.id]: !mcp.tools[t.id] } })}>
-                {t.label}
-              </Option>
-            ))}
+            <span className="check-list">
+              {MCP_TOOLS.map((t) => (
+                <CheckOption key={t.id} active={mcp.tools[t.id]} onClick={() => void set({ tools: { [t.id]: !mcp.tools[t.id] } })}>
+                  {t.label}
+                </CheckOption>
+              ))}
+            </span>
           </Row>
         </>
       )}
@@ -340,18 +351,32 @@ function Row({ label, flow, children }: { label: string; flow?: boolean; childre
   return (
     <li className="row settings-row">
       <span className="settings-label">{label}</span>
-      <span className={`flex flex-wrap items-center gap-x-2 gap-y-2${flow ? ' settings-flow' : ''}`}>
+      <span className={`flex flex-wrap items-center gap-x-2 gap-y-2 ${flow ? 'settings-flow' : ''}`}>
         <RowGroup.Provider value={label}>{children}</RowGroup.Provider>
       </span>
     </li>
   )
 }
 
-function Option({ active, onClick, multi, children }: { active: boolean; onClick: () => void; multi?: boolean; children: ReactNode }) {
+function Option({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   const group = useContext(RowGroup)
   return (
-    <Choice group={`settings-${group}`} active={active} multi={multi} onClick={onClick} className="opt">
+    <Choice group={`settings-${group}`} active={active} onClick={onClick} className="opt">
       {children}
     </Choice>
+  )
+}
+
+/** 可多选的一项：带勾的方框，看得出是控件、看得出选没选（用户不要拿几个字当选择框） */
+function CheckOption({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className="check-opt" role="checkbox" aria-checked={active} data-on={active || undefined} onClick={onClick}>
+      <span className="check-box" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
+      </span>
+      {children}
+    </button>
   )
 }

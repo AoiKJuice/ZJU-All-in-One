@@ -7,6 +7,7 @@ import { Schedule } from './pages/Schedule'
 import { Replay } from './pages/Replay'
 import { Settings } from './pages/Settings'
 import { Tools } from './pages/Tools'
+import { Usage } from './pages/Usage'
 import { AssignmentSheet } from './components/AssignmentSheet'
 import { CourseSheet } from './components/CourseSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -25,7 +26,8 @@ const PAGES: Record<PageId, ComponentType> = {
   schedule: Schedule,
   replay: Replay,
   tools: Tools,
-  settings: Settings
+  settings: Settings,
+  usage: Usage
 }
 
 export function App() {

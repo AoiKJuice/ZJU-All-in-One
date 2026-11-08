@@ -1,9 +1,10 @@
+import { expire } from '@renderer/lib/cache'
 import { create } from 'zustand'
 import type { Assignment, AuthState, ConfirmRequest, CourseSession, LectureReplay, TaskProgress, TodoState, TranscriptSegment } from '@shared/types'
 import type { Theme } from './lib/theme'
 import { applySettings, initialSettings, type Settings } from './lib/settings'
 
-export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings'
+export type PageId = 'home' | 'schedule' | 'replay' | 'tools' | 'settings' | 'usage'
 /** 工具页里打开的工具（见 tools/index.ts） */
 export type ToolId = 'graduation' | 'course' | 'forms' | 'library' | 'news'
 /** 应用内预览的对象：本机文件路径，或校内文件 */
@@ -188,6 +189,8 @@ export const useApp = create<AppStore>((set, get) => {
         todos: { ...s.todos, ignored: ignored ? [...s.todos.ignored, id] : s.todos.ignored.filter((x) => x !== id) }
       }))
       set({ todos: await window.zju['todo:ignore'](id, ignored) })
+      // 被忽略的作业不计入数据统计
+      expire('data:homeworkUsage')
       // 忽略容易点错，给一次撤销
       if (ignored) get().notify('已忽略', { label: '撤销', run: () => void get().ignoreTodo(id, false) })
     },
